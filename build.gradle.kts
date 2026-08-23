@@ -1,299 +1,66 @@
 plugins {
-    id("java")
-    id("com.gradleup.shadow") version "9.4.1"
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.21" // paperweight // Check for new versions at https://plugins.gradle.org/plugin/io.papermc.paperweight.userdev
-    id("maven-publish")
-    id("signing") // Add ./gradlew signArchives
-    id("xyz.jpenilla.run-paper") version "3.0.2" // Paper server for testing/hotloading JVM
-    id("org.sonarqube") version "7.3.0.8198" // Advanced code quality checks
-    id("io.papermc.hangar-publish-plugin") version "0.1.4"
-    id("com.modrinth.minotaur") version "2.+" // cf https://github.com/modrinth/minotaur
-    id("org.jreleaser") version "1.24.0"
+    base
+    id("org.sonarqube") version "7.3.0.8198"
 }
 
-group = "fr.formiko.mc.underilla"
+group = "com.kntrel.mc.underilla"
 version = "2.3.4"
-description="Generate vanilla cave in custom world."
-val mainMinecraftVersion = "1.21.11" // 26.1.2
-val supportedMinecraftVersions = "1.21.5 - 26.1.2"
-val voidWorldGeneratorVersion = "1.3.12"
-val chunkyVersion = "1.4.55"
+description = "Generate vanilla caves in custom worlds."
 
-repositories {
-    mavenLocal()
-    mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
-    maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
-    maven("https://oss.sonatype.org/content/groups/public/")
-    maven("https://jitpack.io")
-    maven("https://repo.codemc.io/repository/maven-public/") // For Chunky
-}
+extra["mainMinecraftVersion"] = "1.21.11"
+extra["supportedMinecraftVersions"] = "1.21.5 - 26.1.2"
+extra["voidWorldGeneratorVersion"] = "1.3.12"
+extra["chunkyVersion"] = "1.4.55"
 
+allprojects {
+    group = rootProject.group
+    version = rootProject.version
 
-dependencies {
-    // compileOnly("io.papermc.paper:paper-api:$mainMinecraftVersion-R0.1-SNAPSHOT") // without paperweight
-    paperweight.paperDevBundle("$mainMinecraftVersion-R0.1-SNAPSHOT")
-    // paperweight.paperDevBundle("$mainMinecraftVersion.build.+")
-    compileOnly("net.kyori:adventure-text-serializer-ansi:4.17.0") // TODO to remove when paper weight latest version will be fixed. It's supposed to be in paperweight.
-
-    implementation("com.github.FormikoLudo:Utils:0.0.9")
-    implementation("org.bstats:bstats-bukkit:3.1.0")
-    implementation("com.github.HydrolienF:KntNBT:2.2.2")
-    compileOnly("fr.formiko.mc.voidworldgenerator:voidworldgenerator:$voidWorldGeneratorVersion")
-    compileOnly("org.popcraft:chunky-common:$chunkyVersion")
-}
-
-// tasks.build.dependsOn tasks.reobfJar // paperweight
-// tasks.build.dependsOn tasks.shadowJar // without paperweight
-
-java {
-    // Configure the java toolchain. This allows gradle to auto-provision JDK 21 on systems that only have JDK 8 installed for example.
-    toolchain.languageVersion.set(JavaLanguageVersion.of(21)) // 25
-    withJavadocJar()
-    withSourcesJar()
-}
-
-
-tasks {
-    shadowJar {
-        minimize()
-        val prefix = "${project.group}.lib"
-        sequenceOf(
-            "co.aikar",
-            "org.bstats",
-            // "fr.formiko.mc.biomeutils",
-            "fr.formiko.utils",
-        ).forEach { pkg ->
-            relocate(pkg, "$prefix.$pkg")
-        }
-        archiveFileName.set("${project.name}-${project.version}.jar")
-        exclude("javax/**")
-        exclude("assets/**")
-        exclude("com/google/**")
-        exclude("org/checkerframework/**")
-        exclude("org/apache/**")
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven("https://repo.papermc.io/repository/maven-public/")
+        maven("https://hub.spigotmc.org/nexus/content/repositories/snapshots/")
+        maven("https://oss.sonatype.org/content/groups/public/")
+        maven("https://jitpack.io")
+        maven("https://repo.codemc.io/repository/maven-public/")
     }
+}
 
-    assemble {
-        dependsOn(shadowJar) // Not needed, probably because reobfJar depends on shadowJar
-        // dependsOn(reobfJar)
-    }
-
-    processResources {
-        val props = mapOf(
-            "name" to project.name,
-            "version" to project.version,
-            "description" to project.description,
-            "apiVersion" to "1.21.5",
-            "group" to project.group,
-            "voidWorldGeneratorVersion" to voidWorldGeneratorVersion,
-            "chunkyVersion" to chunkyVersion
-        )
-        inputs.properties(props)
-        filesMatching(listOf("paper-plugin.yml", "config.yml")) {
-            expand(props)
+subprojects {
+    plugins.withId("java") {
+        extensions.configure<JavaPluginExtension> {
+            toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+            withJavadocJar()
+            withSourcesJar()
         }
     }
-    runServer {
-        // Configure the Minecraft version for our task.
-        // This is the only required configuration besides applying the plugin.
-        // Your plugin's jar (or shadowJar if present) will be used automatically.
-        minecraftVersion(mainMinecraftVersion)
-        // https://hangar.papermc.io/pop4959/Chunky
-        // downloadPlugins {
-        //     hangar("Chunky", "$chunkyVersion")
-        //     github("HydrolienF", "VoidWorldGenerator", "$voidWorldGeneratorVersion", "VoidWorldGenerator-${voidWorldGeneratorVersion}.jar")
-        // }
-    }
 }
 
-// Break Yamlizer.
-// paperweight.reobfArtifactConfiguration = io.papermc.paperweight.userdev.ReobfArtifactConfiguration.MOJANG_PRODUCTION
+tasks.named("assemble") {
+    dependsOn(":underilla-core:assemble", ":underilla-paper:assemble")
+}
 
+tasks.named("check") {
+    dependsOn(":underilla-core:check", ":underilla-paper:check")
+}
 
 tasks.register("echoVersion") {
     doLast {
-        println("${project.version}")
+        println(project.version)
     }
 }
 
 tasks.register("echoReleaseName") {
     doLast {
-        println("${project.version} [${supportedMinecraftVersions}]")
-    }
-}
-
-val extractChangelog = tasks.register("extractChangelog") {
-    group = "documentation"
-    description = "Extracts the changelog for the current project version from CHANGELOG.md, including the version header."
-
-    val changelog = project.objects.property(String::class)
-    outputs.upToDateWhen { false }
-
-    doLast {
-        val version = project.version.toString()
-        val changelogFile = project.file("CHANGELOG.md")
-
-        if (!changelogFile.exists()) {
-            println("CHANGELOG.md not found.")
-            changelog.set("No changelog found.")
-            return@doLast
-        }
-
-        val lines = changelogFile.readLines()
-        val entries = mutableListOf<String>()
-        var foundVersion = false
-
-        for (line in lines) {
-            when {
-                // Include the version line itself
-                line.trim().equals("# $version", ignoreCase = true) -> {
-                    foundVersion = true
-                    entries.add(line)
-                }
-                // Stop collecting at the next version header
-                foundVersion && line.trim().startsWith("# ") -> break
-                // Collect lines after the version header
-                foundVersion -> entries.add(line)
-            }
-        }
-
-        val result = if (entries.isEmpty()) {
-            "Update to $version."
-        } else {
-            entries.joinToString("\n").trim()
-        }
-
-        // println("Changelog for version $version:\n$result")
-        changelog.set(result)
-    }
-
-    // Make changelog accessible from other tasks
-    extensions.add("changelog", changelog)
-}
-
-tasks.register("echoLatestVersionChangelog") {
-    group = "documentation"
-    description = "Displays the latest version change."
-
-    dependsOn(tasks.named("extractChangelog"))
-
-    doLast {
-        println((extractChangelog.get().extensions.getByName("changelog") as Property<String>).get())
-    }
-}
-
-val versionString: String = version as String
-val isRelease: Boolean = !versionString.contains("SNAPSHOT")
-
-hangarPublish { // ./gradlew publishPluginPublicationToHangar
-    publications.register("plugin") {
-        version.set(project.version as String)
-        channel.set(if (isRelease) "Release" else "Snapshot")
-        id.set(project.name)
-        apiKey.set(System.getenv("HANGAR_API_TOKEN"))
-        changelog.set(
-            extractChangelog.map {
-                (it.extensions.getByName("changelog") as Property<String>).get()
-            }
-        )
-        platforms {
-            register(io.papermc.hangarpublishplugin.model.Platforms.PAPER) {
-                url = "https://github.com/HydrolienF/"+project.name+"/releases/download/"+versionString+"/"+project.name+"-"+versionString+".jar"
-
-                // Set platform versions from gradle.properties file
-                val versions: List<String> = supportedMinecraftVersions.replace(" ", "").split(",")
-                platformVersions.set(versions)
-            }
-        }
+        println("${project.version} [${extra["supportedMinecraftVersions"]}]")
     }
 }
 
 sonar {
-  properties {
-    property("sonar.projectKey", project.name)
-    property("sonar.projectName", project.name)
-    property("sonar.host.url", "https://mvndisonar.formiko.fr")
-  }
-}
-
-publishing {
-  publications {
-    create<MavenPublication>("mavenJava") {
-      from(components["java"])
-
-      artifactId = project.name.lowercase()
-      pom {
-        name.set(project.name.lowercase())
-        packaging = "jar"
-        url.set("https://github.com/HydrolienF/${project.name}")
-        inceptionYear.set("2024")
-        description = project.description
-        licenses {
-          license {
-            name.set("MIT license")
-            url.set("https://github.com/HydrolienF/${project.name}/blob/master/LICENSE.md")
-          }
-        }
-        developers {
-          developer {
-            id.set("hydrolienf")
-            name.set("HydrolienF")
-            email.set("hydrolien.f@gmail.com")
-          }
-        }
-        scm {
-          connection.set("scm:git:git@github.com:HydrolienF/${project.name}.git")
-          developerConnection.set("scm:git:ssh:git@github.com:HydrolienF/${project.name}.git")
-          url.set("https://github.com/HydrolienF/${project.name}")
-        }
-      }
+    properties {
+        property("sonar.projectKey", "Underilla")
+        property("sonar.projectName", "Underilla")
+        property("sonar.host.url", "https://mvndisonar.formiko.fr")
     }
-  }
-  repositories {
-    maven {
-        // url = layout.buildDirectory.dir("staging-deploy").get().asFile.toURI()
-        name = "PreDeploy"
-        url = uri(layout.buildDirectory.dir("pre-deploy"))
-
-    }
-  }
-}
-
-jreleaser {
-    project {
-        name.set("${project.name}")
-        copyright.set("Hydrolien")
-        description.set(findProperty("description")?.toString() ?: "Default description")
-        website.set("https://github.com/HydrolienF/${project.name}")
-    }
-
-    deploy {
-        maven {
-            mavenCentral {
-                create("sonatype") {
-                    active.set(org.jreleaser.model.Active.ALWAYS)
-                    url.set("https://central.sonatype.com/api/v1/publisher")
-                    username.set(findProperty("ossrhUsername")?.toString()
-                        ?: System.getenv("OSSRH_USERNAME"))
-                    password.set(findProperty("ossrhPassword")?.toString()
-                        ?: System.getenv("OSSRH_PASSWORD"))
-                    stagingRepository("build/pre-deploy")  // call as function
-
-                    applyMavenCentralRules = false
-                }
-            }
-        }
-    }
-
-    release {
-        github {
-            enabled.set(false)
-        }
-    }
-}
-
-signing {
-    useGpgCmd() // uses local gpg executable
-    sign(publishing.publications["mavenJava"])
 }
