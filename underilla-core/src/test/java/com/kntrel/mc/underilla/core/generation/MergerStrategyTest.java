@@ -25,9 +25,10 @@ import java.util.Set;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.Test;
 
-class MergerStrategyTest {
+class PatcherStrategyTest {
 
     private static final TestBlock AIR = new TestBlock("minecraft:air", false, false, true);
+    private static final TestBlock WATER = new TestBlock("minecraft:water", false, true, false);
     private static final TestBlock STONE = new TestBlock("minecraft:stone", true, false, false);
     private static final TestBlock LEAVES = new TestBlock("minecraft:oak_leaves", true, false, false);
     private static final TestBlock REFERENCE = new TestBlock("minecraft:reference", true, false, false);
@@ -41,29 +42,43 @@ class MergerStrategyTest {
     };
 
     @Test
-    void absoluteMergerUsesOneFixedBoundary() {
+    void boundaryPredicatesHaveExplicitEqualitySemantics() {
+        Boundary boundary = new AbsoluteBoundary(10);
+
+        assertTrue(boundary.isAbove(0, 11, 0));
+        assertFalse(boundary.isAbove(0, 10, 0));
+        assertTrue(boundary.isAboveEquals(0, 10, 0));
+        assertTrue(boundary.isBelow(0, 9, 0));
+        assertFalse(boundary.isBelow(0, 10, 0));
+        assertTrue(boundary.isBelowEquals(0, 10, 0));
+    }
+
+    @Test
+    void absolutePatcherUsesOneFixedBoundary() {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 8;
         config.maximumCaveY = 2;
         GenerationContext context = context(config);
-        Merger merger = new AbsoluteMerger(context);
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 5, REFERENCE);
+        FakeWorldReader referenceWorld = new FakeWorldReader();
+        referenceWorld.putChunk(referenceChunk);
+        Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
+        Patcher patcher = new SurfacePatcher(referenceWorld, boundary, context);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
-        merger.mergeLand(referenceChunk, destination, null);
+        patcher.patch(destination);
 
         assertSame(GENERATED, destination.getBlock(0, 2, 0));
         assertSame(REFERENCE, destination.getBlock(0, 3, 0));
         assertSame(REFERENCE, destination.getBlock(0, 4, 0));
         assertSame(AIR, destination.getBlock(0, 5, 0));
-        assertTrue(merger.isUnderground(100, 2, -100));
-        assertFalse(merger.isUnderground(100, 3, -100));
-        assertTrue(merger.shouldGenerateNoise());
+        assertTrue(boundary.isBelowEquals(100, 2, -100));
+        assertFalse(boundary.isBelowEquals(100, 3, -100));
     }
 
     @Test
-    void surfaceMergerCalculatesAndOwnsThePerColumnBoundary() {
+    void surfaceBoundaryCalculatesAndOwnsThePerColumnBoundary() {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 8;
@@ -76,14 +91,14 @@ class MergerStrategyTest {
         world.putBlock(0, 5, 0, LEAVES);
         world.putBiome(0, config.maximumY, 0, "minecraft:plains");
 
-        Merger merger = new SurfaceMerger(world, context(config));
+        Boundary boundary = heightBoundary(world, config);
 
-        assertTrue(merger.isUnderground(0, 2, 0));
-        assertFalse(merger.isUnderground(0, 3, 0));
+        assertTrue(boundary.isBelowEquals(0, 2, 0));
+        assertFalse(boundary.isBelowEquals(0, 3, 0));
     }
 
     @Test
-    void surfaceMergerPreservesTheWholeReferenceColumnForConfiguredBiomes() {
+    void surfaceBoundaryPreservesTheWholeReferenceColumnForConfiguredBiomes() {
         TestConfig config = new TestConfig();
         config.minimumY = -64;
         config.maximumY = 320;
@@ -92,21 +107,50 @@ class MergerStrategyTest {
         FakeWorldReader world = new FakeWorldReader();
         world.putBiome(12, config.maximumY, -4, "example:preserved");
 
-        Merger merger = new SurfaceMerger(world, context(config));
+        Boundary boundary = heightBoundary(world, config);
 
-        assertTrue(merger.isUnderground(12, -64, -4));
-        assertFalse(merger.isUnderground(12, -63, -4));
+        assertTrue(boundary.isBelowEquals(12, -64, -4));
+        assertFalse(boundary.isBelowEquals(12, -63, -4));
     }
 
     @Test
-    void referenceOnlyMergerDisablesGeneratedNoise() {
+    void referenceOnlyPlanDisablesGeneratedNoise() {
         TestConfig config = new TestConfig();
         config.minimumY = -64;
-        Merger merger = new ReferenceOnlyMerger(context(config));
+        GenerationContext context = context(config);
+        Boundary boundary = new AbsoluteBoundary(config.minimumY);
+        FakeWorldReader referenceWorld = new FakeWorldReader();
+        Patcher terrainPatcher = new SurfacePatcher(referenceWorld, boundary, context);
+        PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, boundary, false);
 
-        assertFalse(merger.shouldGenerateNoise());
-        assertTrue(merger.isUnderground(0, -64, 0));
-        assertFalse(merger.isUnderground(0, -63, 0));
+        assertFalse(plan.generateNoise());
+        assertTrue(boundary.isBelowEquals(0, -64, 0));
+        assertFalse(boundary.isBelowEquals(0, -63, 0));
+    }
+
+    @Test
+    void liquidPatcherOnlyRestoresLiquidsAboveTheBoundary() {
+        TestConfig config = new TestConfig();
+        config.minimumY = 0;
+        config.maximumY = 8;
+        config.maximumCaveY = 2;
+        GenerationContext context = context(config);
+        Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
+        FakeChunkReader surfaceChunk = FakeChunkReader.filled(0, 0, 5, REFERENCE);
+        surfaceChunk.putBlock(0, 2, 0, WATER);
+        surfaceChunk.putBlock(0, 3, 0, WATER);
+        FakeWorldReader surfaceWorld = new FakeWorldReader();
+        surfaceWorld.putChunk(surfaceChunk);
+        TestBlock boundaryBlock = new TestBlock("minecraft:boundary_target", true, false, false);
+        TestBlock aboveBlock = new TestBlock("minecraft:above_target", true, false, false);
+        FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
+        destination.setBlock(0, 2, 0, boundaryBlock);
+        destination.setBlock(0, 3, 0, aboveBlock);
+
+        new LiquidPatcher(surfaceWorld, boundary, context).patch(destination);
+
+        assertFalse(boundaryBlock.isWaterlogged());
+        assertTrue(aboveBlock.isWaterlogged());
     }
 
     private static GenerationContext context(TestConfig config) {
@@ -118,6 +162,13 @@ class MergerStrategyTest {
             public Block create(String name) { return new TestBlock(name, true, false, false); }
         };
         return new GenerationContext(config, blockFactory, NO_OP_LOGGER);
+    }
+
+    private static Boundary heightBoundary(WorldReader surfaceWorld, TestConfig config) {
+        return new HeightBoundary(surfaceWorld, AIR,
+                config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
+                config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
+                config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation);
     }
 
     private static final class TestConfig implements GenerationConfig {
@@ -202,6 +253,8 @@ class MergerStrategyTest {
         @Override
         public void waterlog() { waterlogged = true; }
 
+        boolean isWaterlogged() { return waterlogged; }
+
         @Override
         public String getName() { return name; }
 
@@ -235,6 +288,8 @@ class MergerStrategyTest {
             }
             return reader;
         }
+
+        void putBlock(int x, int y, int z, Block block) { blocks.put(new Position(x, y, z), block); }
 
         @Override
         public int getX() { return chunkX; }
@@ -286,6 +341,8 @@ class MergerStrategyTest {
         void putBlock(int x, int y, int z, Block block) { blocks.put(new Position(x, y, z), block); }
 
         void putBiome(int x, int y, int z, String name) { biomes.put(new Position(x, y, z), () -> name); }
+
+        void putChunk(ChunkReader chunk) { chunks.put(new Position(chunk.getX(), 0, chunk.getZ()), chunk); }
 
         @Override
         public Optional<Block> blockAt(int x, int y, int z) { return Optional.of(blocks.getOrDefault(new Position(x, y, z), AIR)); }

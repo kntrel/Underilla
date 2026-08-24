@@ -7,19 +7,25 @@ import org.bukkit.block.data.BlockData;
 public class BukkitChunkData implements ChunkData {
 
     // FIELDS
-    private org.bukkit.generator.ChunkGenerator.ChunkData chunkData;
+    private final org.bukkit.generator.ChunkGenerator.ChunkData chunkData;
+    private final int chunkX;
+    private final int chunkZ;
 
 
     // CONSTRUCTORS
-    public BukkitChunkData(org.bukkit.generator.ChunkGenerator.ChunkData chunkData) { this.chunkData = chunkData; }
+    public BukkitChunkData(org.bukkit.generator.ChunkGenerator.ChunkData chunkData, int chunkX, int chunkZ) {
+        this.chunkData = chunkData;
+        this.chunkX = chunkX;
+        this.chunkZ = chunkZ;
+    }
 
 
     @Override
     public int getMinHeight() { return this.chunkData.getMinHeight(); }
     @Override
-    public int getChunkX() { throw new UnsupportedOperationException(); }
+    public int getChunkX() { return chunkX; }
     @Override
-    public int getChunkZ() { throw new UnsupportedOperationException(); }
+    public int getChunkZ() { return chunkZ; }
 
     @Override
     public Block getBlock(int x, int y, int z) {

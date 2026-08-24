@@ -2,14 +2,14 @@ package com.kntrel.mc.underilla.paper;
 
 import com.kntrel.mc.underilla.core.generation.Generator;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
-import com.kntrel.mc.underilla.core.generation.Merger;
+import com.kntrel.mc.underilla.core.generation.PatchingPlan;
 import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocksTask;
 import com.kntrel.mc.underilla.paper.cleaning.CleanEntitiesTask;
 import com.kntrel.mc.underilla.paper.cleaning.FollowableProgressTask;
 import com.kntrel.mc.underilla.paper.generation.GeneratorAccessor;
-import com.kntrel.mc.underilla.paper.generation.MergerFactory;
+import com.kntrel.mc.underilla.paper.generation.PatcherFactory;
 import com.kntrel.mc.underilla.paper.generation.UnderillaChunkGenerator;
 import com.kntrel.mc.underilla.paper.impl.BukkitBlockFactory;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldReader;
@@ -25,6 +25,7 @@ import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.util.EnumMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -75,10 +76,23 @@ public final class Underilla extends JavaPlugin {
             return super.getDefaultWorldGenerator(worldName, id);
         }
         ChunkGenerator outOfTheSurfaceWorldGenerator = GeneratorAccessor.getOutOfTheSurfaceWorldGenerator(worldName, id);
-        Merger merger = MergerFactory.create(getUnderillaConfig().getString(StringKeys.STRATEGY), worldSurfaceReader, generationContext);
-        Generator generator = new Generator(worldSurfaceReader, merger, generationContext);
+        WorldReader cavesBlocksWorld = getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BLOCKS_FROM_CAVES_WORLD)
+                ? worldCavesReader
+                : null;
+        String configuredStrategy = getUnderillaConfig().getString(StringKeys.STRATEGY);
+        if (configuredStrategy == null) {
+            throw new IllegalArgumentException("Patch strategy must be configured");
+        }
+        PatchingPlan patchingPlan = switch (configuredStrategy.trim().toUpperCase(Locale.ROOT)) {
+            case "SURFACE" -> PatcherFactory.surface(worldSurfaceReader, cavesBlocksWorld, generationContext);
+            case "ABSOLUTE" -> PatcherFactory.absolute(worldSurfaceReader, cavesBlocksWorld, generationContext);
+            case "NONE" -> PatcherFactory.none(worldSurfaceReader, cavesBlocksWorld, generationContext);
+            default -> throw new IllegalArgumentException("Unknown patch strategy: " + configuredStrategy);
+        };
+        Generator generator = new Generator(worldSurfaceReader, patchingPlan, generationContext);
         info("Using Underilla as main world generator (with " + outOfTheSurfaceWorldGenerator + " as outOfTheSurfaceWorldGenerator)!");
-        return new UnderillaChunkGenerator(this.worldSurfaceReader, this.worldCavesReader, outOfTheSurfaceWorldGenerator, generator, merger);
+        return new UnderillaChunkGenerator(this.worldSurfaceReader, this.worldCavesReader, outOfTheSurfaceWorldGenerator,
+                generator, patchingPlan.boundary());
     }
 
     @Override

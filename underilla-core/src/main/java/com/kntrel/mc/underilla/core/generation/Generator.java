@@ -16,13 +16,13 @@ import java.util.function.Predicate;
 public class Generator {
 
     private final WorldReader worldSurfaceReader;
-    private final Merger merger;
+    private final PatchingPlan patchingPlan;
     private final GenerationContext context;
     public static final Map<String, Long> times = new ConcurrentHashMap<>();
 
-    public Generator(WorldReader worldSurfaceReader, Merger merger, GenerationContext context) {
+    public Generator(WorldReader worldSurfaceReader, PatchingPlan patchingPlan, GenerationContext context) {
         this.worldSurfaceReader = Objects.requireNonNull(worldSurfaceReader, "worldSurfaceReader");
-        this.merger = Objects.requireNonNull(merger, "merger");
+        this.patchingPlan = Objects.requireNonNull(patchingPlan, "patchingPlan");
         this.context = Objects.requireNonNull(context, "context");
     }
 
@@ -52,16 +52,16 @@ public class Generator {
         return y + 1;
     }
 
-    public void generateSurface(ChunkReader reader, ChunkData chunkData, ChunkReader cavesReader) {
-        this.merger.mergeLand(reader, chunkData, cavesReader);
+    public void patchTerrain(ChunkData chunkData) {
+        patchingPlan.terrainPatcher().patch(chunkData);
     }
 
-    public void reInsertLiquidsOverWorldSurface(WorldReader worldReader, ChunkData chunkData) {
-        merger.reInsertLiquids(worldReader, chunkData);
+    public void patchLiquids(ChunkData chunkData) {
+        patchingPlan.liquidPatcher().patch(chunkData);
     }
 
     public boolean shouldGenerateNoise(int chunkX, int chunkZ) {
-        return merger.shouldGenerateNoise();
+        return patchingPlan.generateNoise();
     }
 
     public boolean shouldGenerateSurface(int chunkX, int chunkZ) {

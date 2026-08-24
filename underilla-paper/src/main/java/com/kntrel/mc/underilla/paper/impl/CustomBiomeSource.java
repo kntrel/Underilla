@@ -1,6 +1,6 @@
 package com.kntrel.mc.underilla.paper.impl;
 
-import com.kntrel.mc.underilla.core.generation.Merger;
+import com.kntrel.mc.underilla.core.generation.Boundary;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
@@ -23,15 +23,15 @@ public class CustomBiomeSource {
     private BiomeProvider vanillaBiomeSource;
     private final WorldReader worldSurfaceReader;
     private final WorldReader worldCavesReader;
-    private final Merger merger;
+    private final Boundary boundary;
     private final Map<String, Long> biomesPlaced;
     private long lastInfoPrinted = 0;
     private long lastWarnningPrinted = 0;
 
-    public CustomBiomeSource(@Nonnull WorldReader worldSurfaceReader, @Nullable WorldReader worldCavesReader, Merger merger) {
+    public CustomBiomeSource(@Nonnull WorldReader worldSurfaceReader, @Nullable WorldReader worldCavesReader, Boundary boundary) {
         this.worldSurfaceReader = worldSurfaceReader;
         this.worldCavesReader = worldCavesReader;
-        this.merger = merger;
+        this.boundary = boundary;
         this.biomesPlaced = new ConcurrentHashMap<>();
     }
 
@@ -116,7 +116,7 @@ public class CustomBiomeSource {
             for (int i = 0; i < 4; i++) {
                 for (int j = 0; j < 4; j++) {
                     // If the block is over the merge limit, it's not under the surface.
-                    if (!merger.isUnderground(x + i, y, z + j)) {
+                    if (!boundary.isBelowEquals(x + i, y, z + j)) {
                         return false;
                     }
                 }

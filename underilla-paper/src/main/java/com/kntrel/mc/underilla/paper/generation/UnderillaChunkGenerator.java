@@ -1,9 +1,8 @@
 package com.kntrel.mc.underilla.paper.generation;
 
 import com.kntrel.mc.underilla.core.api.HeightMapType;
+import com.kntrel.mc.underilla.core.generation.Boundary;
 import com.kntrel.mc.underilla.core.generation.Generator;
-import com.kntrel.mc.underilla.core.generation.Merger;
-import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocks;
@@ -18,7 +17,6 @@ import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -46,7 +44,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
     // FIELDS
     private final Generator delegate;
-    private final Merger merger;
+    private final Boundary boundary;
     private final @Nonnull WorldReader worldSurfaceReader;
     private final @Nullable WorldReader worldCavesReader;
     private static CustomBiomeSource customBiomeSource;
@@ -55,12 +53,12 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
     // CONSTRUCTORS
     public UnderillaChunkGenerator(@Nonnull WorldReader worldSurfaceReader, @Nullable WorldReader worldCavesReader,
-            @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator, Generator delegate, Merger merger) {
+            @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator, Generator delegate, Boundary boundary) {
         this.worldSurfaceReader = worldSurfaceReader;
         this.worldCavesReader = worldCavesReader;
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
         this.delegate = delegate;
-        this.merger = merger;
+        this.boundary = boundary;
     }
 
 
@@ -86,7 +84,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         // if is a biome that should not be carved OR surface should not be preserved from carvers (== merge the world before).
         if (!Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey) || !Underilla
                 .getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            mergeSurfaceWorldAndCavesWorld(worldInfo, random, chunkX, chunkZ, chunkData);
+            patchTerrain(chunkX, chunkZ, chunkData);
         }
     }
 
@@ -102,22 +100,16 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         // if is a biome that should be carved and surface should be preserved from carvers (== merge the world after).
         if (Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey) && Underilla
                 .getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            mergeSurfaceWorldAndCavesWorld(worldInfo, random, chunkX, chunkZ, chunkData);
+            patchTerrain(chunkX, chunkZ, chunkData);
         }
     }
 
-    private void mergeSurfaceWorldAndCavesWorld(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
-            @NotNull ChunkData chunkData) {
-        Optional<ChunkReader> reader = this.worldSurfaceReader.readChunk(chunkX, chunkZ);
-        if (reader.isEmpty()) {
+    private void patchTerrain(int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
+        if (this.worldSurfaceReader.readChunk(chunkX, chunkZ).isEmpty()) {
             return;
         }
-        BukkitChunkData data = new BukkitChunkData(chunkData);
-        ChunkReader cavesReader = null;
-        if (this.worldCavesReader != null && Underilla.getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BLOCKS_FROM_CAVES_WORLD)) {
-            cavesReader = this.worldCavesReader.readChunk(chunkX, chunkZ).orElse(null);
-        }
-        this.delegate.generateSurface(reader.get(), data, cavesReader);
+        BukkitChunkData data = new BukkitChunkData(chunkData, chunkX, chunkZ);
+        this.delegate.patchTerrain(data);
     }
     private static String getBiomeKeyStringFromChunkCoordinates(@NotNull WorldInfo worldInfo, int chunkX, int chunkZ) {
         return Bukkit.getWorld(worldInfo.getUID()).getBiome(chunkX * Underilla.CHUNK_SIZE, 0, chunkZ * Underilla.CHUNK_SIZE).getKey()
@@ -128,7 +120,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     @Override
     public List<BlockPopulator> getDefaultPopulators(World world) {
         // Caves are vanilla generated, but they are carved underwater, this re-places the water blocks in case they were carved into.
-        return List.of(new Populator(this.worldSurfaceReader, this.delegate));
+        return List.of(new Populator(this.delegate));
     }
 
     @Override
@@ -236,13 +228,11 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     private static class Populator extends BlockPopulator {
 
         // FIELDS
-        private final WorldReader worldReader_;
         private final Generator generator_;
 
 
         // CONSTRUCTORS
-        public Populator(WorldReader reader, Generator generator) {
-            this.worldReader_ = reader;
+        public Populator(Generator generator) {
             this.generator_ = generator;
         }
 
@@ -261,7 +251,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
                     BukkitRegionChunkData chunkData = new BukkitRegionChunkData(limitedRegion, chunkX, chunkZ, worldInfo.getMinHeight(),
                             worldInfo.getMaxHeight());
-                    this.generator_.reInsertLiquidsOverWorldSurface(this.worldReader_, chunkData);
+                    this.generator_.patchLiquids(chunkData);
                 }
             }
 
@@ -280,7 +270,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
         private BiomeProviderFromFile(BiomeProvider outOfTheSurfaceWorldBiomeProdiver) {
             this.outOfTheSurfaceWorldBiomeProdiver = outOfTheSurfaceWorldBiomeProdiver;
-            customBiomeSource = new CustomBiomeSource(worldSurfaceReader, worldCavesReader, merger);
+            customBiomeSource = new CustomBiomeSource(worldSurfaceReader, worldCavesReader, boundary);
         }
 
         @Override
