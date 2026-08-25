@@ -89,10 +89,9 @@ public final class Underilla extends JavaPlugin {
             case "NONE" -> PatcherFactory.none(worldSurfaceReader, cavesBlocksWorld, generationContext);
             default -> throw new IllegalArgumentException("Unknown patch strategy: " + configuredStrategy);
         };
-        Generator generator = new Generator(worldSurfaceReader, patchingPlan, generationContext);
         info("Using Underilla as main world generator (with " + outOfTheSurfaceWorldGenerator + " as outOfTheSurfaceWorldGenerator)!");
         return new UnderillaChunkGenerator(this.worldSurfaceReader, this.worldCavesReader, outOfTheSurfaceWorldGenerator,
-                generator, patchingPlan.boundary());
+                patchingPlan, generationContext);
     }
 
     @Override
