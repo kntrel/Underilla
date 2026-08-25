@@ -1,7 +1,6 @@
 package com.kntrel.mc.underilla.paper.generation;
 
 import com.kntrel.mc.underilla.core.api.HeightMapType;
-import com.kntrel.mc.underilla.core.generation.Boundary;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
 import com.kntrel.mc.underilla.core.generation.Generator;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
@@ -38,19 +37,21 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     // TODO : For performance reason, we should generate and empty world if transfer_world_from_caves_world==true
 
     // ASSETS
-    private static final Map<HeightMap, HeightMapType> HEIGHTMAPS_MAP = Map.of(HeightMap.OCEAN_FLOOR, HeightMapType.OCEAN_FLOOR,
-            HeightMap.OCEAN_FLOOR_WG, HeightMapType.OCEAN_FLOOR_WG, HeightMap.MOTION_BLOCKING, HeightMapType.MOTION_BLOCKING,
-            HeightMap.MOTION_BLOCKING_NO_LEAVES, HeightMapType.MOTION_BLOCKING_NO_LEAVES, HeightMap.WORLD_SURFACE,
-            HeightMapType.WORLD_SURFACE, HeightMap.WORLD_SURFACE_WG, HeightMapType.WORLD_SURFACE_WG);
+    private static final Map<HeightMap, HeightMapType> HEIGHTMAPS_MAP = Map.of(
+            HeightMap.OCEAN_FLOOR,               HeightMapType.OCEAN_FLOOR,
+            HeightMap.OCEAN_FLOOR_WG,            HeightMapType.OCEAN_FLOOR_WG,
+            HeightMap.MOTION_BLOCKING,           HeightMapType.MOTION_BLOCKING,
+            HeightMap.MOTION_BLOCKING_NO_LEAVES, HeightMapType.MOTION_BLOCKING_NO_LEAVES,
+            HeightMap.WORLD_SURFACE,             HeightMapType.WORLD_SURFACE,
+            HeightMap.WORLD_SURFACE_WG,          HeightMapType.WORLD_SURFACE_WG
+    );
 
 
     // FIELDS
     private final Generator generator;
-    private final Boundary boundary;
     private final @Nonnull WorldReader worldSurfaceReader;
-    private final @Nullable WorldReader worldCavesReader;
-    private static CustomBiomeSource customBiomeSource;
-    private static ChunkGenerator outOfTheSurfaceWorldGenerator;
+    private final CustomBiomeSource customBiomeSource;
+    private final @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator;
 
 
     // CONSTRUCTORS
@@ -62,10 +63,9 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             GenerationContext generationContext
     ) {
         this.worldSurfaceReader = worldSurfaceReader;
-        this.worldCavesReader = worldCavesReader;
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
         this.generator = new Generator(worldSurfaceReader, patchingPlan, generationContext);
-        this.boundary = patchingPlan.boundary();
+        this.customBiomeSource = new CustomBiomeSource(worldSurfaceReader, worldCavesReader, patchingPlan.boundary());
     }
 
 
@@ -215,12 +215,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         return new BiomeProviderFromFile(outOfTheSurfaceWorldBiomeProdiver);
     }
 
-    public static Map<String, Long> getBiomesPlaced() {
-        if (customBiomeSource == null) {
-            return null;
-        }
-        return customBiomeSource.getBiomesPlaced();
-    }
+    public Map<String, Long> getBiomesPlaced() { return customBiomeSource.getBiomesPlaced(); }
 
 
     private boolean isOutsideOfTheSurfaceWorld(int x, int z) {
@@ -277,7 +272,6 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
         private BiomeProviderFromFile(BiomeProvider outOfTheSurfaceWorldBiomeProdiver) {
             this.outOfTheSurfaceWorldBiomeProdiver = outOfTheSurfaceWorldBiomeProdiver;
-            customBiomeSource = new CustomBiomeSource(worldSurfaceReader, worldCavesReader, boundary);
         }
 
         @Override

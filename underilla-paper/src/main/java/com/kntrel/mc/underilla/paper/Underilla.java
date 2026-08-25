@@ -27,6 +27,7 @@ import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -59,6 +60,7 @@ public final class Underilla extends JavaPlugin {
     private CleanBlocksTask cleanBlocksTask;
     private CleanEntitiesTask cleanEntitiesTask;
     private StructureEventListener structureEventListener;
+    private final Map<String, UnderillaChunkGenerator> worldGenerators = new ConcurrentHashMap<>();
 
     private Function<org.bukkit.block.Biome, org.bukkit.block.Biome> endBiomeTransformer;
     private Consumer<Block> endBlockTransformer;
@@ -90,8 +92,10 @@ public final class Underilla extends JavaPlugin {
             default -> throw new IllegalArgumentException("Unknown patch strategy: " + configuredStrategy);
         };
         info("Using Underilla as main world generator (with " + outOfTheSurfaceWorldGenerator + " as outOfTheSurfaceWorldGenerator)!");
-        return new UnderillaChunkGenerator(this.worldSurfaceReader, this.worldCavesReader, outOfTheSurfaceWorldGenerator,
-                patchingPlan, generationContext);
+        UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader, this.worldCavesReader,
+                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext);
+        this.worldGenerators.put(worldName, worldGenerator);
+        return worldGenerator;
     }
 
     @Override
@@ -153,9 +157,10 @@ public final class Underilla extends JavaPlugin {
                     info(entry.getKey() + " took " + entry.getValue() + "ms (" + (entry.getValue() * 100 / totalTime) + "%)");
                 }
             }
-            Map<String, Long> biomesPlaced = UnderillaChunkGenerator.getBiomesPlaced();
-            if (biomesPlaced != null) {
-                info("Map of biome placed: " + biomesPlaced.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+            for (Map.Entry<String, UnderillaChunkGenerator> worldGenerator : worldGenerators.entrySet()) {
+                Map<String, Long> biomesPlaced = worldGenerator.getValue().getBiomesPlaced();
+                info("Map of biomes placed in world '" + worldGenerator.getKey() + "': " + biomesPlaced.entrySet().stream()
+                        .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
                         .map(entry -> entry.getKey() + ": " + entry.getValue()).reduce((a, b) -> a + ", " + b).orElse(""));
             }
         } catch (Exception e) {
