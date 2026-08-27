@@ -5,9 +5,17 @@ public interface GenerationConfig {
 
     int cacheSize();
 
+    int generationAreaMinX();
+
     int generationAreaMinY();
 
+    int generationAreaMinZ();
+
+    int generationAreaMaxX();
+
     int generationAreaMaxY();
+
+    int generationAreaMaxZ();
 
     int maxHeightOfCaves();
 
@@ -23,7 +31,18 @@ public interface GenerationConfig {
 
     boolean structuresEnabled();
 
+    boolean surfaceBiomeUseTopYOnly();
+
+    boolean shouldPreserveBiome(String biomeName);
+
+    boolean preserveBiomesOnlyUnderSurface();
+
     boolean isSurfaceWorldOnlyBiome(String biomeName);
+
+    default boolean isInsideGenerationArea(int x, int z) {
+        return x >= generationAreaMinX() && x < generationAreaMaxX()
+                && z >= generationAreaMinZ() && z < generationAreaMaxZ();
+    }
 
     boolean isIgnoredForSurfaceCalculation(String blockName);
 

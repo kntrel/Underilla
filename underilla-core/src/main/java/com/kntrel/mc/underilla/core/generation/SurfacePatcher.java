@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
@@ -39,16 +40,16 @@ public final class SurfacePatcher implements Patcher {
         int columnBoundary = context.config().maxHeightOfCaves();
         int lastX = -1;
         int lastZ = -1;
-        Generator.addTime("Create VectorIterable to patch land", startTime);
+        UnderillaEngine.addTime("Create VectorIterable to patch land", startTime);
         for (Vector<Integer> vector : iterable) {
             startTime = System.currentTimeMillis();
             Block referenceBlock = surfaceChunk.blockAt(vector.x(), vector.y(), vector.z()).orElse(context.blocks().air());
             referenceBlock = replaceSurfaceBlockIfNecessary(referenceBlock);
-            Generator.addTime("Read block data from reference world", startTime);
+            UnderillaEngine.addTime("Read block data from reference world", startTime);
 
             startTime = System.currentTimeMillis();
             Block undergroundBlock = targetChunk.getBlock(vector);
-            Generator.addTime("Read block data from underground world", startTime);
+            UnderillaEngine.addTime("Read block data from underground world", startTime);
 
             startTime = System.currentTimeMillis();
             if (vector.x() != lastX || vector.z() != lastZ) {
@@ -56,14 +57,14 @@ public final class SurfacePatcher implements Patcher {
                 lastZ = vector.z();
                 columnBoundary = boundary.at(surfaceChunk.getGlobalX(vector.x()), surfaceChunk.getGlobalZ(vector.z()));
             }
-            Generator.addTime("Calculate patch boundary", startTime);
+            UnderillaEngine.addTime("Calculate patch boundary", startTime);
 
             startTime = System.currentTimeMillis();
             if (vector.y() > columnBoundary
                     || shouldKeepReferenceBlockInUnderground(referenceBlock, undergroundBlock)) {
                 targetChunk.setBlock(vector, referenceBlock);
             }
-            Generator.addTime("Patch reference block or not", startTime);
+            UnderillaEngine.addTime("Patch reference block or not", startTime);
         }
     }
 

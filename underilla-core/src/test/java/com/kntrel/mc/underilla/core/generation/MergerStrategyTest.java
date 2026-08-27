@@ -185,10 +185,22 @@ class PatcherStrategyTest {
         public int cacheSize() { return 1; }
 
         @Override
+        public int generationAreaMinX() { return Integer.MIN_VALUE; }
+
+        @Override
         public int generationAreaMinY() { return minimumY; }
 
         @Override
+        public int generationAreaMinZ() { return Integer.MIN_VALUE; }
+
+        @Override
+        public int generationAreaMaxX() { return Integer.MAX_VALUE; }
+
+        @Override
         public int generationAreaMaxY() { return maximumY; }
+
+        @Override
+        public int generationAreaMaxZ() { return Integer.MAX_VALUE; }
 
         @Override
         public int maxHeightOfCaves() { return maximumCaveY; }
@@ -210,6 +222,15 @@ class PatcherStrategyTest {
 
         @Override
         public boolean structuresEnabled() { return true; }
+
+        @Override
+        public boolean surfaceBiomeUseTopYOnly() { return false; }
+
+        @Override
+        public boolean shouldPreserveBiome(String biomeName) { return false; }
+
+        @Override
+        public boolean preserveBiomesOnlyUnderSurface() { return false; }
 
         @Override
         public boolean isSurfaceWorldOnlyBiome(String biomeName) { return preservedBiomes.contains(biomeName); }

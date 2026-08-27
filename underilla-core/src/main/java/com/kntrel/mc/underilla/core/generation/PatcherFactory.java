@@ -1,19 +1,6 @@
-package com.kntrel.mc.underilla.paper.generation;
+package com.kntrel.mc.underilla.core.generation;
 
-import com.kntrel.mc.underilla.core.generation.AbsoluteBoundary;
-import com.kntrel.mc.underilla.core.generation.Boundary;
-import com.kntrel.mc.underilla.core.generation.CachedBoundary;
-import com.kntrel.mc.underilla.core.generation.CavePatcher;
-import com.kntrel.mc.underilla.core.generation.GenerationConfig;
-import com.kntrel.mc.underilla.core.generation.GenerationContext;
-import com.kntrel.mc.underilla.core.generation.HeightBoundary;
-import com.kntrel.mc.underilla.core.generation.LiquidPatcher;
-import com.kntrel.mc.underilla.core.generation.Patcher;
-import com.kntrel.mc.underilla.core.generation.PatcherPipeline;
-import com.kntrel.mc.underilla.core.generation.PatchingPlan;
-import com.kntrel.mc.underilla.core.generation.SurfacePatcher;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import javax.annotation.Nullable;
 
 /** Composes patchers and generation policies for each supported mode. */
 public final class PatcherFactory {
@@ -21,12 +8,12 @@ public final class PatcherFactory {
     private PatcherFactory() {}
 
     public static PatchingPlan surface(WorldReader surfaceWorld,
-            @Nullable WorldReader cavesWorld, GenerationContext context) {
+            WorldReader cavesWorld, GenerationContext context) {
         return plan(surfaceWorld, cavesWorld, context, heightBoundary(surfaceWorld, context), true);
     }
 
     public static PatchingPlan absolute(WorldReader surfaceWorld,
-            @Nullable WorldReader cavesWorld, GenerationContext context) {
+            WorldReader cavesWorld, GenerationContext context) {
         GenerationConfig config = context.config();
         Boundary boundary = new AbsoluteBoundary(config.maxHeightOfCaves(),
                 config.generationAreaMinY(), config.generationAreaMaxY());
@@ -34,12 +21,12 @@ public final class PatcherFactory {
     }
 
     public static PatchingPlan none(WorldReader surfaceWorld,
-            @Nullable WorldReader cavesWorld, GenerationContext context) {
+            WorldReader cavesWorld, GenerationContext context) {
         Boundary boundary = new AbsoluteBoundary(context.config().generationAreaMinY());
         return plan(surfaceWorld, cavesWorld, context, boundary, false);
     }
 
-    private static PatchingPlan plan(WorldReader surfaceWorld, @Nullable WorldReader cavesWorld,
+    private static PatchingPlan plan(WorldReader surfaceWorld, WorldReader cavesWorld,
             GenerationContext context, Boundary boundary, boolean generateNoise) {
         Patcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, context);
         Patcher terrainPatcher = cavesWorld == null

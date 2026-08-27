@@ -30,7 +30,7 @@ public abstract class DiskWorldReader implements WorldReader {
     private final File regions;
     private final RLUCache<MCAFile> regionCache;
     private final RLUCache<ChunkReader> chunkCache;
-    private final RLUCacheTriple<String> biomeCache;
+    private final RLUCacheTriple<Biome> biomeCache;
     private final GenerationLogger logger;
 
     protected DiskWorldReader(String worldPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
@@ -69,10 +69,21 @@ public abstract class DiskWorldReader implements WorldReader {
 
     @Override
     public Optional<Biome> biomeAt(int x, int y, int z) {
-        int chunkX = MCAUtil.blockToChunk(x);
-        int chunkZ = MCAUtil.blockToChunk(z);
-        return readChunk(chunkX, chunkZ)
-                .flatMap(chunk -> chunk.biomeAt(Math.floorMod(x, 16), y, Math.floorMod(z, 16)));
+        int cellSize = GenerationConstants.BIOME_CELL_SIZE;
+        int cellX = Math.floorDiv(x, cellSize) * cellSize;
+        int cellY = Math.floorDiv(y, cellSize) * cellSize;
+        int cellZ = Math.floorDiv(z, cellSize) * cellSize;
+        Biome cachedBiome = biomeCache.get(cellX, cellY, cellZ);
+        if (cachedBiome != null) {
+            return Optional.of(cachedBiome);
+        }
+
+        int chunkX = MCAUtil.blockToChunk(cellX);
+        int chunkZ = MCAUtil.blockToChunk(cellZ);
+        Optional<Biome> biome = readChunk(chunkX, chunkZ)
+                .flatMap(chunk -> chunk.biomeAt(Math.floorMod(cellX, 16), cellY, Math.floorMod(cellZ, 16)));
+        biome.ifPresent(value -> biomeCache.put(cellX, cellY, cellZ, value));
+        return biome;
     }
 
     @Override
@@ -96,19 +107,7 @@ public abstract class DiskWorldReader implements WorldReader {
 
     @Override
     public String getBiomeName(int globalX, int globalY, int globalZ) {
-        int cellSize = GenerationConstants.BIOME_CELL_SIZE;
-        globalX = globalX - globalX % cellSize;
-        globalY = globalY - globalY % cellSize;
-        globalZ = globalZ - globalZ % cellSize;
-
-        String cachedBiome = biomeCache.get(globalX, globalY, globalZ);
-        if (cachedBiome != null) {
-            return cachedBiome;
-        }
-
-        String biomeName = biomeAt(globalX, globalY, globalZ).map(Biome::getName).orElse(null);
-        biomeCache.put(globalX, globalY, globalZ, biomeName);
-        return biomeName;
+        return biomeAt(globalX, globalY, globalZ).map(Biome::getName).orElse(null);
     }
 
     protected abstract ChunkReader newChunkReader(Chunk chunk);

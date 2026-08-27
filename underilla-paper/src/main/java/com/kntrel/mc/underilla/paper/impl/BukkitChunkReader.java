@@ -13,7 +13,6 @@ import java.util.Optional;
 import org.bukkit.Material;
 
 public class BukkitChunkReader extends ChunkReader {
-    // private Map<String, org.bukkit.block.Biome> customBiomes = new HashMap<>();
 
     // CONSTRUCTORS
     public BukkitChunkReader(Chunk chunk) { super(chunk); }

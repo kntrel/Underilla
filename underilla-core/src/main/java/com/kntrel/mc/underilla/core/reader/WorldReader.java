@@ -39,9 +39,9 @@ public interface WorldReader {
 
     default String getBiomeName(int globalX, int globalY, int globalZ) {
         int cellSize = GenerationConstants.BIOME_CELL_SIZE;
-        int cellX = globalX - globalX % cellSize;
-        int cellY = globalY - globalY % cellSize;
-        int cellZ = globalZ - globalZ % cellSize;
+        int cellX = Math.floorDiv(globalX, cellSize) * cellSize;
+        int cellY = Math.floorDiv(globalY, cellSize) * cellSize;
+        int cellZ = Math.floorDiv(globalZ, cellSize) * cellSize;
         Optional<Biome> biome = biomeAt(cellX, cellY, cellZ);
         return biome.map(Biome::getName).orElse(null);
     }

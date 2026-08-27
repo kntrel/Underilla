@@ -2,16 +2,14 @@ package com.kntrel.mc.underilla.paper.generation;
 
 import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
-import com.kntrel.mc.underilla.core.generation.Generator;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
+import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocks;
-import com.kntrel.mc.underilla.paper.impl.BukkitBiome;
 import com.kntrel.mc.underilla.paper.impl.BukkitChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitRegionChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldInfo;
-import com.kntrel.mc.underilla.paper.impl.CustomBiomeSource;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
@@ -25,7 +23,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.HeightMap;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.block.Biome;
 import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
@@ -48,24 +45,20 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
 
     // FIELDS
-    private final Generator generator;
-    private final @Nonnull WorldReader worldSurfaceReader;
-    private final CustomBiomeSource customBiomeSource;
+    private final UnderillaEngine engine;
+    private volatile UnderillaBiomeProvider biomeProvider;
     private final @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator;
 
 
     // CONSTRUCTORS
     public UnderillaChunkGenerator(
             @Nonnull WorldReader worldSurfaceReader,
-            @Nullable WorldReader worldCavesReader,
             @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator,
             PatchingPlan patchingPlan,
             GenerationContext generationContext
     ) {
-        this.worldSurfaceReader = worldSurfaceReader;
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
-        this.generator = new Generator(worldSurfaceReader, patchingPlan, generationContext);
-        this.customBiomeSource = new CustomBiomeSource(worldSurfaceReader, worldCavesReader, patchingPlan.boundary());
+        this.engine = new UnderillaEngine(worldSurfaceReader, patchingPlan, generationContext);
     }
 
 
@@ -75,7 +68,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         // Do not use base height from VoidWorldGenerator if it is outside of the surface world, else it broke structures generation.
         // We only use UnderillaChunkGenerator base height to avoid a bug with the structure generation height.
         BukkitWorldInfo info = new BukkitWorldInfo(worldInfo);
-        return this.generator.getBaseHeight(info, x, z, HEIGHTMAPS_MAP.get(heightMap));
+        return this.engine.getBaseHeight(info, x, z, HEIGHTMAPS_MAP.get(heightMap));
     }
 
     @Override
@@ -91,7 +84,9 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         // if is a biome that should not be carved OR surface should not be preserved from carvers (== merge the world before).
         if (!Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey) || !Underilla
                 .getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            patchTerrain(chunkX, chunkZ, chunkData);
+            if (!tryPatchTerrain(chunkX, chunkZ, chunkData) && outOfTheSurfaceWorldGenerator != null) {
+                outOfTheSurfaceWorldGenerator.generateSurface(worldInfo, random, chunkX, chunkZ, chunkData);
+            }
         }
     }
 
@@ -107,16 +102,15 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         // if is a biome that should be carved and surface should be preserved from carvers (== merge the world after).
         if (Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey) && Underilla
                 .getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            patchTerrain(chunkX, chunkZ, chunkData);
+            if (!tryPatchTerrain(chunkX, chunkZ, chunkData) && outOfTheSurfaceWorldGenerator != null) {
+                outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
+            }
         }
     }
 
-    private void patchTerrain(int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
-        if (this.worldSurfaceReader.readChunk(chunkX, chunkZ).isEmpty()) {
-            return;
-        }
+    private boolean tryPatchTerrain(int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
         BukkitChunkData data = new BukkitChunkData(chunkData, chunkX, chunkZ);
-        this.generator.patchTerrain(data);
+        return this.engine.tryPatchTerrain(data);
     }
     private static String getBiomeKeyStringFromChunkCoordinates(@NotNull WorldInfo worldInfo, int chunkX, int chunkZ) {
         return Bukkit.getWorld(worldInfo.getUID()).getBiome(chunkX * Underilla.CHUNK_SIZE, 0, chunkZ * Underilla.CHUNK_SIZE).getKey()
@@ -127,7 +121,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     @Override
     public List<BlockPopulator> getDefaultPopulators(World world) {
         // Caves are vanilla generated, but they are carved underwater, this re-places the water blocks in case they were carved into.
-        return List.of(new Populator(this.generator));
+        return List.of(new Populator(this.engine));
     }
 
     @Override
@@ -137,7 +131,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             return outOfTheSurfaceWorldGenerator.shouldGenerateNoise(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.generator.shouldGenerateNoise(chunkX, chunkZ);
+        return this.engine.getFlags().noise();
     }
 
 
@@ -149,7 +143,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         }
 
         // Must always return true, bedrock and deepslate layers are generated in this step
-        return this.generator.shouldGenerateSurface(chunkX, chunkZ);
+        return this.engine.getFlags().surface();
     }
 
 
@@ -164,7 +158,8 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         }
 
         String biomeKey = getBiomeKeyStringFromChunkCoordinates(worldInfo, chunkX, chunkZ);
-        return Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey);
+        return this.engine.getFlags().carvers()
+                && Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey);
     }
 
     @Override
@@ -174,7 +169,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             return outOfTheSurfaceWorldGenerator.shouldGenerateDecorations(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.generator.shouldGenerateDecorations(chunkX, chunkZ);
+        return this.engine.getFlags().features();
     }
 
     @Override
@@ -184,7 +179,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             return outOfTheSurfaceWorldGenerator.shouldGenerateMobs(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.generator.shouldGenerateMobs(chunkX, chunkZ);
+        return this.engine.getFlags().mobs();
     }
 
     @Override
@@ -194,7 +189,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             return outOfTheSurfaceWorldGenerator.shouldGenerateStructures(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.generator.shouldGenerateStructures(chunkX, chunkZ);
+        return this.engine.getFlags().structures();
     }
 
     @Override
@@ -208,14 +203,19 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
     // Since 1.21.3 custom biomes are supported by paper.
     @Override
-    public BiomeProvider getDefaultBiomeProvider(@NotNull WorldInfo worldInfo) {
-        Underilla.info("Underilla Use the custom biome provider from file data. Structures will be generate in the right biome.");
-        BiomeProvider outOfTheSurfaceWorldBiomeProdiver = outOfTheSurfaceWorldGenerator == null ? null
-                : outOfTheSurfaceWorldGenerator.getDefaultBiomeProvider(worldInfo);
-        return new BiomeProviderFromFile(outOfTheSurfaceWorldBiomeProdiver);
+    public synchronized BiomeProvider getDefaultBiomeProvider(@NotNull WorldInfo worldInfo) {
+        if (biomeProvider == null) {
+            BiomeProvider outsideSurfaceWorldBiomeProvider = outOfTheSurfaceWorldGenerator == null ? null
+                    : outOfTheSurfaceWorldGenerator.getDefaultBiomeProvider(worldInfo);
+            biomeProvider = new UnderillaBiomeProvider(engine, outsideSurfaceWorldBiomeProvider);
+        }
+        return biomeProvider;
     }
 
-    public Map<String, Long> getBiomesPlaced() { return customBiomeSource.getBiomesPlaced(); }
+    public Map<String, Long> getBiomesPlaced() {
+        UnderillaBiomeProvider currentBiomeProvider = biomeProvider;
+        return currentBiomeProvider == null ? Map.of() : currentBiomeProvider.getBiomesPlaced();
+    }
 
 
     private boolean isOutsideOfTheSurfaceWorld(int x, int z) {
@@ -230,12 +230,12 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     private static class Populator extends BlockPopulator {
 
         // FIELDS
-        private final Generator generator_;
+        private final UnderillaEngine underillaEngine;
 
 
         // CONSTRUCTORS
-        public Populator(Generator generator) {
-            this.generator_ = generator;
+        public Populator(UnderillaEngine underillaEngine) {
+            this.underillaEngine = underillaEngine;
         }
 
 
@@ -253,7 +253,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
                     BukkitRegionChunkData chunkData = new BukkitRegionChunkData(limitedRegion, chunkX, chunkZ, worldInfo.getMinHeight(),
                             worldInfo.getMaxHeight());
-                    this.generator_.patchLiquids(chunkData);
+                    this.underillaEngine.tryPatchLiquids(chunkData);
                 }
             }
 
@@ -267,23 +267,4 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         }
     }
 
-    private class BiomeProviderFromFile extends BiomeProvider {
-        private final BiomeProvider outOfTheSurfaceWorldBiomeProdiver;
-
-        private BiomeProviderFromFile(BiomeProvider outOfTheSurfaceWorldBiomeProdiver) {
-            this.outOfTheSurfaceWorldBiomeProdiver = outOfTheSurfaceWorldBiomeProdiver;
-        }
-
-        @Override
-        public @Nonnull Biome getBiome(@NotNull WorldInfo worldInfo, int x, int y, int z) {
-            if (outOfTheSurfaceWorldBiomeProdiver != null && isOutsideOfTheSurfaceWorld(x, z)) {
-                return outOfTheSurfaceWorldBiomeProdiver.getBiome(worldInfo, x, y, z);
-            }
-            return customBiomeSource.getBiome(worldInfo, x, y, z);
-        }
-
-        @Override
-        public @Nonnull List<Biome> getBiomes(@NotNull WorldInfo worldInfo) { return BukkitBiome.getAllBiomesList(); }
-
-    }
 }

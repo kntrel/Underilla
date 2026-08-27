@@ -1,7 +1,8 @@
 package com.kntrel.mc.underilla.paper;
 
-import com.kntrel.mc.underilla.core.generation.Generator;
+import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
+import com.kntrel.mc.underilla.core.generation.PatcherFactory;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
 import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -9,7 +10,6 @@ import com.kntrel.mc.underilla.paper.cleaning.CleanBlocksTask;
 import com.kntrel.mc.underilla.paper.cleaning.CleanEntitiesTask;
 import com.kntrel.mc.underilla.paper.cleaning.FollowableProgressTask;
 import com.kntrel.mc.underilla.paper.generation.GeneratorAccessor;
-import com.kntrel.mc.underilla.paper.generation.PatcherFactory;
 import com.kntrel.mc.underilla.paper.generation.UnderillaChunkGenerator;
 import com.kntrel.mc.underilla.paper.impl.BukkitBlockFactory;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldReader;
@@ -92,7 +92,7 @@ public final class Underilla extends JavaPlugin {
             default -> throw new IllegalArgumentException("Unknown patch strategy: " + configuredStrategy);
         };
         info("Using Underilla as main world generator (with " + outOfTheSurfaceWorldGenerator + " as outOfTheSurfaceWorldGenerator)!");
-        UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader, this.worldCavesReader,
+        UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader,
                 outOfTheSurfaceWorldGenerator, patchingPlan, generationContext);
         this.worldGenerators.put(worldName, worldGenerator);
         return worldGenerator;
@@ -151,9 +151,9 @@ public final class Underilla extends JavaPlugin {
     public void onDisable() {
         try {
             stopTasks();
-            if (Generator.times != null) {
-                long totalTime = Generator.times.entrySet().stream().mapToLong(Map.Entry::getValue).sum();
-                for (Map.Entry<String, Long> entry : Generator.times.entrySet()) {
+            if (UnderillaEngine.times != null) {
+                long totalTime = UnderillaEngine.times.entrySet().stream().mapToLong(Map.Entry::getValue).sum();
+                for (Map.Entry<String, Long> entry : UnderillaEngine.times.entrySet()) {
                     info(entry.getKey() + " took " + entry.getValue() + "ms (" + (entry.getValue() * 100 / totalTime) + "%)");
                 }
             }

@@ -10,11 +10,17 @@ final class TestGenerationConfig implements GenerationConfig {
 
     private int minimumY;
     private int maximumY;
+    private int minimumX = Integer.MIN_VALUE;
+    private int minimumZ = Integer.MIN_VALUE;
+    private int maximumX = Integer.MAX_VALUE;
+    private int maximumZ = Integer.MAX_VALUE;
     private int maximumCaveY;
     private int mergeDepth;
     private int adaptiveMaximumDepth;
     private int adaptiveMinimumHiddenDepth;
+    private boolean preserveGeneratedBiomesOnlyUnderSurface;
     private final Set<String> surfaceOnlyBiomes = new HashSet<>();
+    private final Set<String> preservedGeneratedBiomes = new HashSet<>();
     private final Set<String> ignoredSurfaceBlocks = new HashSet<>();
     private final Set<String> keptSurfaceBlocks = new HashSet<>();
     private final Map<String, String> surfaceReplacements = new HashMap<>();
@@ -27,6 +33,24 @@ final class TestGenerationConfig implements GenerationConfig {
 
     TestGenerationConfig maximumCaveY(int value) {
         maximumCaveY = value;
+        return this;
+    }
+
+    TestGenerationConfig generationArea(int minimumX, int minimumZ, int maximumX, int maximumZ) {
+        this.minimumX = minimumX;
+        this.minimumZ = minimumZ;
+        this.maximumX = maximumX;
+        this.maximumZ = maximumZ;
+        return this;
+    }
+
+    TestGenerationConfig preserveGeneratedBiome(String biomeName) {
+        preservedGeneratedBiomes.add(biomeName);
+        return this;
+    }
+
+    TestGenerationConfig preserveGeneratedBiomesOnlyUnderSurface() {
+        preserveGeneratedBiomesOnlyUnderSurface = true;
         return this;
     }
 
@@ -69,10 +93,22 @@ final class TestGenerationConfig implements GenerationConfig {
     public int cacheSize() { return 1; }
 
     @Override
+    public int generationAreaMinX() { return minimumX; }
+
+    @Override
     public int generationAreaMinY() { return minimumY; }
 
     @Override
+    public int generationAreaMinZ() { return minimumZ; }
+
+    @Override
+    public int generationAreaMaxX() { return maximumX; }
+
+    @Override
     public int generationAreaMaxY() { return maximumY; }
+
+    @Override
+    public int generationAreaMaxZ() { return maximumZ; }
 
     @Override
     public int maxHeightOfCaves() { return maximumCaveY; }
@@ -94,6 +130,15 @@ final class TestGenerationConfig implements GenerationConfig {
 
     @Override
     public boolean structuresEnabled() { return true; }
+
+    @Override
+    public boolean surfaceBiomeUseTopYOnly() { return false; }
+
+    @Override
+    public boolean shouldPreserveBiome(String biomeName) { return preservedGeneratedBiomes.contains(biomeName); }
+
+    @Override
+    public boolean preserveBiomesOnlyUnderSurface() { return preserveGeneratedBiomesOnlyUnderSurface; }
 
     @Override
     public boolean isSurfaceWorldOnlyBiome(String biomeName) { return surfaceOnlyBiomes.contains(biomeName); }

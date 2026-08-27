@@ -79,10 +79,22 @@ public class UnderillaConfig implements GenerationConfig {
     public int cacheSize() { return getInt(IntegerKeys.CACHE_SIZE); }
 
     @Override
+    public int generationAreaMinX() { return getInt(IntegerKeys.GENERATION_AREA_MIN_X); }
+
+    @Override
     public int generationAreaMinY() { return getInt(IntegerKeys.GENERATION_AREA_MIN_Y); }
 
     @Override
+    public int generationAreaMinZ() { return getInt(IntegerKeys.GENERATION_AREA_MIN_Z); }
+
+    @Override
+    public int generationAreaMaxX() { return getInt(IntegerKeys.GENERATION_AREA_MAX_X); }
+
+    @Override
     public int generationAreaMaxY() { return getInt(IntegerKeys.GENERATION_AREA_MAX_Y); }
+
+    @Override
+    public int generationAreaMaxZ() { return getInt(IntegerKeys.GENERATION_AREA_MAX_Z); }
 
     @Override
     public int maxHeightOfCaves() { return getInt(IntegerKeys.MAX_HEIGHT_OF_CAVES); }
@@ -106,6 +118,19 @@ public class UnderillaConfig implements GenerationConfig {
 
     @Override
     public boolean structuresEnabled() { return getBoolean(BooleanKeys.STRUCTURES_ENABLED); }
+
+    @Override
+    public boolean surfaceBiomeUseTopYOnly() { return getBoolean(BooleanKeys.SURFACE_WORLD_BIOME_USE_TOP_Y_VALUE_ONLY); }
+
+    @Override
+    public boolean shouldPreserveBiome(String biomeName) {
+        return isBiomeInSet(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES, biomeName);
+    }
+
+    @Override
+    public boolean preserveBiomesOnlyUnderSurface() {
+        return getBoolean(BooleanKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_UNDER_SURFACE);
+    }
 
     @Override
     public boolean isSurfaceWorldOnlyBiome(String biomeName) {
