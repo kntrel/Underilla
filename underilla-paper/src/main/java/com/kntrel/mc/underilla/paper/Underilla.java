@@ -24,6 +24,7 @@ import com.kntrel.mc.underilla.paper.listener.StructureEventListener;
 import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
 import com.kntrel.mc.underilla.paper.selector.Selector;
+import java.io.File;
 import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
@@ -74,7 +75,7 @@ public final class Underilla extends JavaPlugin {
             return GeneratorAccessor.getOutOfTheSurfaceWorldGenerator(worldName, id);
         }
         if (this.worldSurfaceReader == null) {
-            warning("No world with name '" + getUnderillaConfig().getString(StringKeys.SURFACE_WORLD_NAME) + "' found");
+            warning("No surface region directory at '" + getUnderillaConfig().getSurfaceRegionPath() + "' found");
             return super.getDefaultWorldGenerator(worldName, id);
         }
         ChunkGenerator outOfTheSurfaceWorldGenerator = GeneratorAccessor.getOutOfTheSurfaceWorldGenerator(worldName, id);
@@ -112,12 +113,13 @@ public final class Underilla extends JavaPlugin {
             GenerationLogger generationLogger = new PaperGenerationLogger();
             generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory(), generationLogger);
             // Loading reference world
+            File surfaceRegionDirectory = getUnderillaConfig().getSurfaceRegionPath().toFile();
             try {
-                this.worldSurfaceReader = new BukkitWorldReader(getUnderillaConfig().getString(StringKeys.SURFACE_WORLD_NAME),
+                this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory,
                         getUnderillaConfig().cacheSize(), generationLogger);
-                info("World '" + getUnderillaConfig().getString(StringKeys.SURFACE_WORLD_NAME) + "' found.");
+                info("Surface region directory '" + surfaceRegionDirectory + "' found.");
             } catch (NoSuchFieldException e) {
-                warning("No world with name '" + getUnderillaConfig().getString(StringKeys.SURFACE_WORLD_NAME) + "' found");
+                warning("No surface region directory at '" + surfaceRegionDirectory + "' found");
                 warning(() -> Tools.exceptionToString(e));
             }
             // Loading caves world if we should use it.
@@ -125,10 +127,11 @@ public final class Underilla extends JavaPlugin {
                     || getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BIOMES_FROM_CAVES_WORLD)) {
                 try {
                     info("Loading caves world");
-                    this.worldCavesReader = new BukkitWorldReader(getUnderillaConfig().getString(StringKeys.CAVES_WORLD_NAME),
+                    File cavesRegionDirectory = getUnderillaConfig().getCavesRegionPath().toFile();
+                    this.worldCavesReader = new BukkitWorldReader(cavesRegionDirectory,
                             getUnderillaConfig().cacheSize(), generationLogger);
                 } catch (NoSuchFieldException e) {
-                    warning("No world with name '" + getUnderillaConfig().getString(StringKeys.CAVES_WORLD_NAME) + "' found");
+                    warning("No caves region directory at '" + getUnderillaConfig().getCavesRegionPath() + "' found");
                     warning(() -> Tools.exceptionToString(e));
                 }
             }

@@ -54,7 +54,7 @@ This guide will help you to generate the 0, 0 to 512, 512 area as a first test o
 2. 
     1. Download the latest Underilla version from the [releases](https://github.com/kntrel/underilla/releases).
     2. Move the downloaded jar file to the existing directory `plugins/` in your server directory.
-    3. Copy your custom world to a new directory called `world_surface/` inside your server directory. (Only the `region/` sub directory of your world matters. Make sure to have some region file in `world_surface/region/`.)
+    3. Copy your custom world to a new directory called `world_surface/` inside your server directory. The default configuration reads the `minecraft:overworld` dimension from this world. You can instead configure `surfaceWorld.regionPath` to point directly to any region directory.
 3. 
    1. Restart the server again. Underilla will update some settings & download 2 needed plugins and stop the server.
    2. Restart the server again. Underilla is launched, you can join the server once it's running or after it have finished and check the result.
@@ -78,12 +78,13 @@ See the full guide below to generate other area than 0, 0 to 512, 512 & improve 
     1. Download the latest Underilla version from the [releases](https://github.com/kntrel/underilla/releases).
     2. Move the downloaded jar file to the existing directory `plugins/` in your server directory.
 3. Setup your custom world
-    1. Copy your custom world to a new directory called `world_surface/` inside your server directory. (Only the `region/` sub directory of your world matters. Make sure to have some region file in `world_surface/region/`.)
+    1. Copy your custom world to a new directory called `world_surface/` inside your server directory.
 4. Configure Underilla
     1. Copy the config from [this file](https://github.com/kntrel/underilla/blob/main/underilla-paper/src/main/resources/config.yml) and save it as config.yml in `plugins/Underilla/`. The default config can also be initialized by running underilla, but copying it from the repo ensure that Underilla config is configured before Underilla starts. If the `plugins/Underilla/` directory does not exist yet, you can create it.
-    2. Edit `generationArea` inside `plugins/Underilla/config.yml` to match your surface world size. If you just want to test Underilla for a 1st generation, you can keep default values.
-    3. You can read the other fields of the config and edit some of them. This steps can be done later after a 1st generation try, to customize your world generation.
-    4. If you have already done a generation, you need to switch back some step (underillaGeneration, cleaningBlocks, cleaingEntities) from "done" to "todo".
+    2. Select each source using either `worldPath` plus a dimension ID, or a direct `regionPath`. When `regionPath` is non-empty it overrides `worldPath` and `dimension`.
+    3. Edit `generationArea` inside `plugins/Underilla/config.yml` to match your surface world size. If you just want to test Underilla for a 1st generation, you can keep default values.
+    4. You can read the other fields of the config and edit some of them. This steps can be done later after a 1st generation try, to customize your world generation.
+    5. If you have already done a generation, you need to switch back some step (underillaGeneration, cleaningBlocks, cleaingEntities) from "done" to "todo".
 5. Configure datapack
     1. If your custom world already have a datapack, you can move it to `world/datapacks/` to keep your custom biomes etc.
     2. If you don't have a datapack yet, you should create one from [vanilla biome files](https://github.com/misode/mcmeta/tree/data) where you have remove the features you don't want. For example if your custom surface world already have trees and most important, have caves high enought for your world.
@@ -158,7 +159,11 @@ You might want to update the plugin config to fit your needs.
 
 Run a local paper server with the example map & datapack on Linux.
 ```sh
-rm run/world_surface/ -fr; cp testMap/world/ run/world_surface/; rm -fr run/world/; mkdir -p run/world/datapacks; cp DatapackExamples/UnderillaBaseDataPack/ run/world/datapacks; ./gradlew runServer
+rm -rf run/world_surface run/world
+mkdir -p run/world_surface/dimensions/minecraft/overworld run/world/datapacks
+cp -r testMap/world/region run/world_surface/dimensions/minecraft/overworld/
+cp -r DatapackExamples/UnderillaBaseDataPack/ run/world/datapacks/
+./gradlew runServer
 ```
 
 ## Deploy

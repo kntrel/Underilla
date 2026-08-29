@@ -12,9 +12,9 @@ public final class TestDiskWorldReader extends DiskWorldReader {
 
     private final TestBlockFactory blocks;
 
-    public TestDiskWorldReader(File worldDirectory, int cacheSize, GenerationLogger logger, TestBlockFactory blocks)
+    public TestDiskWorldReader(File regionDirectory, int cacheSize, GenerationLogger logger, TestBlockFactory blocks)
             throws NoSuchFieldException {
-        super(worldDirectory, cacheSize, logger);
+        super(regionDirectory, cacheSize, logger);
         this.blocks = Objects.requireNonNull(blocks, "blocks");
     }
 

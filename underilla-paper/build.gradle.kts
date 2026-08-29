@@ -27,9 +27,18 @@ dependencies {
     implementation("org.bstats:bstats-bukkit:3.1.0")
     compileOnly("fr.formiko.mc.voidworldgenerator:voidworldgenerator:$voidWorldGeneratorVersion")
     compileOnly("org.popcraft:chunky-common:$chunkyVersion")
+
+    testImplementation(platform("org.junit:junit-bom:6.0.1"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("net.kyori:adventure-text-serializer-ansi:4.17.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+    }
+
     shadowJar {
         minimize()
         val prefix = "${project.group}.lib"

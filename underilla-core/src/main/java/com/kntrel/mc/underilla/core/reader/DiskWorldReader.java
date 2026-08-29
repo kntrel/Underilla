@@ -17,35 +17,27 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Reads a Minecraft world from Anvil region files on disk.
+ * Reads chunks directly from a directory of Anvil region files.
  *
- * <p>Chunk conversion remains platform-specific, so subclasses provide the
- * appropriate {@link ChunkReader} implementation.</p>
+ * <p>This reader deliberately has no knowledge of Minecraft world or dimension directory layouts. Chunk conversion
+ * remains platform-specific, so subclasses provide the appropriate {@link ChunkReader} implementation.</p>
  */
 public abstract class DiskWorldReader implements WorldReader {
 
-    private static final String REGION_DIRECTORY = "region";
-
-    private final File world;
     private final File regions;
     private final RLUCache<MCAFile> regionCache;
     private final RLUCache<ChunkReader> chunkCache;
     private final RLUCacheTriple<Biome> biomeCache;
     private final GenerationLogger logger;
 
-    protected DiskWorldReader(String worldPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        this(new File(worldPath), cacheSize, logger);
+    protected DiskWorldReader(String regionPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
+        this(new File(regionPath), cacheSize, logger);
     }
 
-    protected DiskWorldReader(File worldDirectory, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        if (!(worldDirectory.exists() && worldDirectory.isDirectory())) {
-            throw new NoSuchFieldException("World directory '" + worldDirectory.getPath() + "' does not exist.");
-        }
-        File regionDirectory = new File(worldDirectory, REGION_DIRECTORY);
+    protected DiskWorldReader(File regionDirectory, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
         if (!(regionDirectory.exists() && regionDirectory.isDirectory())) {
-            throw new NoSuchFieldException("World '" + worldDirectory.getName() + "' doesn't have a 'region' directory.");
+            throw new NoSuchFieldException("Region directory '" + regionDirectory.getPath() + "' does not exist.");
         }
-        this.world = worldDirectory;
         this.regions = regionDirectory;
         this.logger = Objects.requireNonNull(logger, "logger");
         this.regionCache = new RLUCache<>(cacheSize);
@@ -53,10 +45,6 @@ public abstract class DiskWorldReader implements WorldReader {
         this.chunkCache = new RLUCache<>(chunkCacheSize);
         this.biomeCache = new RLUCacheTriple<>(chunkCacheSize * GenerationConstants.BIOME_CELL_SIZE
                 * GenerationConstants.BIOME_CELL_SIZE);
-    }
-
-    public String getWorldName() {
-        return world.getName();
     }
 
     @Override

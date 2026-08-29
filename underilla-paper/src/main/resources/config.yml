@@ -26,7 +26,11 @@ finalWorld:
 
 # The world to copy the surface from
 surfaceWorld:
-  name: "world_surface"
+  # Point to a world and select its dimension. Dimension IDs without a namespace use "minecraft".
+  worldPath: "world_surface"
+  dimension: "minecraft:overworld"
+  # Alternatively, point directly to a region directory. A non-empty regionPath overrides worldPath and dimension.
+  # regionPath: "world_surface/region"
   blocks:
     # List of blocks of surface world to replace by another block. It will replace the block defined here by the block defined in the value.
     # Remove blocks by replacing them with AIR.
@@ -62,9 +66,12 @@ transferBlocksFromCavesWorld: false
 # If true caves biomes in the list transferedCavesWorldBiomes will be transferred from cavesWorld to the merged world.
 # DISABLED FOR NOW.
 transferBiomesFromCavesWorld: false
-# Directory where the caves world is stored. It must be in the same directory as the surface world.
+# Region data used as the optional caves source.
 cavesWorld:
-  name: "world_caves"
+  worldPath: "world_caves"
+  dimension: "minecraft:overworld"
+  # A non-empty regionPath overrides worldPath and dimension.
+  # regionPath: "world_caves/region"
 # Witch biome to transfer from cavesWorld to the merged world.
 # Caves world biomes won't be transferred in preserveBiomes.
 # Caves world won't be transferred over surfaceAndAbsolute.limit.

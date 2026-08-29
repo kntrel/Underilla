@@ -7,6 +7,7 @@ import com.kntrel.mc.underilla.paper.selector.Selector;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,6 +36,8 @@ public class UnderillaConfig implements GenerationConfig {
     private final EnumMap<MapMaterialKeys, Map<Material, Material>> listMapMaterialMap;
     private final EnumMap<SetStructureKeys, Set<Structure>> listStructureMap;
     private final EnumMap<SetEntityTypeKeys, Set<EntityType>> listEntityTypeMap;
+    private Path surfaceRegionPath;
+    private Path cavesRegionPath;
 
 
     public UnderillaConfig(FileConfiguration fileConfiguration) {
@@ -68,6 +71,8 @@ public class UnderillaConfig implements GenerationConfig {
     }
     public boolean isStructureInSet(SetStructureKeys key, Structure structure) { return getSetStructure(key).contains(structure); }
     public boolean isEntityTypeInSet(SetEntityTypeKeys key, EntityType entityType) { return getSetEntityType(key).contains(entityType); }
+    public Path getSurfaceRegionPath() { return surfaceRegionPath; }
+    public Path getCavesRegionPath() { return cavesRegionPath; }
 
     public void saveNewValue(StringKeys key, String value) {
         stringMap.put(key, value);
@@ -175,7 +180,7 @@ public class UnderillaConfig implements GenerationConfig {
             booleanMap.put(key, fileConfiguration.getBoolean(key.path, key.defaultValue));
         }
 
-        // Surface world name need to be loaded before IntegerKeys
+        // Source paths need to be loaded before IntegerKeys so automatic coordinates can inspect the surface regions.
         stringMap.clear();
         for (StringKeys key : StringKeys.values()) {
             if (!fileConfiguration.contains(key.path)) {
@@ -183,6 +188,8 @@ public class UnderillaConfig implements GenerationConfig {
             }
             stringMap.put(key, fileConfiguration.getString(key.path, key.defaultValue));
         }
+        surfaceRegionPath = RegionPathResolver.resolve(fileConfiguration, "surfaceWorld");
+        cavesRegionPath = RegionPathResolver.resolve(fileConfiguration, "cavesWorld");
         integerMap.clear();
         integerAutoMap.clear();
         for (IntegerKeys key : IntegerKeys.values()) {
@@ -267,11 +274,10 @@ public class UnderillaConfig implements GenerationConfig {
         // Compute the 4 coordinates of the area from the surface world that we can guess from regions files.
         if (!integerAutoMap.containsKey(key)) {
             // Read all file names in the regions folder.
-            String surfaceWorldName = getString(StringKeys.SURFACE_WORLD_NAME);
-            File surfaceWorldDirectory = new File(Bukkit.getPluginsFolder() + "/../" + surfaceWorldName + "/region");
-            File[] regionsFiles = surfaceWorldDirectory.listFiles((dir, name) -> name.endsWith(".mca"));
+            File surfaceRegionDirectory = surfaceRegionPath.toFile();
+            File[] regionsFiles = surfaceRegionDirectory.listFiles((dir, name) -> name.endsWith(".mca"));
             if (regionsFiles == null) {
-                throw new RuntimeException("Could not find regions files in " + surfaceWorldDirectory);
+                throw new RuntimeException("Could not find regions files in " + surfaceRegionDirectory);
             }
 
             // Compute the min and max X and Z coordinates.
@@ -462,6 +468,7 @@ public class UnderillaConfig implements GenerationConfig {
     @Override
     public String toString() {
         return "UnderillaConfig{" + "booleanMap=" + booleanMap + "\nintegerMap=" + integerMap + "\nstringMap=" + stringMap
+                + "\nsurfaceRegionPath=" + surfaceRegionPath + "\ncavesRegionPath=" + cavesRegionPath
         // + "\nlistStringMap=" + toString(listStringMap)
                 + "\nlistBiomeStringMap=" + toString(listBiomeStringMap) + "\nlistMaterialMap=" + toString(listMaterialMap)
                 + "\nlistMapMaterialMap=" + listMapMaterialMap + "\nlistStructureMap=" + listStructureMapToString() + '}';
@@ -566,8 +573,6 @@ public class UnderillaConfig implements GenerationConfig {
         STEP_CLEANING_BLOCKS("steps.cleaningBlocks", "skip"),
         STEP_CLEANING_ENTITIES("steps.cleaingEntities", "skip"),
         FINAL_WORLD_NAME("finalWorld.name", "world"),
-        SURFACE_WORLD_NAME("surfaceWorld.name", "world_surface"),
-        CAVES_WORLD_NAME("cavesWorld.name", "world_caves"),
         OUT_OF_THE_SURFACE_WORLD_GENERATOR("outOfTheSurfaceWorldGenerator", "VoidWorldGenerator"),
         STRATEGY("strategy", "SURFACE");
         // @formatter:on

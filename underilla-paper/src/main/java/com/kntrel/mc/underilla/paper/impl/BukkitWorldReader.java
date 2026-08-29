@@ -9,11 +9,11 @@ import java.io.File;
 public class BukkitWorldReader extends DiskWorldReader {
 
     // CONSTRUCTORS
-    public BukkitWorldReader(String worldPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        super(worldPath, cacheSize, logger);
+    public BukkitWorldReader(String regionPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
+        super(regionPath, cacheSize, logger);
     }
-    public BukkitWorldReader(File worldDir, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        super(worldDir, cacheSize, logger);
+    public BukkitWorldReader(File regionDirectory, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
+        super(regionDirectory, cacheSize, logger);
     }
 
 

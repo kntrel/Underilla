@@ -306,7 +306,7 @@ class MergerCharacterizationTest {
         Path worldDirectory = temporaryDirectory.resolve(worldName);
         Path regionDirectory = Files.createDirectories(worldDirectory.resolve("region"));
         Files.copy(resourcePath(resourcePath), regionDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
-        return new TestDiskWorldReader(worldDirectory.toFile(), 1, NO_OP_LOGGER, blocks);
+        return new TestDiskWorldReader(regionDirectory.toFile(), 1, NO_OP_LOGGER, blocks);
     }
 
     private static Path resourcePath(String path) throws URISyntaxException {
@@ -317,7 +317,7 @@ class MergerCharacterizationTest {
 
     private static ChunkReader requiredChunk(TestDiskWorldReader world, ChunkCoordinate coordinate) {
         return world.readChunk(coordinate.x(), coordinate.z()).orElseThrow(() ->
-                new AssertionError("Missing source chunk " + coordinate + " in " + world.getWorldName()));
+                new AssertionError("Missing source chunk " + coordinate));
     }
 
     private record ChunkCoordinate(int x, int z) {}
