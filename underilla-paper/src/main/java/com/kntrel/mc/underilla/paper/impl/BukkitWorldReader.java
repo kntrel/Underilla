@@ -1,7 +1,6 @@
 package com.kntrel.mc.underilla.paper.impl;
 
 import com.jkantrell.mca.Chunk;
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import java.io.File;
@@ -9,11 +8,11 @@ import java.io.File;
 public class BukkitWorldReader extends DiskWorldReader {
 
     // CONSTRUCTORS
-    public BukkitWorldReader(String regionPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        super(regionPath, cacheSize, logger);
+    public BukkitWorldReader(String regionPath, int cacheSize) throws NoSuchFieldException {
+        super(regionPath, cacheSize);
     }
-    public BukkitWorldReader(File regionDirectory, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        super(regionDirectory, cacheSize, logger);
+    public BukkitWorldReader(File regionDirectory, int cacheSize) throws NoSuchFieldException {
+        super(regionDirectory, cacheSize);
     }
 
 

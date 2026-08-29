@@ -12,8 +12,11 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CleanBlocksTask extends FollowableProgressTask {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CleanBlocksTask.class);
     private LevelReader levelReader;
     public CleanBlocksTask(int taskID, int tasksCount) {
         super(taskID, tasksCount);
@@ -57,10 +60,10 @@ public class CleanBlocksTask extends FollowableProgressTask {
                 if (selector == null || selector.progress() >= 1 || stop) {
                     printProgress(processedBlocks, startTime);
 
-                    Underilla.info(
-                            "Cleaning blocks task " + taskID + " finished in " + Duration.ofMillis(System.currentTimeMillis() - startTime));
-                    Underilla.info("Replaced blocks: " + replacedBlock);
-                    Underilla.info("Final blocks: " + finalBlock);
+                    LOGGER.info("Cleaning blocks task {} finished in {}", taskID,
+                            Duration.ofMillis(System.currentTimeMillis() - startTime));
+                    LOGGER.info("Replaced blocks: {}", replacedBlock);
+                    LOGGER.info("Final blocks: {}", finalBlock);
                     cancel();
                     Underilla.getInstance().validateTask(StringKeys.STEP_CLEANING_BLOCKS);
                     return;

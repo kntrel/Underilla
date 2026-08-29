@@ -24,8 +24,11 @@ import org.bukkit.Registry;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.EntityType;
 import org.bukkit.generator.structure.Structure;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UnderillaConfig implements GenerationConfig {
+    private static final Logger LOGGER = LoggerFactory.getLogger(UnderillaConfig.class);
     private final EnumMap<BooleanKeys, Boolean> booleanMap;
     private final EnumMap<IntegerKeys, Integer> integerMap;
     private final EnumMap<IntegerKeys, Integer> integerAutoMap;
@@ -209,11 +212,11 @@ public class UnderillaConfig implements GenerationConfig {
                 value = fileConfiguration.getInt(key.path, key.defaultValue);
             }
             if (value > key.max) {
-                Underilla.warning("Value " + value + " is greater than max " + key.max + " for key " + key);
+                LOGGER.warn("Value {} is greater than max {} for key {}", value, key.max, key);
                 value = key.max;
             }
             if (value < key.min) {
-                Underilla.warning("Value " + value + " is less than min " + key.min + " for key " + key);
+                LOGGER.warn("Value {} is less than min {} for key {}", value, key.min, key);
                 value = key.min;
             }
             integerMap.put(key, value);
@@ -312,19 +315,19 @@ public class UnderillaConfig implements GenerationConfig {
 
     private void swapAeraValueIfNeeded() {
         if (getInt(IntegerKeys.GENERATION_AREA_MIN_X) > getInt(IntegerKeys.GENERATION_AREA_MAX_X)) {
-            Underilla.warning("Min X is greater than max X. Swapping values.");
+            LOGGER.warn("Min X is greater than max X. Swapping values.");
             int temp = getInt(IntegerKeys.GENERATION_AREA_MIN_X);
             integerMap.put(IntegerKeys.GENERATION_AREA_MIN_X, getInt(IntegerKeys.GENERATION_AREA_MAX_X));
             integerMap.put(IntegerKeys.GENERATION_AREA_MAX_X, temp);
         }
         if (getInt(IntegerKeys.GENERATION_AREA_MIN_Y) > getInt(IntegerKeys.GENERATION_AREA_MAX_Y)) {
-            Underilla.warning("Min Y is greater than max Y. Swapping values.");
+            LOGGER.warn("Min Y is greater than max Y. Swapping values.");
             int temp = getInt(IntegerKeys.GENERATION_AREA_MIN_Y);
             integerMap.put(IntegerKeys.GENERATION_AREA_MIN_Y, getInt(IntegerKeys.GENERATION_AREA_MAX_Y));
             integerMap.put(IntegerKeys.GENERATION_AREA_MAX_Y, temp);
         }
         if (getInt(IntegerKeys.GENERATION_AREA_MIN_Z) > getInt(IntegerKeys.GENERATION_AREA_MAX_Z)) {
-            Underilla.warning("Min Z is greater than max Z. Swapping values.");
+            LOGGER.warn("Min Z is greater than max Z. Swapping values.");
             int temp = getInt(IntegerKeys.GENERATION_AREA_MIN_Z);
             integerMap.put(IntegerKeys.GENERATION_AREA_MIN_Z, getInt(IntegerKeys.GENERATION_AREA_MAX_Z));
             integerMap.put(IntegerKeys.GENERATION_AREA_MAX_Z, temp);
@@ -353,13 +356,13 @@ public class UnderillaConfig implements GenerationConfig {
                 fileConfiguration.getConfigurationSection(key.path).getKeys(false).forEach(materialKey -> {
                     Material material = Material.matchMaterial(materialKey);
                     if (material == null) {
-                        Underilla.warning("Material " + materialKey + " not found in the material list of the server.");
+                        LOGGER.warn("Material {} not found in the material list of the server.", materialKey);
                         return;
                     }
                     String value = fileConfiguration.getString(key.path + "." + materialKey);
                     Material valueMaterial = Material.matchMaterial(value);
                     if (valueMaterial == null) {
-                        Underilla.warning("Material " + value + " not found in the material list of the server.");
+                        LOGGER.warn("Material {} not found in the material list of the server.", value);
                         return;
                     }
                     map.put(material, valueMaterial);
@@ -392,7 +395,7 @@ public class UnderillaConfig implements GenerationConfig {
                 } else if (allBiomes.contains(biomeOrTag)) {
                     existingBiomes.add(biomeOrTag);
                 } else {
-                    Underilla.warning("Biome or tag " + biomeOrTag + " not found in the biome list of the server.");
+                    LOGGER.warn("Biome or tag {} not found in the biome list of the server.", biomeOrTag);
                 }
             }
             listBiomeStringMap.put(key, existingBiomes);
@@ -494,7 +497,7 @@ public class UnderillaConfig implements GenerationConfig {
         boolean exceptOnEmpty = exceptOn.isEmpty();
 
         if (!onlyOnEmpty && !exceptOnEmpty) {
-            Underilla.warning("Both " + onlyOnKey + " and " + exceptOnKey + " are set. Ignoring " + exceptOnKey + ".");
+            LOGGER.warn("Both {} and {} are set. Ignoring {}.", onlyOnKey, exceptOnKey, exceptOnKey);
         } else if (onlyOnEmpty && exceptOnEmpty) {
             listBiomeStringMap.put(onlyOnKey, new HashSet<>(allBiomes));
         } else if (onlyOnEmpty) {
@@ -504,7 +507,7 @@ public class UnderillaConfig implements GenerationConfig {
         listBiomeStringMap.remove(exceptOnKey);
     }
 
-    private void warnKeyMissing(Object key) { Underilla.warning("Key " + key + " not found in config"); }
+    private void warnKeyMissing(Object key) { LOGGER.warn("Key {} not found in config", key); }
 
 
     // enum keys ------------------------------------------------------------------------------------------------------

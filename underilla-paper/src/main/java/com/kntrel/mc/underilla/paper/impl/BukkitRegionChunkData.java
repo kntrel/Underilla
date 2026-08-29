@@ -7,10 +7,13 @@ import com.kntrel.mc.underilla.core.vector.VectorIterable;
 import com.kntrel.mc.underilla.paper.Underilla;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.generator.LimitedRegion;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BukkitRegionChunkData implements ChunkData {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(BukkitRegionChunkData.class);
     // FIELDS
     private final LimitedRegion region;
     private final int minHeight_, maxHeight_, chunkX_, chunkZ_, absX_, absZ_;
@@ -67,7 +70,7 @@ public class BukkitRegionChunkData implements ChunkData {
                     this.absZ_ + z) instanceof org.bukkit.block.CreatureSpawner creatureSpawner) {
                 creatureSpawner.setSpawnedType(bukkitBlock.getSpawnedType().get());
                 creatureSpawner.update();
-                Underilla.info("\nSet spawner type to " + bukkitBlock.getSpawnedType().get());
+                LOGGER.info("Set spawner type to {}", bukkitBlock.getSpawnedType().get());
             }
         }
     }

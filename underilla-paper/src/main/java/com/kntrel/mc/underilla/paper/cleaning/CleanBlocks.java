@@ -14,8 +14,11 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.craftbukkit.CraftWorld;
 import org.bukkit.generator.LimitedRegion;
 import org.bukkit.generator.WorldInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CleanBlocks {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CleanBlocks.class);
     private static Set<Material> returnToDirt = Set.of(Material.GRASS_BLOCK, Material.PODZOL, Material.DIRT_PATH);
 
     public static void cleanBlocks(Chunk chunk) {
@@ -48,7 +51,7 @@ public class CleanBlocks {
             for (int z = minZ; z < maxZ; z++) {
                 for (int y = minY; y < maxY; y++) {
                     if (!limitedRegion.isInRegion(x, y, z)) {
-                        Underilla.warning("Block " + x + ", " + y + ", " + z + " is not in the region " + limitedRegion.getBuffer());
+                        LOGGER.warn("Block {}, {}, {} is not in the region {}", x, y, z, limitedRegion.getBuffer());
                         continue;
                     }
                     BlockData blockData = limitedRegion.getBlockData(x, y, z);

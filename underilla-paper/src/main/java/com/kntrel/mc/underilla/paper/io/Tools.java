@@ -1,15 +1,10 @@
 package com.kntrel.mc.underilla.paper.io;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.annotation.Nonnull;
 
 public class Tools {
     private Tools() {}
-    public static String exceptionToString(Exception e) {
-        return Arrays.stream(e.getStackTrace()).map(s -> s.toString()).collect(Collectors.joining("\n", e.getMessage() + ": ", ""));
-    }
 
     /**
      * Normalize the name to the format minecraft:name

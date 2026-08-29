@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
@@ -21,14 +20,6 @@ class UnderillaEngineBiomeTest {
     private static final TestBiome PLAINS = new TestBiome("minecraft:plains");
     private static final TestBiome DEEP_DARK = new TestBiome("minecraft:deep_dark");
     private static final TestBiome REFERENCE = new TestBiome("example:reference");
-    private static final GenerationLogger NO_OP_LOGGER = new GenerationLogger() {
-        @Override
-        public void warning(String message) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-    };
-
     @Test
     void biomeDataDerivesChunkAndBiomeCoordinatesWithFloorDivision() {
         BiomeData data = new TestBiomeData(PLAINS, -1, -1, -17);
@@ -94,7 +85,7 @@ class UnderillaEngineBiomeTest {
 
     private static UnderillaEngine engine(TestWorld referenceWorld, TestGenerationConfig config, Boundary boundary) {
         TestBlockFactory blocks = new TestBlockFactory(TestBlock.air("minecraft:air"));
-        GenerationContext context = new GenerationContext(config, blocks, NO_OP_LOGGER);
+        GenerationContext context = new GenerationContext(config, blocks);
         PatchingPlan plan = new PatchingPlan(chunk -> {}, chunk -> {}, boundary, true);
         return new UnderillaEngine(referenceWorld, plan, context);
     }

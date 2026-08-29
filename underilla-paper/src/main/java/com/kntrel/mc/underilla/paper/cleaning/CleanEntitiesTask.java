@@ -11,8 +11,12 @@ import org.bukkit.Chunk;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CleanEntitiesTask extends FollowableProgressTask {
+    private static final Logger LOGGER = LoggerFactory.getLogger(CleanEntitiesTask.class);
+
     public CleanEntitiesTask(int taskID, int tasksCount) { super(taskID, tasksCount); }
     public CleanEntitiesTask(int taskID, int tasksCount, Selector selector) { super(taskID, tasksCount, selector); }
 
@@ -44,10 +48,10 @@ public class CleanEntitiesTask extends FollowableProgressTask {
                 if (selector == null || selector.progress() >= 1 || stop) {
                     printProgress(processedEntities, startTime);
                     String finishOrStop = stop ? "stopped" : "finished";
-                    Underilla.info("Cleaning entities task " + taskID + " " + finishOrStop + " in "
-                            + Duration.ofMillis(System.currentTimeMillis() - startTime));
-                    Underilla.info("Removed entities: " + removedEntity);
-                    Underilla.info("Final entities: " + finalEntity);
+                    LOGGER.info("Cleaning entities task {} {} in {}", taskID, finishOrStop,
+                            Duration.ofMillis(System.currentTimeMillis() - startTime));
+                    LOGGER.info("Removed entities: {}", removedEntity);
+                    LOGGER.info("Final entities: {}", finalEntity);
                     cancel();
                     Underilla.getInstance().validateTask(StringKeys.STEP_CLEANING_ENTITIES);
                     return;

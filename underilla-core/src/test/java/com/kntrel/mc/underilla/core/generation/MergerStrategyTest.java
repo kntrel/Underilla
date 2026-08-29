@@ -12,7 +12,6 @@ import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
@@ -33,14 +32,6 @@ class PatcherStrategyTest {
     private static final TestBlock LEAVES = new TestBlock("minecraft:oak_leaves", true, false, false);
     private static final TestBlock REFERENCE = new TestBlock("minecraft:reference", true, false, false);
     private static final TestBlock GENERATED = new TestBlock("minecraft:generated", true, false, false);
-    private static final GenerationLogger NO_OP_LOGGER = new GenerationLogger() {
-        @Override
-        public void warning(String message) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-    };
-
     @Test
     void boundaryPredicatesHaveExplicitEqualitySemantics() {
         Boundary boundary = new AbsoluteBoundary(10);
@@ -161,7 +152,7 @@ class PatcherStrategyTest {
             @Override
             public Block create(String name) { return new TestBlock(name, true, false, false); }
         };
-        return new GenerationContext(config, blockFactory, NO_OP_LOGGER);
+        return new GenerationContext(config, blockFactory);
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, TestConfig config) {

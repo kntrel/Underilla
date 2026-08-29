@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestDiskWorldReader;
@@ -18,13 +17,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 class DiskWorldReaderTest {
 
-    private static final GenerationLogger NO_OP_LOGGER = new GenerationLogger() {
-        @Override
-        public void warning(String message) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-    };
     @TempDir
     Path temporaryDirectory;
 
@@ -34,7 +26,7 @@ class DiskWorldReaderTest {
         Files.copy(resourcePath("mca/surface.mca"), regionDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
 
         TestDiskWorldReader reader = new TestDiskWorldReader(
-                regionDirectory.toFile(), 1, NO_OP_LOGGER,
+                regionDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
 
         assertEquals("minecraft:stone", reader.blockAt(0, 0, 0).orElseThrow().getName());
@@ -45,7 +37,7 @@ class DiskWorldReaderTest {
         Path missingRegionDirectory = temporaryDirectory.resolve("world/region");
 
         assertThrows(NoSuchFieldException.class, () -> new TestDiskWorldReader(
-                missingRegionDirectory.toFile(), 1, NO_OP_LOGGER,
+                missingRegionDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air"))));
     }
 

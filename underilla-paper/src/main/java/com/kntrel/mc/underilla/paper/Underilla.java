@@ -4,7 +4,6 @@ import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
 import com.kntrel.mc.underilla.core.generation.PatcherFactory;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocksTask;
 import com.kntrel.mc.underilla.paper.cleaning.CleanEntitiesTask;
@@ -13,8 +12,6 @@ import com.kntrel.mc.underilla.paper.generation.GeneratorAccessor;
 import com.kntrel.mc.underilla.paper.generation.UnderillaChunkGenerator;
 import com.kntrel.mc.underilla.paper.impl.BukkitBlockFactory;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldReader;
-import com.kntrel.mc.underilla.paper.impl.PaperGenerationLogger;
-import com.kntrel.mc.underilla.paper.io.Tools;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
@@ -31,8 +28,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.logging.Level;
 import javax.annotation.Nullable;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -43,9 +38,12 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.popcraft.chunky.Chunky;
 import org.popcraft.chunky.ChunkyProvider;
 import org.popcraft.chunky.api.event.task.GenerationProgressEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Underilla extends JavaPlugin {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(Underilla.class);
     private UnderillaConfig underillaConfig;
     private GenerationContext generationContext;
     private WorldReader worldSurfaceReader;
@@ -71,11 +69,11 @@ public final class Underilla extends JavaPlugin {
     @Override
     public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
         if (allStepsDone()) {
-            info("Use the out of the surface world generator instead of Underilla because we have done all generation & cleaning steps.");
+            LOGGER.info("Use the out of the surface world generator instead of Underilla because we have done all generation & cleaning steps.");
             return GeneratorAccessor.getOutOfTheSurfaceWorldGenerator(worldName, id);
         }
         if (this.worldSurfaceReader == null) {
-            warning("No surface region directory at '" + getUnderillaConfig().getSurfaceRegionPath() + "' found");
+            LOGGER.warn("No surface region directory at '{}' found", getUnderillaConfig().getSurfaceRegionPath());
             return super.getDefaultWorldGenerator(worldName, id);
         }
         ChunkGenerator outOfTheSurfaceWorldGenerator = GeneratorAccessor.getOutOfTheSurfaceWorldGenerator(worldName, id);
@@ -92,7 +90,8 @@ public final class Underilla extends JavaPlugin {
             case "NONE" -> PatcherFactory.none(worldSurfaceReader, cavesBlocksWorld, generationContext);
             default -> throw new IllegalArgumentException("Unknown patch strategy: " + configuredStrategy);
         };
-        info("Using Underilla as main world generator (with " + outOfTheSurfaceWorldGenerator + " as outOfTheSurfaceWorldGenerator)!");
+        LOGGER.info("Using Underilla as main world generator (with {} as outOfTheSurfaceWorldGenerator)!",
+                outOfTheSurfaceWorldGenerator);
         UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader,
                 outOfTheSurfaceWorldGenerator, patchingPlan, generationContext);
         this.worldGenerators.put(worldName, worldGenerator);
@@ -110,29 +109,24 @@ public final class Underilla extends JavaPlugin {
         runStepsOnEnabled();
 
         if (!allStepsDone()) {
-            GenerationLogger generationLogger = new PaperGenerationLogger();
-            generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory(), generationLogger);
+            generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory());
             // Loading reference world
             File surfaceRegionDirectory = getUnderillaConfig().getSurfaceRegionPath().toFile();
             try {
-                this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory,
-                        getUnderillaConfig().cacheSize(), generationLogger);
-                info("Surface region directory '" + surfaceRegionDirectory + "' found.");
+                this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, getUnderillaConfig().cacheSize());
+                LOGGER.info("Surface region directory '{}' found.", surfaceRegionDirectory);
             } catch (NoSuchFieldException e) {
-                warning("No surface region directory at '" + surfaceRegionDirectory + "' found");
-                warning(() -> Tools.exceptionToString(e));
+                LOGGER.warn("No surface region directory at '{}' found", surfaceRegionDirectory, e);
             }
             // Loading caves world if we should use it.
             if (getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BLOCKS_FROM_CAVES_WORLD)
                     || getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BIOMES_FROM_CAVES_WORLD)) {
                 try {
-                    info("Loading caves world");
+                    LOGGER.info("Loading caves world");
                     File cavesRegionDirectory = getUnderillaConfig().getCavesRegionPath().toFile();
-                    this.worldCavesReader = new BukkitWorldReader(cavesRegionDirectory,
-                            getUnderillaConfig().cacheSize(), generationLogger);
+                    this.worldCavesReader = new BukkitWorldReader(cavesRegionDirectory, getUnderillaConfig().cacheSize());
                 } catch (NoSuchFieldException e) {
-                    warning("No caves region directory at '" + getUnderillaConfig().getCavesRegionPath() + "' found");
-                    warning(() -> Tools.exceptionToString(e));
+                    LOGGER.warn("No caves region directory at '{}' found", getUnderillaConfig().getCavesRegionPath(), e);
                 }
             }
 
@@ -144,7 +138,7 @@ public final class Underilla extends JavaPlugin {
             this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
 
             if (getUnderillaConfig().getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
-                info("Cleaning listener for blocks and/or entities have been init.");
+                LOGGER.info("Cleaning listener for blocks and/or entities have been init.");
                 this.getServer().getPluginManager().registerEvents(new ChunkGeneratedListener(), this);
             }
         }
@@ -157,18 +151,17 @@ public final class Underilla extends JavaPlugin {
             if (UnderillaEngine.times != null) {
                 long totalTime = UnderillaEngine.times.entrySet().stream().mapToLong(Map.Entry::getValue).sum();
                 for (Map.Entry<String, Long> entry : UnderillaEngine.times.entrySet()) {
-                    info(entry.getKey() + " took " + entry.getValue() + "ms (" + (entry.getValue() * 100 / totalTime) + "%)");
+                    LOGGER.info("{} took {}ms ({}%)", entry.getKey(), entry.getValue(), entry.getValue() * 100 / totalTime);
                 }
             }
             for (Map.Entry<String, UnderillaChunkGenerator> worldGenerator : worldGenerators.entrySet()) {
                 Map<String, Long> biomesPlaced = worldGenerator.getValue().getBiomesPlaced();
-                info("Map of biomes placed in world '" + worldGenerator.getKey() + "': " + biomesPlaced.entrySet().stream()
+                LOGGER.info("Map of biomes placed in world '{}': {}", worldGenerator.getKey(), biomesPlaced.entrySet().stream()
                         .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
                         .map(entry -> entry.getKey() + ": " + entry.getValue()).reduce((a, b) -> a + ", " + b).orElse(""));
             }
         } catch (Exception e) {
-            info("Fail to print times or biomes placed.");
-            Underilla.info(() -> Tools.exceptionToString(e));
+            LOGGER.error("Failed to print times or biomes placed", e);
         }
     }
 
@@ -181,35 +174,13 @@ public final class Underilla extends JavaPlugin {
             underillaConfig.reload(getConfig());
         }
         if (!allStepsDone()) {
-            Underilla.info("Config reloaded with values: " + underillaConfig);
+            LOGGER.info("Config reloaded with values: {}", underillaConfig);
         }
     }
 
     public static Underilla getInstance() { return getPlugin(Underilla.class); }
     public static UnderillaConfig getUnderillaConfig() { return getInstance().underillaConfig; }
-
-
-    public static void log(Level level, String message) { getInstance().getLogger().log(level, message); }
-    public static void log(Level level, String message, Throwable e) { getInstance().getLogger().log(level, message, e); }
-    public static void debug(String message) {
-        if (getInstance().getConfig().getBoolean("debug", false)) {
-            log(Level.INFO, message);
-        }
-    }
-    public static void debug(Supplier<String> messageProvider) {
-        if (getInstance().getConfig().getBoolean("debug", false)) {
-            log(Level.INFO, messageProvider.get());
-        }
-    }
-    public static void info(String message) { log(Level.INFO, message); }
-    public static void info(Supplier<String> messageProvider) { log(Level.INFO, messageProvider.get()); }
-    public static void info(String message, Throwable e) { log(Level.INFO, message, e); }
-    public static void warning(String message) { log(Level.WARNING, message); }
-    public static void warning(Supplier<String> messageProvider) { log(Level.WARNING, messageProvider.get()); }
-    public static void warning(String message, Throwable e) { log(Level.WARNING, message, e); }
-    public static void error(String message) { log(Level.SEVERE, message); }
-    public static void error(Supplier<String> messageProvider) { log(Level.SEVERE, messageProvider.get()); }
-    public static void error(String message, Throwable e) { log(Level.SEVERE, message, e); }
+    public static boolean isDebugEnabled() { return getInstance().getConfig().getBoolean("debug", false); }
 
 
     private void runStepsOnEnabled() {
@@ -225,7 +196,7 @@ public final class Underilla extends JavaPlugin {
             needARestart = ServerSetup.setupBukkitWorldGenerator() || needARestart;
         }
         if (needARestart) {
-            info("Underilla have done pre generation steps. Restarting server to apply changes.");
+            LOGGER.info("Underilla have done pre generation steps. Restarting server to apply changes.");
             Bukkit.shutdownMessage();
             // Bukkit.shutdown(); // It doesn't work before the world is loaded.
             Bukkit.getServer().restart();
@@ -255,7 +226,7 @@ public final class Underilla extends JavaPlugin {
     public void validateTask(StringKeys taskKey, boolean done) {
         getUnderillaConfig().saveNewValue(taskKey, done ? DONE : FAILED);
         if (done && endTaskActions.containsKey(taskKey)) {
-            Underilla.info("Running post action for task " + taskKey);
+            LOGGER.info("Running post action for task {}", taskKey);
             endTaskActions.get(taskKey).run();
         }
         runNextStepsAfterWorldInit();
@@ -313,9 +284,9 @@ public final class Underilla extends JavaPlugin {
         });
 
         chunky.getApi().onGenerationComplete(generationCompleteEvent -> {
-            info("Chunky task for world " + worldName + " has finished");
+            LOGGER.info("Chunky task for world {} has finished", worldName);
             if (structureEventListener != null) {
-                info("Structure generation: " + structureEventListener.getStructureCount());
+                LOGGER.info("Structure generation: {}", structureEventListener.getStructureCount());
             }
             validateTask(StringKeys.STEP_UNDERILLA_GENERATION);
         });
@@ -328,23 +299,23 @@ public final class Underilla extends JavaPlugin {
             setToDoingTask(StringKeys.STEP_UNDERILLA_GENERATION);
         }
         if (worked) {
-            info("Started Chunky task for world " + worldName);
+            LOGGER.info("Started Chunky task for world {}", worldName);
         } else {
-            warning("Failed to start Chunky task for world " + worldName);
+            LOGGER.warn("Failed to start Chunky task for world {}", worldName);
             validateTask(StringKeys.STEP_UNDERILLA_GENERATION, false);
         }
     }
     private void runChunky() { runChunky(false); }
     private void runCleanBlocks(Selector selector) {
         setToDoingTask(StringKeys.STEP_CLEANING_BLOCKS);
-        info("Starting clean blocks task");
+        LOGGER.info("Starting clean blocks task");
         cleanBlocksTask = new CleanBlocksTask(2, 3, selector);
         cleanBlocksTask.run();
     }
     private void runCleanBlocks() { runCleanBlocks(getUnderillaConfig().getSelector()); }
     private void runCleanEntities(Selector selector) {
         setToDoingTask(StringKeys.STEP_CLEANING_ENTITIES);
-        info("Starting clean entities task");
+        LOGGER.info("Starting clean entities task");
         cleanEntitiesTask = new CleanEntitiesTask(3, 3);
         cleanEntitiesTask.run();
     }
@@ -364,24 +335,24 @@ public final class Underilla extends JavaPlugin {
 
     // restart tasks --------------------------------------------------------------------------------------------------
     private void restartChunky() {
-        info("Restarting Chunky task");
+        LOGGER.info("Restarting Chunky task");
         runChunky(true);
     }
     private void restartCleanBlocks() {
-        info("Restarting clean blocks task");
+        LOGGER.info("Restarting clean blocks task");
         try {
             runCleanBlocks(Selector.loadFrom("cleanBlocksTask"));
         } catch (Exception e) {
-            Underilla.warning("Tasks can't be restarted from last state. Restarting from the beginning.");
+            LOGGER.warn("Tasks can't be restarted from last state. Restarting from the beginning.", e);
             runCleanBlocks();
         }
     }
     private void restartCleanEntities() {
-        info("Restarting clean entities task");
+        LOGGER.info("Restarting clean entities task");
         try {
             runCleanEntities(Selector.loadFrom("cleanEntitiesTask"));
         } catch (Exception e) {
-            Underilla.warning("Tasks can't be restarted from last state. Restarting from the beginning.");
+            LOGGER.warn("Tasks can't be restarted from last state. Restarting from the beginning.", e);
             runCleanEntities();
         }
     }

@@ -12,10 +12,13 @@ import org.bukkit.block.Biome;
 import org.bukkit.generator.BiomeProvider;
 import org.bukkit.generator.WorldInfo;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Provides Underilla's reference-world biomes while preserving configured vanilla cave biomes. */
 public final class UnderillaBiomeProvider extends BiomeProvider {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(UnderillaBiomeProvider.class);
     private final UnderillaEngine underillaEngine;
     private volatile BiomeProvider vanillaProvider;
     private final @Nullable BiomeProvider outOfBoundsProvider;
@@ -65,7 +68,7 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
         synchronized (this) {
             if (vanillaProvider == null) {
                 vanillaProvider = worldInfo.vanillaBiomeProvider();
-                Underilla.info("Vanilla biome provider initialized: " + vanillaProvider);
+                LOGGER.info("Vanilla biome provider initialized: {}", vanillaProvider);
             }
             return vanillaProvider;
         }
@@ -76,7 +79,7 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
     private synchronized void warning(String message) {
         long currentTime = System.currentTimeMillis();
         if (currentTime - lastWarningPrinted > Underilla.MS_PER_SECOND) {
-            Underilla.warning(message);
+            LOGGER.warn(message);
             lastWarningPrinted = currentTime;
         }
     }

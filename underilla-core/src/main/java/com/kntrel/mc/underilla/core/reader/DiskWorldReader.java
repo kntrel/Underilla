@@ -6,15 +6,15 @@ import com.jkantrell.mca.MCAUtil;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import java.io.File;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Reads chunks directly from a directory of Anvil region files.
@@ -24,22 +24,21 @@ import java.util.Optional;
  */
 public abstract class DiskWorldReader implements WorldReader {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(DiskWorldReader.class);
     private final File regions;
     private final RLUCache<MCAFile> regionCache;
     private final RLUCache<ChunkReader> chunkCache;
     private final RLUCacheTriple<Biome> biomeCache;
-    private final GenerationLogger logger;
 
-    protected DiskWorldReader(String regionPath, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
-        this(new File(regionPath), cacheSize, logger);
+    protected DiskWorldReader(String regionPath, int cacheSize) throws NoSuchFieldException {
+        this(new File(regionPath), cacheSize);
     }
 
-    protected DiskWorldReader(File regionDirectory, int cacheSize, GenerationLogger logger) throws NoSuchFieldException {
+    protected DiskWorldReader(File regionDirectory, int cacheSize) throws NoSuchFieldException {
         if (!(regionDirectory.exists() && regionDirectory.isDirectory())) {
             throw new NoSuchFieldException("Region directory '" + regionDirectory.getPath() + "' does not exist.");
         }
         this.regions = regionDirectory;
-        this.logger = Objects.requireNonNull(logger, "logger");
         this.regionCache = new RLUCache<>(cacheSize);
         int chunkCacheSize = cacheSize * 64;
         this.chunkCache = new RLUCache<>(chunkCacheSize);
@@ -114,7 +113,7 @@ public abstract class DiskWorldReader implements WorldReader {
             regionCache.put(x, z, region);
             return region;
         } catch (Exception exception) {
-            logger.error("Failed to read region file '" + regionFile.getPath() + "'", exception);
+            LOGGER.error("Failed to read region file '{}'", regionFile.getPath(), exception);
             return null;
         }
     }

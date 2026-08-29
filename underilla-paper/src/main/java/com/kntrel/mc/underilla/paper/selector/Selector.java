@@ -13,11 +13,14 @@ import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // Upgraded version from WorldSelectorH.
 // TODO test if we can improve performance by iterating region per region instead of moving one x and one z at a time. And inside each
 // region, iterate by chunks.
 public class Selector implements Serializable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Selector.class);
     private final int xMin;
     private final int zMin;
     private final int yMin; // = -64
@@ -119,19 +122,19 @@ public class Selector implements Serializable {
         File file = new File(getSaveFolder(), path + ".dat");
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
             oos.writeObject(this);
-            Underilla.info("Selector saved to file: " + file.getAbsolutePath());
+            LOGGER.info("Selector saved to file: {}", file.getAbsolutePath());
         } catch (IOException e) {
-            Underilla.error("Error while saving selector to file: " + file.getAbsolutePath());
+            LOGGER.error("Error while saving selector to file: {}", file.getAbsolutePath(), e);
         }
     }
     public static Selector loadFrom(String path) {
         File file = new File(Underilla.getInstance().getDataFolder(), path + ".dat");
         try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
             Selector selector = (Selector) ois.readObject();
-            Underilla.info("Selector loaded from file: " + file.getAbsolutePath());
+            LOGGER.info("Selector loaded from file: {}", file.getAbsolutePath());
             return selector;
         } catch (IOException | ClassNotFoundException e) {
-            Underilla.error("Error while loading selector from file: " + file.getAbsolutePath());
+            LOGGER.error("Error while loading selector from file: {}", file.getAbsolutePath(), e);
         }
         return null;
     }

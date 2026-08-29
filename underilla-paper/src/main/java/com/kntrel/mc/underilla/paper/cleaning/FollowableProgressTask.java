@@ -4,8 +4,11 @@ import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class FollowableProgressTask {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FollowableProgressTask.class);
     protected final Selector selector;
     protected final int taskID;
     protected final int tasksCount;
@@ -45,8 +48,8 @@ public abstract class FollowableProgressTask {
         long timeForFullProgressLeft = timeForFullProgress - (System.currentTimeMillis() - startTime);
         extraString = extraString == null ? "" : " " + extraString;
         String taskIDCount = tasksCount > 1 ? " (" + taskID + "/" + tasksCount + ")" : "";
-        Underilla.info("Task" + taskIDCount + " Progress: " + processed + "   " + doubleToPercent(progress) + " ETA: "
-                + Duration.ofMillis(timeForFullProgressLeft) + extraString);
+        LOGGER.info("Task{} Progress: {}   {} ETA: {}{}", taskIDCount, processed, doubleToPercent(progress),
+                Duration.ofMillis(timeForFullProgressLeft), extraString);
     }
     private static String doubleToPercent(double d) { return String.format("%.4f", d * 100) + "%"; }
 }

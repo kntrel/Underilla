@@ -8,10 +8,13 @@ import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
 import java.util.List;
 import java.util.Objects;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Restores reference-world liquids above the terrain boundary after carvers run. */
 public final class LiquidPatcher implements Patcher {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(LiquidPatcher.class);
     private final WorldReader surfaceWorld;
     private final Boundary boundary;
     private final GenerationContext context;
@@ -26,8 +29,8 @@ public final class LiquidPatcher implements Patcher {
     public void patch(ChunkData targetChunk) {
         ChunkReader surfaceChunk = surfaceWorld.readChunk(targetChunk.getChunkX(), targetChunk.getChunkZ()).orElse(null);
         if (surfaceChunk == null) {
-            context.logger().warning(String.format("No reader found for chunk %d, %d. Skipping liquid reinsertion.",
-                    targetChunk.getChunkX(), targetChunk.getChunkZ()));
+            LOGGER.warn("No reader found for chunk {}, {}. Skipping liquid reinsertion.",
+                    targetChunk.getChunkX(), targetChunk.getChunkZ());
             return;
         }
 

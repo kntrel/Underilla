@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
-import com.kntrel.mc.underilla.core.api.GenerationLogger;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
@@ -61,14 +60,6 @@ class MergerCharacterizationTest {
             new ChunkCoordinate(17, 14),
             new ChunkCoordinate(23, 0),
             new ChunkCoordinate(30, 30));
-    private static final GenerationLogger NO_OP_LOGGER = new GenerationLogger() {
-        @Override
-        public void warning(String message) {}
-
-        @Override
-        public void error(String message, Throwable cause) {}
-    };
-
     @TempDir
     Path temporaryDirectory;
 
@@ -88,7 +79,7 @@ class MergerCharacterizationTest {
 
         TestGenerationConfig absoluteConfig = new TestGenerationConfig(MINIMUM_Y, MAXIMUM_Y)
                 .maximumCaveY(ABSOLUTE_MERGE_BOUNDARY_Y);
-        GenerationContext absoluteContext = new GenerationContext(absoluteConfig, blocks, NO_OP_LOGGER);
+        GenerationContext absoluteContext = new GenerationContext(absoluteConfig, blocks);
         absolutePatcher = new LegacyMergerPatcher(new AbsoluteMerger(absoluteContext), surfaceWorld, cavesWorld);
 
         surfaceConfig = new TestGenerationConfig(MINIMUM_Y, MAXIMUM_Y)
@@ -97,7 +88,7 @@ class MergerCharacterizationTest {
                 .adaptiveMaximumDepth(ADAPTIVE_MAXIMUM_DEPTH)
                 .adaptiveMinimumHiddenDepth(ADAPTIVE_MINIMUM_HIDDEN_DEPTH);
         IGNORED_SURFACE_BLOCKS.forEach(surfaceConfig::ignoreSurfaceBlock);
-        GenerationContext surfaceContext = new GenerationContext(surfaceConfig, blocks, NO_OP_LOGGER);
+        GenerationContext surfaceContext = new GenerationContext(surfaceConfig, blocks);
         surfacePatcher = new LegacyMergerPatcher(new SurfaceMerger(surfaceWorld, surfaceContext),
                 surfaceWorld, cavesWorld);
         surfacePatcherWithoutCaves = new LegacyMergerPatcher(new SurfaceMerger(surfaceWorld, surfaceContext),
@@ -306,7 +297,7 @@ class MergerCharacterizationTest {
         Path worldDirectory = temporaryDirectory.resolve(worldName);
         Path regionDirectory = Files.createDirectories(worldDirectory.resolve("region"));
         Files.copy(resourcePath(resourcePath), regionDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
-        return new TestDiskWorldReader(regionDirectory.toFile(), 1, NO_OP_LOGGER, blocks);
+        return new TestDiskWorldReader(regionDirectory.toFile(), 1, blocks);
     }
 
     private static Path resourcePath(String path) throws URISyntaxException {

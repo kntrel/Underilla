@@ -10,8 +10,11 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.AsyncStructureSpawnEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StructureEventListener implements Listener {
+    private static final Logger LOGGER = LoggerFactory.getLogger(StructureEventListener.class);
     private final Map<String, Integer> structureCount;
 
     public StructureEventListener() { structureCount = new HashMap<>(); }
@@ -24,8 +27,10 @@ public class StructureEventListener implements Listener {
         if (Underilla.getUnderillaConfig().isStructureInSet(SetStructureKeys.SURUCTURE_ONLY, e.getStructure())) {
             NamespacedKey structureKey = RegistryAccess.registryAccess().getRegistry(RegistryKey.STRUCTURE).getKey(e.getStructure());
             String structureName = structureKey == null ? "null" : structureKey.asString();
-            Underilla.debug(() -> structureName + " spawned at " + e.getChunkX() + " " + e.getChunkZ() + " in biome "
-                    + e.getWorld().getBiome(e.getChunkX() * 16, 0, e.getChunkZ() * 16));
+            if (Underilla.isDebugEnabled()) {
+                LOGGER.info("{} spawned at {} {} in biome {}", structureName, e.getChunkX(), e.getChunkZ(),
+                        e.getWorld().getBiome(e.getChunkX() * 16, 0, e.getChunkZ() * 16));
+            }
             structureCount.put(structureName, structureCount.getOrDefault(structureName, 0) + 1);
         } else {
             e.setCancelled(true);

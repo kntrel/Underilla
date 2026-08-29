@@ -7,12 +7,13 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.TagInterpreter;
-import com.kntrel.mc.underilla.paper.Underilla;
-import com.kntrel.mc.underilla.paper.io.Tools;
 import java.util.Optional;
 import org.bukkit.Material;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BukkitChunkReader extends ChunkReader {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BukkitChunkReader.class);
 
     // CONSTRUCTORS
     public BukkitChunkReader(Chunk chunk) { super(chunk); }
@@ -40,15 +41,14 @@ public class BukkitChunkReader extends ChunkReader {
         try {
             String dataString = TagInterpreter.COMPOUND.interpretBlockDataString(properties);
             // if (dataString != null && dataString.length() > 90) {
-            // Underilla.info(dataString);
+            // LOGGER.debug("{}", dataString);
             // }
             if (m.equals(Material.VINE)) {
                 dataString = removeVineDownProperty(dataString);
             }
             block = new BukkitBlock(m.createBlockData(dataString));
         } catch (IllegalArgumentException e) {
-            Underilla.warning("Failed to create block data " + m + ": " + e.getMessage());
-            Underilla.warning(() -> Tools.exceptionToString(e));
+            LOGGER.warn("Failed to create block data {}", m, e);
             block = new BukkitBlock(m.createBlockData());
         }
         return Optional.of(block);
@@ -74,20 +74,19 @@ public class BukkitChunkReader extends ChunkReader {
             // if it's a spawner or a chest
             if (blockEntity.getString("id").equals("minecraft:mob_spawner")) {
                 try {
-                    // Underilla.info("Interesting Spawner: " + blockEntity);
+                    // LOGGER.debug("Interesting Spawner: {}", blockEntity);
                     String spawnedType = blockEntity.getCompoundTag("SpawnData").getCompoundTag("entity").getString("id");
                     // System.out.println("Spawner Type: " + spawnedType);
                     if (block.get() instanceof BukkitBlock bukkitBlock) {
                         // bukkitBlock.setBlockData(Material.SPAWNER.createBlockData());
                         bukkitBlock.setSpawnedType(spawnedType);
-                        // Underilla.info("blockFromTag: " + bukkitBlock.getSpawnedType());
+                        // LOGGER.debug("blockFromTag: {}", bukkitBlock.getSpawnedType());
                     }
 
                     // } else if (blockEntity.getString("id").equals("minecraft:chest")) {
                     // System.out.println("Interesting Chest: " + blockEntity);
                 } catch (Exception e) {
-                    Underilla.warning("Failed to set the type of a spawner: " + blockEntity);
-                    Underilla.warning(() -> Tools.exceptionToString(e));
+                    LOGGER.warn("Failed to set the type of a spawner: {}", blockEntity, e);
                 }
 
             } else if (blockEntity.getString("id").equals("minecraft:chest")) {
