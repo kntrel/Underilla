@@ -4,6 +4,7 @@ import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiome;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiomeData;
+import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +21,7 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UnderillaBiomeProvider.class);
     private final UnderillaEngine underillaEngine;
+    private final ChunkGenerationProfiler chunkProfiler;
     private volatile BiomeProvider vanillaProvider;
     private final @Nullable BiomeProvider outOfBoundsProvider;
     private final Map<String, Long> biomesPlaced = new ConcurrentHashMap<>();
@@ -27,16 +29,26 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
 
     public UnderillaBiomeProvider(
             UnderillaEngine underillaEngine,
-            @Nullable BiomeProvider outOfBoundsBiomeProvider
+            @Nullable BiomeProvider outOfBoundsBiomeProvider,
+            ChunkGenerationProfiler chunkProfiler
     ) {
         this.underillaEngine = underillaEngine;
         this.outOfBoundsProvider = outOfBoundsBiomeProvider;
+        this.chunkProfiler = chunkProfiler;
     }
 
     public Map<String, Long> getBiomesPlaced() { return biomesPlaced; }
 
     @Override
     public @NotNull Biome getBiome(@NotNull WorldInfo worldInfo, int x, int y, int z) {
+        return chunkProfiler.call(
+                worldInfo.getUID(),
+                Math.floorDiv(x, Underilla.CHUNK_SIZE),
+                Math.floorDiv(z, Underilla.CHUNK_SIZE),
+                () -> getBiomeForPosition(worldInfo, x, y, z));
+    }
+
+    private @NotNull Biome getBiomeForPosition(@NotNull WorldInfo worldInfo, int x, int y, int z) {
         Biome vanillaBiome = getVanillaBiomeProvider(worldInfo).getBiome(worldInfo, x, y, z);
         BukkitBiomeData biomeData = new BukkitBiomeData(vanillaBiome, x, y, z);
         if (!underillaEngine.tryPatchBiome(biomeData) && outOfBoundsProvider != null) {

@@ -15,6 +15,7 @@ import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
+import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -47,6 +48,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
     // FIELDS
     private final UnderillaEngine engine;
+    private final ChunkGenerationProfiler chunkProfiler;
     private volatile UnderillaBiomeProvider biomeProvider;
     private final @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator;
 
@@ -57,10 +59,12 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator,
             PatchingPlan patchingPlan,
             GenerationContext generationContext,
-            Instrumenter instrumenter
+            Instrumenter instrumenter,
+            ChunkGenerationProfiler chunkProfiler
     ) {
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
         this.engine = new UnderillaEngine(worldSurfaceReader, patchingPlan, generationContext, instrumenter);
+        this.chunkProfiler = chunkProfiler;
     }
 
 
@@ -75,6 +79,12 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
     @Override
     public void generateSurface(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
+            @NotNull ChunkData chunkData) {
+        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ,
+                () -> generateSurfaceStep(worldInfo, random, chunkX, chunkZ, chunkData));
+    }
+
+    private void generateSurfaceStep(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
             @NotNull ChunkData chunkData) {
         if (outOfTheSurfaceWorldGenerator != null
                 && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
@@ -94,6 +104,12 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
     @Override
     public void generateCaves(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
+        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ,
+                () -> generateCavesStep(worldInfo, random, chunkX, chunkZ, chunkData));
+    }
+
+    private void generateCavesStep(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
+            @NotNull ChunkData chunkData) {
         if (outOfTheSurfaceWorldGenerator != null
                 && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
             outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
@@ -123,7 +139,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     @Override
     public List<BlockPopulator> getDefaultPopulators(World world) {
         // Caves are vanilla generated, but they are carved underwater, this re-places the water blocks in case they were carved into.
-        return List.of(new Populator(this.engine));
+        return List.of(new Populator(this.engine, this.chunkProfiler));
     }
 
     @Override
@@ -209,7 +225,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         if (biomeProvider == null) {
             BiomeProvider outsideSurfaceWorldBiomeProvider = outOfTheSurfaceWorldGenerator == null ? null
                     : outOfTheSurfaceWorldGenerator.getDefaultBiomeProvider(worldInfo);
-            biomeProvider = new UnderillaBiomeProvider(engine, outsideSurfaceWorldBiomeProvider);
+            biomeProvider = new UnderillaBiomeProvider(engine, outsideSurfaceWorldBiomeProvider, chunkProfiler);
         }
         return biomeProvider;
     }
@@ -233,17 +249,24 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
 
         // FIELDS
         private final UnderillaEngine underillaEngine;
+        private final ChunkGenerationProfiler chunkProfiler;
 
 
         // CONSTRUCTORS
-        public Populator(UnderillaEngine underillaEngine) {
+        public Populator(UnderillaEngine underillaEngine, ChunkGenerationProfiler chunkProfiler) {
             this.underillaEngine = underillaEngine;
+            this.chunkProfiler = chunkProfiler;
         }
 
 
         // OVERRITES
         @Override
         public void populate(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, LimitedRegion limitedRegion) {
+            chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ,
+                    () -> populateStep(worldInfo, chunkX, chunkZ, limitedRegion));
+        }
+
+        private void populateStep(WorldInfo worldInfo, int chunkX, int chunkZ, LimitedRegion limitedRegion) {
             // If carvers are enabled in this biome & surface was not preserved from carvers & liquids are preserved from carvers.
             // => we need to re-insert the water blocks from surface world over the limits between the 2 world.
 

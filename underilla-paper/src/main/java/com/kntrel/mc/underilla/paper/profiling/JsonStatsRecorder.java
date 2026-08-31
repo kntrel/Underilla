@@ -41,6 +41,7 @@ public final class JsonStatsRecorder implements Recorder, AutoCloseable {
 
     public static final Duration DEFAULT_FLUSH_INTERVAL = Duration.ofMinutes(1);
 
+    private static final double NANOS_PER_MILLISECOND = 1_000_000.0;
     private static final Logger LOGGER = LoggerFactory.getLogger(JsonStatsRecorder.class);
     private static final Comparator<MetricKey> KEY_ORDER = Comparator
             .comparing(MetricKey::subject)
@@ -203,11 +204,11 @@ public final class JsonStatsRecorder implements Recorder, AutoCloseable {
             String subject,
             String event,
             long count,
-            long totalNanos,
-            long minNanos,
-            long maxNanos,
-            double meanNanos,
-            double standardDeviationNanos
+            double totalMilliseconds,
+            double minMilliseconds,
+            double maxMilliseconds,
+            double meanMilliseconds,
+            double standardDeviationMilliseconds
     ) {
 
         private static JsonMetric from(MetricKey key, MetricStatistics statistics) {
@@ -215,11 +216,15 @@ public final class JsonStatsRecorder implements Recorder, AutoCloseable {
                     key.subject(),
                     key.event(),
                     statistics.count(),
-                    statistics.totalNanos(),
-                    statistics.minNanos(),
-                    statistics.maxNanos(),
-                    statistics.meanNanos(),
-                    statistics.standardDeviationNanos());
+                    toMilliseconds(statistics.totalNanos()),
+                    toMilliseconds(statistics.minNanos()),
+                    toMilliseconds(statistics.maxNanos()),
+                    toMilliseconds(statistics.meanNanos()),
+                    toMilliseconds(statistics.standardDeviationNanos()));
+        }
+
+        private static double toMilliseconds(double nanoseconds) {
+            return nanoseconds / NANOS_PER_MILLISECOND;
         }
     }
 

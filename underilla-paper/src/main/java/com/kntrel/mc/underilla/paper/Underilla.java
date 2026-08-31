@@ -17,9 +17,11 @@ import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.StringKeys;
 import com.kntrel.mc.underilla.paper.listener.ChunkGeneratedListener;
+import com.kntrel.mc.underilla.paper.listener.ChunkProfilingListener;
 import com.kntrel.mc.underilla.paper.listener.StructureEventListener;
 import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
+import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import com.kntrel.mc.underilla.paper.profiling.JsonStatsRecorder;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.io.File;
@@ -63,6 +65,7 @@ public final class Underilla extends JavaPlugin {
     private StructureEventListener structureEventListener;
     private JsonStatsRecorder profilingRecorder;
     private Instrumenter instrumenter;
+    private ChunkGenerationProfiler chunkGenerationProfiler;
     private final Map<String, UnderillaChunkGenerator> worldGenerators = new ConcurrentHashMap<>();
 
     private Function<org.bukkit.block.Biome, org.bukkit.block.Biome> endBiomeTransformer;
@@ -97,7 +100,7 @@ public final class Underilla extends JavaPlugin {
         LOGGER.info("Using Underilla as main world generator (with {} as outOfTheSurfaceWorldGenerator)!",
                 outOfTheSurfaceWorldGenerator);
         UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader,
-                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext, instrumenter);
+                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext, instrumenter, chunkGenerationProfiler);
         this.worldGenerators.put(worldName, worldGenerator);
         return worldGenerator;
     }
@@ -115,6 +118,7 @@ public final class Underilla extends JavaPlugin {
         if (!allStepsDone()) {
             this.profilingRecorder = new JsonStatsRecorder(getDataFolder().toPath().resolve("metrics.json"));
             this.instrumenter = new Instrumenter(profilingRecorder);
+            this.chunkGenerationProfiler = new ChunkGenerationProfiler(instrumenter);
             LOGGER.info("Profiling metrics will be written to '{}'", profilingRecorder.outputPath());
             generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory());
             // Loading reference world
@@ -143,6 +147,7 @@ public final class Underilla extends JavaPlugin {
                 this.getServer().getPluginManager().registerEvents(structureEventListener, this);
             }
             this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
+            this.getServer().getPluginManager().registerEvents(new ChunkProfilingListener(chunkGenerationProfiler), this);
 
             if (getUnderillaConfig().getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
                 LOGGER.info("Cleaning listener for blocks and/or entities have been init.");
@@ -189,6 +194,7 @@ public final class Underilla extends JavaPlugin {
         if (profilingRecorder == null) {
             return;
         }
+        chunkGenerationProfiler.discardAll();
         try {
             profilingRecorder.close();
         } catch (IOException e) {

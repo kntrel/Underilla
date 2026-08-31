@@ -14,7 +14,7 @@ public final class Instrumenter {
     private final LongSupplier nanoTime;
     private final Clock clock;
     private final Supplier<UUID> operationIds;
-    private final ThreadLocal<Operation> currentOperation = new ThreadLocal<>();
+    private final ThreadLocal<OperationBinding> currentOperation = new ThreadLocal<>();
 
     public Instrumenter(Recorder recorder) {
         this(recorder, System::nanoTime, Clock.systemUTC(), UUID::randomUUID);
@@ -40,16 +40,54 @@ public final class Instrumenter {
         return new Tracker(this, Objects.requireNonNull(subject, "subject"));
     }
 
+    /** Provisions an operation that can be explicitly rebound across separate units of work. */
+    public Operation operation() {
+        return new Operation(this, operationIds.get());
+    }
+
+    void run(Operation operation, Runnable action) {
+        Objects.requireNonNull(action, "action");
+        call(operation, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    <T> T call(Operation operation, Supplier<T> action) {
+        Objects.requireNonNull(operation, "operation").requireOwner(this);
+        Objects.requireNonNull(action, "action");
+
+        OperationBinding previous = currentOperation.get();
+        currentOperation.set(new OperationBinding(operation, true));
+        try {
+            return action.get();
+        } finally {
+            restore(previous);
+        }
+    }
+
     Stopwatch stopwatch(Class<?> subject, String event) {
-        Operation operation = currentOperation.get();
-        if (operation == null) {
-            operation = new Operation(operationIds.get());
-            currentOperation.set(operation);
+        OperationBinding binding = currentOperation.get();
+        if (binding == null) {
+            binding = new OperationBinding(operation(), false);
+            currentOperation.set(binding);
         }
 
+        Operation operation = binding.operation();
         Stopwatch stopwatch = new Stopwatch(this, operation, subject, event, nanoTime.getAsLong());
         operation.add(stopwatch);
         return stopwatch;
+    }
+
+    void record(Class<?> subject, String event, long durationNanos) {
+        OperationBinding binding = currentOperation.get();
+        Operation operation = binding == null ? operation() : binding.operation();
+        recorder.record(new Measurement(
+                operation.id(),
+                subject,
+                event,
+                durationNanos,
+                Instant.now(clock)));
     }
 
     void stop(Stopwatch stopwatch) {
@@ -59,7 +97,11 @@ public final class Instrumenter {
         operation.remove(stopwatch);
         stopwatch.markStopped();
 
-        if (operation.isEmpty() && currentOperation.get() == operation) {
+        OperationBinding binding = currentOperation.get();
+        if (operation.isEmpty()
+                && binding != null
+                && binding.operation() == operation
+                && !binding.explicit()) {
             currentOperation.remove();
         }
         recorder.record(new Measurement(
@@ -69,4 +111,14 @@ public final class Instrumenter {
                 stoppedAtNanos - stopwatch.startedAtNanos(),
                 capturedAt));
     }
+
+    private void restore(OperationBinding previous) {
+        if (previous == null || (!previous.explicit() && previous.operation().isEmpty())) {
+            currentOperation.remove();
+        } else {
+            currentOperation.set(previous);
+        }
+    }
+
+    private record OperationBinding(Operation operation, boolean explicit) {}
 }

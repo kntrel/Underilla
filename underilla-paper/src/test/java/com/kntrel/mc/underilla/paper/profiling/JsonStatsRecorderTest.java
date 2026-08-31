@@ -50,7 +50,7 @@ class JsonStatsRecorderTest {
             assertFalse(recorder.flush());
             assertFalse(Files.exists(output));
 
-            recorder.record(measurement(FIRST_OPERATION, "caves_patch", 25));
+            recorder.record(measurement(FIRST_OPERATION, "caves_patch", 25_000_000));
             assertTrue(recorder.flush());
             String firstSnapshot = Files.readString(output);
             assertFalse(recorder.flush());
@@ -62,7 +62,12 @@ class JsonStatsRecorderTest {
             assertEquals(JsonStatsRecorderTest.class.getName(), metric.get("subject").getAsString());
             assertEquals("caves_patch", metric.get("event").getAsString());
             assertEquals(1, metric.get("count").getAsLong());
-            assertEquals(25, metric.get("meanNanos").getAsDouble());
+            assertEquals(25.0, metric.get("totalMilliseconds").getAsDouble());
+            assertEquals(25.0, metric.get("minMilliseconds").getAsDouble());
+            assertEquals(25.0, metric.get("maxMilliseconds").getAsDouble());
+            assertEquals(25.0, metric.get("meanMilliseconds").getAsDouble());
+            assertEquals(0.0, metric.get("standardDeviationMilliseconds").getAsDouble());
+            assertFalse(metric.has("meanNanos"));
         }
     }
 
