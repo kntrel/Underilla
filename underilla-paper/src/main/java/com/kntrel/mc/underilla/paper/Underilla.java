@@ -1,9 +1,9 @@
 package com.kntrel.mc.underilla.paper;
 
-import com.kntrel.mc.underilla.core.UnderillaEngine;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
 import com.kntrel.mc.underilla.core.generation.PatcherFactory;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
+import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocksTask;
 import com.kntrel.mc.underilla.paper.cleaning.CleanEntitiesTask;
@@ -20,8 +20,10 @@ import com.kntrel.mc.underilla.paper.listener.ChunkGeneratedListener;
 import com.kntrel.mc.underilla.paper.listener.StructureEventListener;
 import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
+import com.kntrel.mc.underilla.paper.profiling.JsonStatsRecorder;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.io.File;
+import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Locale;
 import java.util.Map;
@@ -59,6 +61,8 @@ public final class Underilla extends JavaPlugin {
     private CleanBlocksTask cleanBlocksTask;
     private CleanEntitiesTask cleanEntitiesTask;
     private StructureEventListener structureEventListener;
+    private JsonStatsRecorder profilingRecorder;
+    private Instrumenter instrumenter;
     private final Map<String, UnderillaChunkGenerator> worldGenerators = new ConcurrentHashMap<>();
 
     private Function<org.bukkit.block.Biome, org.bukkit.block.Biome> endBiomeTransformer;
@@ -93,7 +97,7 @@ public final class Underilla extends JavaPlugin {
         LOGGER.info("Using Underilla as main world generator (with {} as outOfTheSurfaceWorldGenerator)!",
                 outOfTheSurfaceWorldGenerator);
         UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader,
-                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext);
+                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext, instrumenter);
         this.worldGenerators.put(worldName, worldGenerator);
         return worldGenerator;
     }
@@ -109,6 +113,9 @@ public final class Underilla extends JavaPlugin {
         runStepsOnEnabled();
 
         if (!allStepsDone()) {
+            this.profilingRecorder = new JsonStatsRecorder(getDataFolder().toPath().resolve("metrics.json"));
+            this.instrumenter = new Instrumenter(profilingRecorder);
+            LOGGER.info("Profiling metrics will be written to '{}'", profilingRecorder.outputPath());
             generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory());
             // Loading reference world
             File surfaceRegionDirectory = getUnderillaConfig().getSurfaceRegionPath().toFile();
@@ -148,12 +155,6 @@ public final class Underilla extends JavaPlugin {
     public void onDisable() {
         try {
             stopTasks();
-            if (UnderillaEngine.times != null) {
-                long totalTime = UnderillaEngine.times.entrySet().stream().mapToLong(Map.Entry::getValue).sum();
-                for (Map.Entry<String, Long> entry : UnderillaEngine.times.entrySet()) {
-                    LOGGER.info("{} took {}ms ({}%)", entry.getKey(), entry.getValue(), entry.getValue() * 100 / totalTime);
-                }
-            }
             for (Map.Entry<String, UnderillaChunkGenerator> worldGenerator : worldGenerators.entrySet()) {
                 Map<String, Long> biomesPlaced = worldGenerator.getValue().getBiomesPlaced();
                 LOGGER.info("Map of biomes placed in world '{}': {}", worldGenerator.getKey(), biomesPlaced.entrySet().stream()
@@ -161,7 +162,9 @@ public final class Underilla extends JavaPlugin {
                         .map(entry -> entry.getKey() + ": " + entry.getValue()).reduce((a, b) -> a + ", " + b).orElse(""));
             }
         } catch (Exception e) {
-            LOGGER.error("Failed to print times or biomes placed", e);
+            LOGGER.error("Failed to stop tasks or print biomes placed", e);
+        } finally {
+            closeProfilingRecorder();
         }
     }
 
@@ -181,6 +184,17 @@ public final class Underilla extends JavaPlugin {
     public static Underilla getInstance() { return getPlugin(Underilla.class); }
     public static UnderillaConfig getUnderillaConfig() { return getInstance().underillaConfig; }
     public static boolean isDebugEnabled() { return getInstance().getConfig().getBoolean("debug", false); }
+
+    private void closeProfilingRecorder() {
+        if (profilingRecorder == null) {
+            return;
+        }
+        try {
+            profilingRecorder.close();
+        } catch (IOException e) {
+            LOGGER.warn("Could not write the final profiling snapshot to {}", profilingRecorder.outputPath(), e);
+        }
+    }
 
 
     private void runStepsOnEnabled() {

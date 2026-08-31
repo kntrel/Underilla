@@ -4,6 +4,7 @@ import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
 import com.kntrel.mc.underilla.core.UnderillaEngine;
+import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocks;
@@ -55,10 +56,11 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             @Nonnull WorldReader worldSurfaceReader,
             @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator,
             PatchingPlan patchingPlan,
-            GenerationContext generationContext
+            GenerationContext generationContext,
+            Instrumenter instrumenter
     ) {
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
-        this.engine = new UnderillaEngine(worldSurfaceReader, patchingPlan, generationContext);
+        this.engine = new UnderillaEngine(worldSurfaceReader, patchingPlan, generationContext, instrumenter);
     }
 
 

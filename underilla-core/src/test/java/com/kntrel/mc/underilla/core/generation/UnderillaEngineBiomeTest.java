@@ -13,6 +13,7 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import org.junit.jupiter.api.Test;
 
 class UnderillaEngineBiomeTest {
@@ -87,7 +88,7 @@ class UnderillaEngineBiomeTest {
         TestBlockFactory blocks = new TestBlockFactory(TestBlock.air("minecraft:air"));
         GenerationContext context = new GenerationContext(config, blocks);
         PatchingPlan plan = new PatchingPlan(chunk -> {}, chunk -> {}, boundary, true);
-        return new UnderillaEngine(referenceWorld, plan, context);
+        return new UnderillaEngine(referenceWorld, plan, context, new Instrumenter(_ -> {}));
     }
 
     private static TestWorld referenceWorld(TestBiome biome) {

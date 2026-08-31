@@ -10,12 +10,14 @@ import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.api.WorldInfo;
 import com.kntrel.mc.underilla.core.generation.GenerationContext;
 import com.kntrel.mc.underilla.core.generation.GenerationFlags;
+import com.kntrel.mc.underilla.core.generation.Patcher;
 import com.kntrel.mc.underilla.core.generation.PatchingPlan;
+import com.kntrel.mc.underilla.core.profiling.Instrumenter;
+import com.kntrel.mc.underilla.core.profiling.Tracker;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import java.util.Map;
+import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 
 public class UnderillaEngine {
@@ -23,12 +25,23 @@ public class UnderillaEngine {
     private final WorldReader worldSurfaceReader;
     private final PatchingPlan patchingPlan;
     private final GenerationContext context;
-    public static final Map<String, Long> times = new ConcurrentHashMap<>();
+    private final Tracker tracker;
+    private final List<InstrumentedPatcher> terrainPatchers;
+    private final InstrumentedPatcher liquidPatcher;
 
-    public UnderillaEngine(WorldReader worldSurfaceReader, PatchingPlan patchingPlan, GenerationContext context) {
+    public UnderillaEngine(WorldReader worldSurfaceReader, PatchingPlan patchingPlan, GenerationContext context,
+            Instrumenter instrumenter) {
         this.worldSurfaceReader = Objects.requireNonNull(worldSurfaceReader, "worldSurfaceReader");
         this.patchingPlan = Objects.requireNonNull(patchingPlan, "patchingPlan");
         this.context = Objects.requireNonNull(context, "context");
+        Objects.requireNonNull(instrumenter, "instrumenter");
+        this.tracker = instrumenter.tracker(UnderillaEngine.class);
+        this.terrainPatchers = patchingPlan.terrainPatchers().stream()
+                .map(patcher -> new InstrumentedPatcher(patcher, instrumenter.tracker(patcher.getClass())))
+                .toList();
+        this.liquidPatcher = new InstrumentedPatcher(
+                patchingPlan.liquidPatcher(),
+                instrumenter.tracker(patchingPlan.liquidPatcher().getClass()));
     }
 
     // TODO fix issue with short grass making village houses 1 block higher.
@@ -67,7 +80,11 @@ public class UnderillaEngine {
             return false;
         }
 
-        patchingPlan.terrainPatcher().patch(chunkData);
+        try (var _ = tracker.stopwatch("terrain_patch")) {
+            for (InstrumentedPatcher patcher : terrainPatchers) {
+                patcher.patch(chunkData);
+            }
+        }
         return true;
     }
 
@@ -81,7 +98,9 @@ public class UnderillaEngine {
             return false;
         }
 
-        patchingPlan.liquidPatcher().patch(chunkData);
+        try (var _ = tracker.stopwatch("liquid_patch")) {
+            liquidPatcher.patch(chunkData);
+        }
         return true;
     }
 
@@ -93,26 +112,29 @@ public class UnderillaEngine {
      */
     public boolean tryPatchBiome(BiomeData biomeData) {
         Objects.requireNonNull(biomeData, "biomeData");
+
         if (!context.config().isInsideGenerationArea(biomeData.getX(), biomeData.getZ())) {
             return false;
         }
 
-        int referenceY = context.config().surfaceBiomeUseTopYOnly()
-                ? context.config().generationAreaMaxY()
-                : biomeData.getY();
-        Biome referenceBiome = worldSurfaceReader.biomeAt(biomeData.getX(), referenceY, biomeData.getZ()).orElse(null);
-        if (referenceBiome == null) {
-            return false;
-        }
+        try (var _ = tracker.stopwatch("patch_biome")) {
+            int referenceY = context.config().surfaceBiomeUseTopYOnly()
+                    ? context.config().generationAreaMaxY()
+                    : biomeData.getY();
+            Biome referenceBiome = worldSurfaceReader.biomeAt(biomeData.getX(), referenceY, biomeData.getZ()).orElse(null);
+            if (referenceBiome == null) {
+                return false;
+            }
 
-        if (!context.config().isSurfaceWorldOnlyBiome(referenceBiome.getName())
-                && context.config().shouldPreserveBiome(biomeData.get().getName())
-                && isBiomeUnderSurface(biomeData)) {
+            if (!context.config().isSurfaceWorldOnlyBiome(referenceBiome.getName())
+                    && context.config().shouldPreserveBiome(biomeData.get().getName())
+                    && isBiomeUnderSurface(biomeData)) {
+                return true;
+            }
+
+            biomeData.set(referenceBiome);
             return true;
         }
-
-        biomeData.set(referenceBiome);
-        return true;
     }
 
     private boolean isBiomeUnderSurface(BiomeData biomeData) {
@@ -144,7 +166,17 @@ public class UnderillaEngine {
         );
     }
 
-    public static void addTime(String name, long startTime) {
-        times.merge(name, System.currentTimeMillis() - startTime, Long::sum);
+    private record InstrumentedPatcher(Patcher patcher, Tracker tracker) {
+
+        private InstrumentedPatcher {
+            Objects.requireNonNull(patcher, "patcher");
+            Objects.requireNonNull(tracker, "tracker");
+        }
+
+        private void patch(ChunkData chunkData) {
+            try (var _ = tracker.stopwatch("patch")) {
+                patcher.patch(chunkData);
+            }
+        }
     }
 }

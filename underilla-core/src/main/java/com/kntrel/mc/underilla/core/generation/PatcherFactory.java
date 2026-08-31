@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import java.util.List;
 
 /** Composes patchers and generation policies for each supported mode. */
 public final class PatcherFactory {
@@ -29,11 +30,11 @@ public final class PatcherFactory {
     private static PatchingPlan plan(WorldReader surfaceWorld, WorldReader cavesWorld,
             GenerationContext context, Boundary boundary, boolean generateNoise) {
         Patcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, context);
-        Patcher terrainPatcher = cavesWorld == null
-                ? surfacePatcher
-                : new PatcherPipeline(new CavePatcher(cavesWorld, boundary, context), surfacePatcher);
+        List<Patcher> terrainPatchers = cavesWorld == null
+                ? List.of(surfacePatcher)
+                : List.of(new CavePatcher(cavesWorld, boundary, context), surfacePatcher);
         Patcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary, context);
-        return new PatchingPlan(terrainPatcher, liquidPatcher, boundary, generateNoise);
+        return new PatchingPlan(terrainPatchers, liquidPatcher, boundary, generateNoise);
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, GenerationContext context) {
