@@ -6,6 +6,8 @@ import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
+import com.kntrel.mc.underilla.core.reader.EntityView;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -15,7 +17,11 @@ public final class TestChunkReader extends ChunkReader {
     private final TestBlockFactory blocks;
 
     public TestChunkReader(Chunk chunk, TestBlockFactory blocks) {
-        super(chunk);
+        this(chunk, List.of(), blocks);
+    }
+
+    public TestChunkReader(Chunk chunk, List<EntityView> entities, TestBlockFactory blocks) {
+        super(chunk, entities);
         this.blocks = Objects.requireNonNull(blocks, "blocks");
     }
 

@@ -123,8 +123,20 @@ public final class Underilla extends JavaPlugin {
             generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory());
             // Loading reference world
             File surfaceRegionDirectory = getUnderillaConfig().getSurfaceRegionPath().toFile();
+            File surfaceEntitiesDirectory = null;
+            if (getUnderillaConfig().getSurfaceEntitiesPath() != null) {
+                File configuredEntitiesDirectory = getUnderillaConfig().getSurfaceEntitiesPath().toFile();
+                if (configuredEntitiesDirectory.isDirectory()) {
+                    surfaceEntitiesDirectory = configuredEntitiesDirectory;
+                    LOGGER.info("Surface entity region directory '{}' found.", surfaceEntitiesDirectory);
+                } else {
+                    LOGGER.info("No surface entity region directory at '{}'; reference entities are disabled.",
+                            configuredEntitiesDirectory);
+                }
+            }
             try {
-                this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, getUnderillaConfig().cacheSize());
+                this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, surfaceEntitiesDirectory,
+                        getUnderillaConfig().cacheSize());
                 LOGGER.info("Surface region directory '{}' found.", surfaceRegionDirectory);
             } catch (NoSuchFieldException e) {
                 LOGGER.warn("No surface region directory at '{}' found", surfaceRegionDirectory, e);

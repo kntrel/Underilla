@@ -40,6 +40,7 @@ public class UnderillaConfig implements GenerationConfig {
     private final EnumMap<SetStructureKeys, Set<Structure>> listStructureMap;
     private final EnumMap<SetEntityTypeKeys, Set<EntityType>> listEntityTypeMap;
     private Path surfaceRegionPath;
+    private Path surfaceEntitiesPath;
     private Path cavesRegionPath;
 
 
@@ -75,6 +76,7 @@ public class UnderillaConfig implements GenerationConfig {
     public boolean isStructureInSet(SetStructureKeys key, Structure structure) { return getSetStructure(key).contains(structure); }
     public boolean isEntityTypeInSet(SetEntityTypeKeys key, EntityType entityType) { return getSetEntityType(key).contains(entityType); }
     public Path getSurfaceRegionPath() { return surfaceRegionPath; }
+    public @Nullable Path getSurfaceEntitiesPath() { return surfaceEntitiesPath; }
     public Path getCavesRegionPath() { return cavesRegionPath; }
 
     public void saveNewValue(StringKeys key, String value) {
@@ -192,6 +194,7 @@ public class UnderillaConfig implements GenerationConfig {
             stringMap.put(key, fileConfiguration.getString(key.path, key.defaultValue));
         }
         surfaceRegionPath = RegionPathResolver.resolve(fileConfiguration, "surfaceWorld");
+        surfaceEntitiesPath = RegionPathResolver.resolveEntities(fileConfiguration, "surfaceWorld");
         cavesRegionPath = RegionPathResolver.resolve(fileConfiguration, "cavesWorld");
         integerMap.clear();
         integerAutoMap.clear();
@@ -471,7 +474,8 @@ public class UnderillaConfig implements GenerationConfig {
     @Override
     public String toString() {
         return "UnderillaConfig{" + "booleanMap=" + booleanMap + "\nintegerMap=" + integerMap + "\nstringMap=" + stringMap
-                + "\nsurfaceRegionPath=" + surfaceRegionPath + "\ncavesRegionPath=" + cavesRegionPath
+                + "\nsurfaceRegionPath=" + surfaceRegionPath + "\nsurfaceEntitiesPath=" + surfaceEntitiesPath
+                + "\ncavesRegionPath=" + cavesRegionPath
         // + "\nlistStringMap=" + toString(listStringMap)
                 + "\nlistBiomeStringMap=" + toString(listBiomeStringMap) + "\nlistMaterialMap=" + toString(listMaterialMap)
                 + "\nlistMapMaterialMap=" + listMapMaterialMap + "\nlistStructureMap=" + listStructureMapToString() + '}';

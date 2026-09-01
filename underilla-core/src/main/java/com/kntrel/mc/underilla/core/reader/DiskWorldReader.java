@@ -7,9 +7,11 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -26,19 +28,32 @@ public abstract class DiskWorldReader implements WorldReader {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DiskWorldReader.class);
     private final File regions;
-    private final RLUCache<MCAFile> regionCache;
+    private final File entitites;
+    private final RLUCache<RegionBucket> regionCache;
     private final RLUCache<ChunkReader> chunkCache;
     private final RLUCacheTriple<Biome> biomeCache;
 
     protected DiskWorldReader(String regionPath, int cacheSize) throws NoSuchFieldException {
-        this(new File(regionPath), cacheSize);
+        this(new File(regionPath), null, cacheSize);
+    }
+
+    protected DiskWorldReader(String regionPath, String entityRegionPath, int cacheSize) throws NoSuchFieldException {
+        this(new File(regionPath), entityRegionPath == null ? null : new File(entityRegionPath), cacheSize);
     }
 
     protected DiskWorldReader(File regionDirectory, int cacheSize) throws NoSuchFieldException {
+        this(regionDirectory, null, cacheSize);
+    }
+
+    protected DiskWorldReader(File regionDirectory, File entityDirectory, int cacheSize) throws NoSuchFieldException {
         if (!(regionDirectory.exists() && regionDirectory.isDirectory())) {
             throw new NoSuchFieldException("Region directory '" + regionDirectory.getPath() + "' does not exist.");
         }
+        if (entityDirectory != null && !(entityDirectory.exists() && entityDirectory.isDirectory())) {
+            throw new NoSuchFieldException("Entity region directory '" + entityDirectory.getPath() + "' does not exist.");
+        }
         this.regions = regionDirectory;
+        this.entitites = entityDirectory;
         this.regionCache = new RLUCache<>(cacheSize);
         int chunkCacheSize = cacheSize * 64;
         this.chunkCache = new RLUCache<>(chunkCacheSize);
@@ -79,15 +94,18 @@ public abstract class DiskWorldReader implements WorldReader {
         if (cachedChunk != null) {
             return Optional.of(cachedChunk);
         }
-        MCAFile region = readRegion(x >> 5, z >> 5);
+        RegionBucket region = readRegion(x >> 5, z >> 5);
         if (region == null) {
             return Optional.empty();
         }
-        Chunk chunk = region.getChunk(Math.floorMod(x, 32), Math.floorMod(z, 32));
+        int localX = Math.floorMod(x, 32);
+        int localZ = Math.floorMod(z, 32);
+        Chunk chunk = region.terrain().getChunk(localX, localZ);
         if (chunk == null) {
             return Optional.empty();
         }
-        ChunkReader chunkReader = newChunkReader(chunk);
+        Chunk entityChunk = region.entities() == null ? null : region.entities().getChunk(localX, localZ);
+        ChunkReader chunkReader = newChunkReader(chunk, entityViews(entityChunk));
         chunkCache.put(x, z, chunkReader);
         return Optional.of(chunkReader);
     }
@@ -97,25 +115,45 @@ public abstract class DiskWorldReader implements WorldReader {
         return biomeAt(globalX, globalY, globalZ).map(Biome::getName).orElse(null);
     }
 
-    protected abstract ChunkReader newChunkReader(Chunk chunk);
+    protected abstract ChunkReader newChunkReader(Chunk chunk, List<EntityView> entities);
 
-    private MCAFile readRegion(int x, int z) {
-        MCAFile cachedRegion = regionCache.get(x, z);
+    private RegionBucket readRegion(int x, int z) {
+        RegionBucket cachedRegion = regionCache.get(x, z);
         if (cachedRegion != null) {
             return cachedRegion;
         }
-        File regionFile = new File(regions, "r." + x + "." + z + ".mca");
+        MCAFile terrain = readRegionFile(regions, x, z);
+        if (terrain == null) {
+            return null;
+        }
+        MCAFile entities = entitites == null ? null : readRegionFile(entitites, x, z);
+        RegionBucket region = new RegionBucket(terrain, entities);
+        regionCache.put(x, z, region);
+        return region;
+    }
+
+    private MCAFile readRegionFile(File directory, int x, int z) {
+        File regionFile = new File(directory, "r." + x + "." + z + ".mca");
         if (!regionFile.exists()) {
             return null;
         }
         try {
-            MCAFile region = MCAUtil.read(regionFile);
-            regionCache.put(x, z, region);
-            return region;
+            return MCAUtil.read(regionFile);
         } catch (Exception exception) {
             LOGGER.error("Failed to read region file '{}'", regionFile.getPath(), exception);
             return null;
         }
+    }
+
+    private static List<EntityView> entityViews(Chunk chunk) {
+        if (chunk == null || chunk.getEntities() == null) {
+            return List.of();
+        }
+        List<EntityView> entities = new ArrayList<>(chunk.getEntities().size());
+        for (var entity : chunk.getEntities()) {
+            entities.add(new EntityView(entity, chunk.getDataVersion()));
+        }
+        return List.copyOf(entities);
     }
 
     private static final class RLUCache<T> {
@@ -179,4 +217,6 @@ public abstract class DiskWorldReader implements WorldReader {
     private record ChunkCoordinate(int x, int z) {}
 
     private record BiomeCoordinate(int x, int y, int z) {}
+
+    private record RegionBucket(MCAFile terrain, MCAFile entities) {}
 }

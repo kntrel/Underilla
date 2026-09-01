@@ -6,7 +6,9 @@ import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
+import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.TagInterpreter;
+import java.util.List;
 import java.util.Optional;
 import org.bukkit.Material;
 import org.slf4j.Logger;
@@ -17,6 +19,7 @@ public class BukkitChunkReader extends ChunkReader {
 
     // CONSTRUCTORS
     public BukkitChunkReader(Chunk chunk) { super(chunk); }
+    public BukkitChunkReader(Chunk chunk, List<EntityView> entities) { super(chunk, entities); }
 
 
     // IMPLEMENTATION

@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.paper.io;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.file.Path;
@@ -28,6 +29,26 @@ class RegionPathResolverTest {
         Path result = RegionPathResolver.resolve("surfaceWorld", null, "world", "overworld");
 
         assertEquals(Path.of("world/dimensions/minecraft/overworld/region"), result);
+    }
+
+    @Test
+    void resolvesEntityDataFromWorldAndDimension() {
+        Path result = RegionPathResolver.resolveEntities("surfaceWorld", null, "imports/surface", "example:moon/deep");
+
+        assertEquals(Path.of("imports/surface/dimensions/example/moon/deep/entities"), result);
+    }
+
+    @Test
+    void explicitEntitiesPathOverridesWorldAndDimensionConfiguration() {
+        Path result = RegionPathResolver.resolveEntities(
+                "surfaceWorld", "imports/entities", "ignored-world", "not a valid dimension");
+
+        assertEquals(Path.of("imports/entities"), result);
+    }
+
+    @Test
+    void entityDataCanBeDisabledWhenNoLocationIsConfigured() {
+        assertNull(RegionPathResolver.resolveEntities("surfaceWorld", null, null, null));
     }
 
     @Test

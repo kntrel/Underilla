@@ -31,6 +31,9 @@ surfaceWorld:
   dimension: "minecraft:overworld"
   # Alternatively, point directly to a region directory. A non-empty regionPath overrides worldPath and dimension.
   # regionPath: "world_surface/region"
+  # Entity data is resolved beside the region directory when worldPath and dimension are set.
+  # Alternatively, point directly to an entity region directory.
+  # entitiesPath: "world_surface/entities"
   blocks:
     # List of blocks of surface world to replace by another block. It will replace the block defined here by the block defined in the value.
     # Remove blocks by replacing them with AIR.

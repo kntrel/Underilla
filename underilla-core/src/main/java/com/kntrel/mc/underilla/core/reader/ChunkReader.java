@@ -26,11 +26,16 @@ public abstract class ChunkReader {
 
     // FIELDS
     private final Chunk chunk_;
+    private final List<EntityView> entities_;
     private Integer airColumnHeight_ = null;
 
 
     // CONSTRUCTORS
-    protected ChunkReader(Chunk chunk) { this.chunk_ = chunk; }
+    protected ChunkReader(Chunk chunk) { this(chunk, List.of()); }
+    protected ChunkReader(Chunk chunk, List<EntityView> entities) {
+        this.chunk_ = chunk;
+        this.entities_ = List.copyOf(entities);
+    }
 
 
     // GETTERS
@@ -38,6 +43,7 @@ public abstract class ChunkReader {
     public int getZ() { return this.chunk_.getZ(); }
     public int getGlobalX(int localX) { return this.chunk_.getX() * CHUNK_SIZE + localX; }
     public int getGlobalZ(int localZ) { return this.chunk_.getZ() * CHUNK_SIZE + localZ; }
+    public List<EntityView> getEntities() { return this.entities_; }
 
 
     // UTIL
