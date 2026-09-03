@@ -12,6 +12,7 @@ import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -56,7 +57,7 @@ class PatcherStrategyTest {
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
         Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
-        Patcher patcher = new SurfacePatcher(referenceWorld, boundary, context);
+        ChunkPatcher patcher = new SurfacePatcher(referenceWorld, boundary, context);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
         patcher.patch(destination);
@@ -112,7 +113,7 @@ class PatcherStrategyTest {
         GenerationContext context = context(config);
         Boundary boundary = new AbsoluteBoundary(config.minimumY);
         FakeWorldReader referenceWorld = new FakeWorldReader();
-        Patcher terrainPatcher = new SurfacePatcher(referenceWorld, boundary, context);
+        ChunkPatcher terrainPatcher = new SurfacePatcher(referenceWorld, boundary, context);
         PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, boundary, false);
 
         assertFalse(plan.generateNoise());

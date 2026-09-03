@@ -1,6 +1,8 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
 
@@ -10,7 +12,7 @@ import java.util.Objects;
  */
 final class LegacyMergerPatcher {
 
-    private final Patcher patcher;
+    private final ChunkPatcher patcher;
 
     LegacyMergerPatcher(AbsoluteMerger merger, WorldReader surfaceWorld, WorldReader cavesWorld) {
         Objects.requireNonNull(merger, "merger");
@@ -34,12 +36,12 @@ final class LegacyMergerPatcher {
         patcher.patch(chunk);
     }
 
-    private static Patcher pipeline(WorldReader cavesWorld, Boundary boundary, GenerationContext context,
-            Patcher strategyPatcher) {
+    private static ChunkPatcher pipeline(WorldReader cavesWorld, Boundary boundary, GenerationContext context,
+            ChunkPatcher strategyPatcher) {
         if (cavesWorld == null) {
             return strategyPatcher;
         }
-        return new PatcherPipeline(new CavePatcher(cavesWorld, boundary, context), strategyPatcher);
+        return new ChunkPatcherPipeline(new CavePatcher(cavesWorld, boundary, context), strategyPatcher);
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, GenerationContext context) {

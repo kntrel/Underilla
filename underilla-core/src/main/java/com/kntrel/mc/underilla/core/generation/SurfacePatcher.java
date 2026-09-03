@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.generation;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.Vector;
@@ -10,7 +11,7 @@ import com.kntrel.mc.underilla.core.vector.VectorIterable;
 import java.util.Objects;
 
 /** Copies reference terrain above the configured boundary. */
-public final class SurfacePatcher implements Patcher {
+public final class SurfacePatcher implements ChunkPatcher {
 
     private final WorldReader surfaceWorld;
     private final Boundary boundary;

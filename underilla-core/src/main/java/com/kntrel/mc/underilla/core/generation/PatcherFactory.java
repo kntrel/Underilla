@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.List;
 
@@ -29,11 +30,11 @@ public final class PatcherFactory {
 
     private static PatchingPlan plan(WorldReader surfaceWorld, WorldReader cavesWorld,
             GenerationContext context, Boundary boundary, boolean generateNoise) {
-        Patcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, context);
-        List<Patcher> terrainPatchers = cavesWorld == null
+        ChunkPatcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, context);
+        List<ChunkPatcher> terrainPatchers = cavesWorld == null
                 ? List.of(surfacePatcher)
                 : List.of(new CavePatcher(cavesWorld, boundary, context), surfacePatcher);
-        Patcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary, context);
+        ChunkPatcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary, context);
         return new PatchingPlan(terrainPatchers, liquidPatcher, boundary, generateNoise);
     }
 

@@ -10,6 +10,7 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.profiling.Measurement;
 import java.util.ArrayList;
@@ -64,7 +65,7 @@ class UnderillaEngineProfilingTest {
         assertEquals(event, measurement.event());
     }
 
-    private abstract static class RecordingPatcher implements Patcher {
+    private abstract static class RecordingPatcher implements ChunkPatcher {
 
         private final List<String> calls;
         private final String name;

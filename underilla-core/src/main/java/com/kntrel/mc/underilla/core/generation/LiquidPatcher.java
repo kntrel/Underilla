@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.generation;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
@@ -12,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Restores reference-world liquids above the terrain boundary after carvers run. */
-public final class LiquidPatcher implements Patcher {
+public final class LiquidPatcher implements ChunkPatcher {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LiquidPatcher.class);
     private final WorldReader surfaceWorld;
