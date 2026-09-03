@@ -59,7 +59,7 @@ public final class TestWorld implements WorldReader {
         private final TestChunkGrid grid;
 
         private GridChunkReader(TestChunkGrid grid) {
-            super(null);
+            super(null, grid.getEntities());
             this.grid = grid;
         }
 

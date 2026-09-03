@@ -13,6 +13,7 @@ import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
+import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
 import java.util.ArrayList;
@@ -417,5 +418,10 @@ class PatcherStrategyTest {
 
         @Override
         public void setBiome(int x, int y, int z, Biome biome) {}
+
+        @Override
+        public void addEntity(EntityView entity) {
+            throw new UnsupportedOperationException("Fake chunk data cannot add entities");
+        }
     }
 }

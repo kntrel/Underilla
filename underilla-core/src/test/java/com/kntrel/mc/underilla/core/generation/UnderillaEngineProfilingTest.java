@@ -39,16 +39,20 @@ class UnderillaEngineProfilingTest {
 
         assertTrue(engine.tryPatchTerrain(chunk()));
         assertTrue(engine.tryPatchLiquids(chunk()));
+        assertTrue(engine.tryPatchEntities(chunk()));
 
         assertEquals(List.of("cave", "surface", "liquid"), calls);
-        assertEquals(5, measurements.size());
+        assertEquals(7, measurements.size());
         assertMeasurement(measurements.get(0), CaveStep.class, "patch");
         assertMeasurement(measurements.get(1), SurfaceStep.class, "patch");
         assertMeasurement(measurements.get(2), UnderillaEngine.class, "terrain_patch");
         assertMeasurement(measurements.get(3), LiquidStep.class, "patch");
         assertMeasurement(measurements.get(4), UnderillaEngine.class, "liquid_patch");
+        assertMeasurement(measurements.get(5), EntityPatcher.class, "patch");
+        assertMeasurement(measurements.get(6), UnderillaEngine.class, "entity_patch");
         assertEquals(1, measurements.subList(0, 3).stream().map(Measurement::operationId).distinct().count());
         assertEquals(1, measurements.subList(3, 5).stream().map(Measurement::operationId).distinct().count());
+        assertEquals(1, measurements.subList(5, 7).stream().map(Measurement::operationId).distinct().count());
     }
 
     private static TestChunkGrid chunk() {

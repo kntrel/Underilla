@@ -15,12 +15,14 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestDiskWorldReader;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.DeflaterOutputStream;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -29,13 +31,27 @@ class DiskWorldReaderTest {
     @TempDir
     Path temporaryDirectory;
 
+    private Path arbitraryTerrainDirectory;
+    private Path regionDirectory;
+    private Path entityDirectory;
+    private Path missingRegionDirectory;
+    private Path missingEntityDirectory;
+
+    @BeforeEach
+    void setUpTemporaryPaths() throws IOException {
+        arbitraryTerrainDirectory = Files.createDirectories(temporaryDirectory.resolve("arbitrary/source/terrain"));
+        regionDirectory = Files.createDirectories(temporaryDirectory.resolve("world/region"));
+        entityDirectory = Files.createDirectories(temporaryDirectory.resolve("world/entities"));
+        missingRegionDirectory = temporaryDirectory.resolve("missing-world/region");
+        missingEntityDirectory = temporaryDirectory.resolve("missing-world/entities");
+    }
+
     @Test
     void readsTheProvidedRegionDirectoryWithoutWorldOrDimensionAssumptions() throws Exception {
-        Path regionDirectory = Files.createDirectories(temporaryDirectory.resolve("arbitrary/source/terrain"));
-        Files.copy(resourcePath("mca/surface.mca"), regionDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
+        Files.copy(resourcePath("mca/surface.mca"), arbitraryTerrainDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
 
         TestDiskWorldReader reader = new TestDiskWorldReader(
-                regionDirectory.toFile(), 1,
+                arbitraryTerrainDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
 
         assertEquals("minecraft:stone", reader.blockAt(0, 0, 0).orElseThrow().getName());
@@ -43,8 +59,6 @@ class DiskWorldReaderTest {
 
     @Test
     void rejectsAMissingRegionDirectory() {
-        Path missingRegionDirectory = temporaryDirectory.resolve("world/region");
-
         assertThrows(NoSuchFieldException.class, () -> new TestDiskWorldReader(
                 missingRegionDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air"))));
@@ -52,8 +66,6 @@ class DiskWorldReaderTest {
 
     @Test
     void injectsEntitiesFromTheCorrespondingEntityRegion() throws Exception {
-        Path regionDirectory = Files.createDirectories(temporaryDirectory.resolve("world/region"));
-        Path entityDirectory = Files.createDirectories(temporaryDirectory.resolve("world/entities"));
         Files.copy(resourcePath("mca/surface.mca"), regionDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
         writeEntityRegion(entityDirectory.resolve("r.0.0.mca"));
 
@@ -69,8 +81,6 @@ class DiskWorldReaderTest {
 
     @Test
     void treatsAMissingEntityRegionAsAnEmptyEntityList() throws Exception {
-        Path regionDirectory = Files.createDirectories(temporaryDirectory.resolve("world/region"));
-        Path entityDirectory = Files.createDirectories(temporaryDirectory.resolve("world/entities"));
         Files.copy(resourcePath("mca/surface.mca"), regionDirectory.resolve("r.0.0.mca"), REPLACE_EXISTING);
 
         TestDiskWorldReader reader = new TestDiskWorldReader(
@@ -84,9 +94,6 @@ class DiskWorldReaderTest {
 
     @Test
     void treatsAMissingTerrainRegionAsOutsideTheSurface() throws Exception {
-        Path regionDirectory = Files.createDirectories(temporaryDirectory.resolve("world/region"));
-        Path entityDirectory = Files.createDirectories(temporaryDirectory.resolve("world/entities"));
-
         TestDiskWorldReader reader = new TestDiskWorldReader(
                 regionDirectory.toFile(), entityDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
@@ -96,9 +103,6 @@ class DiskWorldReaderTest {
 
     @Test
     void rejectsAMissingEntityRegionDirectoryWhenOneIsProvided() throws Exception {
-        Path regionDirectory = Files.createDirectories(temporaryDirectory.resolve("world/region"));
-        Path missingEntityDirectory = temporaryDirectory.resolve("world/entities");
-
         assertThrows(NoSuchFieldException.class, () -> new TestDiskWorldReader(
                 regionDirectory.toFile(), missingEntityDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air"))));

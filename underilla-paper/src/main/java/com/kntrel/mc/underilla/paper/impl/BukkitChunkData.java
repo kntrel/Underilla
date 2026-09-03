@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.paper.impl;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.reader.EntityView;
 import org.bukkit.block.data.BlockData;
 
 public class BukkitChunkData implements ChunkData {
@@ -63,5 +64,10 @@ public class BukkitChunkData implements ChunkData {
     @Override
     public void setBiome(int x, int y, int z, com.kntrel.mc.underilla.core.api.Biome biome) {
         // No need to set biome for chunk. It's done by the generator.
+    }
+
+    @Override
+    public void addEntity(EntityView entity) {
+        throw new UnsupportedOperationException("Generator chunk data cannot add entities");
     }
 }

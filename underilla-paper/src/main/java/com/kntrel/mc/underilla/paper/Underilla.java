@@ -17,7 +17,6 @@ import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.StringKeys;
 import com.kntrel.mc.underilla.paper.listener.ChunkGeneratedListener;
-import com.kntrel.mc.underilla.paper.listener.ChunkProfilingListener;
 import com.kntrel.mc.underilla.paper.listener.StructureEventListener;
 import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
@@ -100,8 +99,13 @@ public final class Underilla extends JavaPlugin {
         LOGGER.info("Using Underilla as main world generator (with {} as outOfTheSurfaceWorldGenerator)!",
                 outOfTheSurfaceWorldGenerator);
         UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader,
-                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext, instrumenter, chunkGenerationProfiler);
-        this.worldGenerators.put(worldName, worldGenerator);
+                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext, instrumenter, chunkGenerationProfiler,
+                worldName);
+        UnderillaChunkGenerator existingGenerator = this.worldGenerators.putIfAbsent(worldName, worldGenerator);
+        if (existingGenerator != null) {
+            return existingGenerator;
+        }
+        this.getServer().getPluginManager().registerEvents(worldGenerator, this);
         return worldGenerator;
     }
 
@@ -159,7 +163,6 @@ public final class Underilla extends JavaPlugin {
                 this.getServer().getPluginManager().registerEvents(structureEventListener, this);
             }
             this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
-            this.getServer().getPluginManager().registerEvents(new ChunkProfilingListener(chunkGenerationProfiler), this);
 
             if (getUnderillaConfig().getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
                 LOGGER.info("Cleaning listener for blocks and/or entities have been init.");

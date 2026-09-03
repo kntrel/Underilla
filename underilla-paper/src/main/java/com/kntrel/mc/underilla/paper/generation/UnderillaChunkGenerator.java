@@ -30,9 +30,12 @@ import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.LimitedRegion;
 import org.bukkit.generator.WorldInfo;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.jetbrains.annotations.NotNull;
 
-public class UnderillaChunkGenerator extends ChunkGenerator {
+public class UnderillaChunkGenerator extends ChunkGenerator implements Listener {
     // TODO : For performance reason, we should generate and empty world if transfer_world_from_caves_world==true
 
     // ASSETS
@@ -49,6 +52,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
     // FIELDS
     private final UnderillaEngine engine;
     private final ChunkGenerationProfiler chunkProfiler;
+    private final String worldName;
     private volatile UnderillaBiomeProvider biomeProvider;
     private final @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator;
 
@@ -60,15 +64,25 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             PatchingPlan patchingPlan,
             GenerationContext generationContext,
             Instrumenter instrumenter,
-            ChunkGenerationProfiler chunkProfiler
+            ChunkGenerationProfiler chunkProfiler,
+            String worldName
     ) {
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
         this.engine = new UnderillaEngine(worldSurfaceReader, patchingPlan, generationContext, instrumenter);
         this.chunkProfiler = chunkProfiler;
+        this.worldName = worldName;
     }
 
 
     // IMPLEMENTATIONS
+    @EventHandler(ignoreCancelled = true)
+    public void onChunkLoad(ChunkLoadEvent event) {
+        if (!event.isNewChunk() || !event.getWorld().getName().equals(worldName)) {
+            return;
+        }
+        this.chunkProfiler.complete(event.getWorld().getUID(), event.getChunk().getX(), event.getChunk().getZ());
+    }
+
     @Override
     public int getBaseHeight(WorldInfo worldInfo, Random random, int x, int z, HeightMap heightMap) {
         // Do not use base height from VoidWorldGenerator if it is outside of the surface world, else it broke structures generation.
@@ -123,6 +137,14 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
             if (!tryPatchTerrain(chunkX, chunkZ, chunkData) && outOfTheSurfaceWorldGenerator != null) {
                 outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
             }
+        }
+
+        // Paper invokes this callback after vanilla carvers, so restore liquids here before decoration and lighting.
+        if (Underilla.getUnderillaConfig().getBoolean(BooleanKeys.PRESERVE_LIQUID_FROM_CAVERS)
+                && Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey)
+                && !Underilla.getUnderillaConfig()
+                        .isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
+            this.engine.tryPatchLiquids(new BukkitChunkData(chunkData, chunkX, chunkZ));
         }
     }
 
@@ -267,28 +289,16 @@ public class UnderillaChunkGenerator extends ChunkGenerator {
         }
 
         private void populateStep(WorldInfo worldInfo, int chunkX, int chunkZ, LimitedRegion limitedRegion) {
-            // If carvers are enabled in this biome & surface was not preserved from carvers & liquids are preserved from carvers.
-            // => we need to re-insert the water blocks from surface world over the limits between the 2 world.
-
-            if (Underilla.getUnderillaConfig().getBoolean(BooleanKeys.PRESERVE_LIQUID_FROM_CAVERS)) {
-                String biomeKey = getBiomeKeyStringFromChunkCoordinates(worldInfo, chunkX, chunkZ);
-                if (Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey)
-                        && !Underilla.getUnderillaConfig()
-                                .isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-
-                    BukkitRegionChunkData chunkData = new BukkitRegionChunkData(limitedRegion, chunkX, chunkZ, worldInfo.getMinHeight(),
-                            worldInfo.getMaxHeight());
-                    this.underillaEngine.tryPatchLiquids(chunkData);
-                }
-            }
+            BukkitRegionChunkData chunkData = new BukkitRegionChunkData(
+                    limitedRegion, chunkX, chunkZ, worldInfo.getMinHeight(), worldInfo.getMaxHeight());
 
             // The block populators are called after addVanillaDecorations(...) before light and mod spawn.
-            // It's the right time to clean of blocks, but not yet for entities.
-            // Calling it here should be thread safe and lag safe since Chunky will waut that the chunks is generated before stating new
-            // chunks generation.
+            // It is the final generation-time opportunity to clean decorated blocks and add reference entities.
+            // Calling it here is thread-safe and lag-safe because Chunky waits for generation to finish before starting more chunks.
             if (Underilla.getUnderillaConfig().getBoolean(UnderillaConfig.BooleanKeys.CLEAN_BLOCKS_ENABLED)) {
                 CleanBlocks.cleanBlocks(worldInfo, chunkX, chunkZ, limitedRegion);
             }
+            this.underillaEngine.tryPatchEntities(chunkData);
         }
     }
 

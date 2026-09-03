@@ -1,10 +1,18 @@
 package com.kntrel.mc.underilla.paper.impl;
 
+import com.jkantrell.nbt.io.NBTSerializer;
+import com.jkantrell.nbt.io.NamedTag;
+import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.VectorIterable;
 import com.kntrel.mc.underilla.paper.Underilla;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.zip.GZIPOutputStream;
+import org.bukkit.Bukkit;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.generator.LimitedRegion;
 import org.slf4j.Logger;
@@ -85,5 +93,27 @@ public class BukkitRegionChunkData implements ChunkData {
             biome = Underilla.getInstance().getEndBiomeTransformer().apply(biome);
         }
         Underilla.getUnderillaConfig().getSelector().getWorld().setBiome(this.absX_ + x, y, this.absZ_ + z, biome);
+    }
+    @Override
+    @SuppressWarnings("deprecation")
+    public void addEntity(EntityView entity) {
+        try {
+            org.bukkit.entity.Entity bukkitEntity = Bukkit.getUnsafe().deserializeEntity(
+                    serialize(entity), this.region.getWorld(), false, true);
+            this.region.addEntity(bukkitEntity);
+        } catch (IOException | RuntimeException exception) {
+            LOGGER.warn("Failed to deserialize a reference entity in chunk {}, {}",
+                    getChunkX(), getChunkZ(), exception);
+        }
+    }
+
+    private static byte[] serialize(EntityView entityView) throws IOException {
+        CompoundTag entity = entityView.tag();
+        entity.putInt("DataVersion", entityView.dataVersion());
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (GZIPOutputStream compressed = new GZIPOutputStream(output)) {
+            new NBTSerializer(false).toStream(new NamedTag(null, entity), compressed);
+        }
+        return output.toByteArray();
     }
 }

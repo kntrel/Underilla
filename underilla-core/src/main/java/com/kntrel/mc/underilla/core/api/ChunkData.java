@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.api;
 
+import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.Vector;
 
 public interface ChunkData {
@@ -17,5 +18,6 @@ public interface ChunkData {
     default void setBlock(Vector<Integer> pos, Block block) { this.setBlock(pos.x(), pos.y(), pos.z(), block); }
     void setBiome(int x, int y, int z, Biome biome);
     default void setBiome(Vector<Integer> pos, Biome biome) { this.setBiome(pos.x(), pos.y(), pos.z(), biome); }
+    void addEntity(EntityView entity);
 
 }
