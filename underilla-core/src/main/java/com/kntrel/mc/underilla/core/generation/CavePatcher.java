@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
@@ -13,12 +14,14 @@ public final class CavePatcher implements ChunkPatcher {
 
     private final WorldReader cavesWorld;
     private final Boundary boundary;
-    private final GenerationContext context;
+    private final GenerationConfig config;
+    private final BlockFactory blocks;
 
-    public CavePatcher(WorldReader cavesWorld, Boundary boundary, GenerationContext context) {
+    public CavePatcher(WorldReader cavesWorld, Boundary boundary, GenerationConfig config, BlockFactory blocks) {
         this.cavesWorld = Objects.requireNonNull(cavesWorld, "cavesWorld");
         this.boundary = Objects.requireNonNull(boundary, "boundary");
-        this.context = Objects.requireNonNull(context, "context");
+        this.config = Objects.requireNonNull(config, "config");
+        this.blocks = Objects.requireNonNull(blocks, "blocks");
     }
 
     @Override
@@ -28,7 +31,7 @@ public final class CavePatcher implements ChunkPatcher {
             return;
         }
 
-        int minimumY = Math.max(context.config().generationAreaMinY(), targetChunk.getMinHeight());
+        int minimumY = Math.max(config.generationAreaMinY(), targetChunk.getMinHeight());
         int maximumY = targetChunk.getMaxHeight() - 1;
         int chunkOriginX = targetChunk.getChunkX() * GenerationConstants.CHUNK_SIZE;
         int chunkOriginZ = targetChunk.getChunkZ() * GenerationConstants.CHUNK_SIZE;
@@ -36,7 +39,7 @@ public final class CavePatcher implements ChunkPatcher {
             for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
                 int columnMaximumY = Math.min(maximumY, boundary.at(chunkOriginX + x, chunkOriginZ + z));
                 for (int y = minimumY; y <= columnMaximumY; y++) {
-                    Block caveBlock = cavesChunk.blockAt(x, y, z).orElse(context.blocks().air());
+                    Block caveBlock = cavesChunk.blockAt(x, y, z).orElse(blocks.air());
                     targetChunk.setBlock(x, y, z, caveBlock);
                 }
             }

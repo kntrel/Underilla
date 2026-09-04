@@ -30,11 +30,13 @@ public final class PatcherFactory {
 
     private static PatchingPlan plan(WorldReader surfaceWorld, WorldReader cavesWorld,
             GenerationContext context, Boundary boundary, boolean generateNoise) {
-        ChunkPatcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, context);
+        GenerationConfig config = context.config();
+        var blocks = context.blocks();
+        ChunkPatcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, config, blocks);
         List<ChunkPatcher> terrainPatchers = cavesWorld == null
                 ? List.of(surfacePatcher)
-                : List.of(new CavePatcher(cavesWorld, boundary, context), surfacePatcher);
-        ChunkPatcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary, context);
+                : List.of(new CavePatcher(cavesWorld, boundary, config, blocks), surfacePatcher);
+        ChunkPatcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary);
         return new PatchingPlan(terrainPatchers, liquidPatcher, boundary, generateNoise);
     }
 

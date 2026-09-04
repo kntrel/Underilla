@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
@@ -15,12 +16,14 @@ public final class SurfacePatcher implements ChunkPatcher {
 
     private final WorldReader surfaceWorld;
     private final Boundary boundary;
-    private final GenerationContext context;
+    private final GenerationConfig config;
+    private final BlockFactory blocks;
 
-    public SurfacePatcher(WorldReader surfaceWorld, Boundary boundary, GenerationContext context) {
+    public SurfacePatcher(WorldReader surfaceWorld, Boundary boundary, GenerationConfig config, BlockFactory blocks) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
         this.boundary = Objects.requireNonNull(boundary, "boundary");
-        this.context = Objects.requireNonNull(context, "context");
+        this.config = Objects.requireNonNull(config, "config");
+        this.blocks = Objects.requireNonNull(blocks, "blocks");
     }
 
     @Override
@@ -32,15 +35,15 @@ public final class SurfacePatcher implements ChunkPatcher {
 
         int airColumn = surfaceChunk.airSectionsBottom();
         targetChunk.setRegion(0, airColumn, 0, GenerationConstants.CHUNK_SIZE, targetChunk.getMaxHeight(),
-                GenerationConstants.CHUNK_SIZE, context.blocks().air());
+                GenerationConstants.CHUNK_SIZE, blocks.air());
 
         VectorIterable iterable = new VectorIterable(0, GenerationConstants.CHUNK_SIZE,
-                context.config().generationAreaMinY(), airColumn, 0, GenerationConstants.CHUNK_SIZE);
-        int columnBoundary = context.config().maxHeightOfCaves();
+                config.generationAreaMinY(), airColumn, 0, GenerationConstants.CHUNK_SIZE);
+        int columnBoundary = config.maxHeightOfCaves();
         int lastX = -1;
         int lastZ = -1;
         for (Vector<Integer> vector : iterable) {
-            Block referenceBlock = surfaceChunk.blockAt(vector.x(), vector.y(), vector.z()).orElse(context.blocks().air());
+            Block referenceBlock = surfaceChunk.blockAt(vector.x(), vector.y(), vector.z()).orElse(blocks.air());
             referenceBlock = replaceSurfaceBlockIfNecessary(referenceBlock);
 
             Block undergroundBlock = targetChunk.getBlock(vector);
@@ -59,12 +62,12 @@ public final class SurfacePatcher implements ChunkPatcher {
     }
 
     private boolean shouldKeepReferenceBlockInUnderground(Block referenceBlock, Block undergroundBlock) {
-        return context.config().shouldKeepSurfaceBlockInCaves(referenceBlock.getName())
+        return config.shouldKeepSurfaceBlockInCaves(referenceBlock.getName())
                 && (undergroundBlock == null || undergroundBlock.isSolid());
     }
 
     private Block replaceSurfaceBlockIfNecessary(Block block) {
-        String replacement = context.config().surfaceBlockReplacement(block.getName());
-        return replacement == null ? block : context.blocks().create(replacement);
+        String replacement = config.surfaceBlockReplacement(block.getName());
+        return replacement == null ? block : blocks.create(replacement);
     }
 }

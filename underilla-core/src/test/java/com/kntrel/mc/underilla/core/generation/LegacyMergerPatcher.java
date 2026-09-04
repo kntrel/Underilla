@@ -18,18 +18,21 @@ final class LegacyMergerPatcher {
         Objects.requireNonNull(merger, "merger");
         Objects.requireNonNull(surfaceWorld, "surfaceWorld");
         GenerationConfig config = merger.context().config();
+        var blocks = merger.context().blocks();
         Boundary boundary = new AbsoluteBoundary(config.maxHeightOfCaves(),
                 config.generationAreaMinY(), config.generationAreaMaxY());
         this.patcher = pipeline(cavesWorld, boundary, merger.context(),
-                new SurfacePatcher(surfaceWorld, boundary, merger.context()));
+                new SurfacePatcher(surfaceWorld, boundary, config, blocks));
     }
 
     LegacyMergerPatcher(SurfaceMerger merger, WorldReader surfaceWorld, WorldReader cavesWorld) {
         Objects.requireNonNull(merger, "merger");
         Objects.requireNonNull(surfaceWorld, "surfaceWorld");
+        GenerationConfig config = merger.context().config();
+        var blocks = merger.context().blocks();
         Boundary boundary = heightBoundary(surfaceWorld, merger.context());
         this.patcher = pipeline(cavesWorld, boundary, merger.context(),
-                new SurfacePatcher(surfaceWorld, boundary, merger.context()));
+                new SurfacePatcher(surfaceWorld, boundary, config, blocks));
     }
 
     void patch(ChunkData chunk) {
@@ -41,7 +44,7 @@ final class LegacyMergerPatcher {
         if (cavesWorld == null) {
             return strategyPatcher;
         }
-        return new ChunkPatcherPipeline(new CavePatcher(cavesWorld, boundary, context), strategyPatcher);
+        return new ChunkPatcherPipeline(new CavePatcher(cavesWorld, boundary, context.config(), context.blocks()), strategyPatcher);
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, GenerationContext context) {

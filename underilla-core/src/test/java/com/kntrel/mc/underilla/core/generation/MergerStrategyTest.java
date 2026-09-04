@@ -57,7 +57,7 @@ class PatcherStrategyTest {
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
         Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
-        ChunkPatcher patcher = new SurfacePatcher(referenceWorld, boundary, context);
+        ChunkPatcher patcher = new SurfacePatcher(referenceWorld, boundary, context.config(), context.blocks());
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
         patcher.patch(destination);
@@ -113,7 +113,7 @@ class PatcherStrategyTest {
         GenerationContext context = context(config);
         Boundary boundary = new AbsoluteBoundary(config.minimumY);
         FakeWorldReader referenceWorld = new FakeWorldReader();
-        ChunkPatcher terrainPatcher = new SurfacePatcher(referenceWorld, boundary, context);
+        ChunkPatcher terrainPatcher = new SurfacePatcher(referenceWorld, boundary, context.config(), context.blocks());
         PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, boundary, false);
 
         assertFalse(plan.generateNoise());
@@ -140,7 +140,7 @@ class PatcherStrategyTest {
         destination.setBlock(0, 2, 0, boundaryBlock);
         destination.setBlock(0, 3, 0, aboveBlock);
 
-        new LiquidPatcher(surfaceWorld, boundary, context).patch(destination);
+        new LiquidPatcher(surfaceWorld, boundary).patch(destination);
 
         assertFalse(boundaryBlock.isWaterlogged());
         assertTrue(aboveBlock.isWaterlogged());

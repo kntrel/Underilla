@@ -18,12 +18,10 @@ public final class LiquidPatcher implements ChunkPatcher {
     private static final Logger LOGGER = LoggerFactory.getLogger(LiquidPatcher.class);
     private final WorldReader surfaceWorld;
     private final Boundary boundary;
-    private final GenerationContext context;
 
-    public LiquidPatcher(WorldReader surfaceWorld, Boundary boundary, GenerationContext context) {
+    public LiquidPatcher(WorldReader surfaceWorld, Boundary boundary) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
         this.boundary = Objects.requireNonNull(boundary, "boundary");
-        this.context = Objects.requireNonNull(context, "context");
     }
 
     @Override
