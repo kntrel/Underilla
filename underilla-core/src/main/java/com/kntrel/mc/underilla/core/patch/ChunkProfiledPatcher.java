@@ -6,12 +6,12 @@ import com.kntrel.mc.underilla.core.profiling.Tracker;
 import java.util.Objects;
 
 /** Decorates a chunk patcher with an individual {@code patch} measurement. */
-public final class ProfiledPatcher implements ChunkPatcher {
+public final class ChunkProfiledPatcher implements ChunkPatcher {
 
     private final ChunkPatcher patcher;
     private final Tracker tracker;
 
-    public ProfiledPatcher(ChunkPatcher patcher, Instrumenter instrumenter) {
+    public ChunkProfiledPatcher(ChunkPatcher patcher, Instrumenter instrumenter) {
         this.patcher = Objects.requireNonNull(patcher, "patcher");
         this.tracker = Objects.requireNonNull(instrumenter, "instrumenter").tracker(patcher.getClass());
     }

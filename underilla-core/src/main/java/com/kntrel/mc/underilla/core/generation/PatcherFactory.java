@@ -1,8 +1,11 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /** Composes patchers and generation policies for each supported mode. */
 public final class PatcherFactory {
@@ -32,10 +35,17 @@ public final class PatcherFactory {
             GenerationContext context, Boundary boundary, boolean generateNoise) {
         GenerationConfig config = context.config();
         var blocks = context.blocks();
-        ChunkPatcher surfacePatcher = new SurfacePatcher(surfaceWorld, boundary, config, blocks);
+        ChunkPatcher surfacePatcher = new SurfacePatcher(
+                surfaceWorld,
+                boundary,
+                config.generationAreaMinY(),
+                blocks::air,
+                block -> config.shouldKeepSurfaceBlockInCaves(block.getName()),
+                surfaceBlockTransformer(config, blocks));
         List<ChunkPatcher> terrainPatchers = cavesWorld == null
                 ? List.of(surfacePatcher)
-                : List.of(new CavePatcher(cavesWorld, boundary, config, blocks), surfacePatcher);
+                : List.of(new CavePatcher(cavesWorld, boundary, config.generationAreaMinY(), blocks::air),
+                        surfacePatcher);
         ChunkPatcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary);
         return new PatchingPlan(terrainPatchers, liquidPatcher, boundary, generateNoise);
     }
@@ -47,5 +57,15 @@ public final class PatcherFactory {
                 config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
                 config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation);
         return new CachedBoundary(heightBoundary, config.cacheSize());
+    }
+
+    private static UnaryOperator<Block> surfaceBlockTransformer(
+            GenerationConfig config,
+            BlockFactory blocks
+    ) {
+        return block -> {
+            String replacement = config.surfaceBlockReplacement(block.getName());
+            return replacement == null ? block : blocks.create(replacement);
+        };
     }
 }

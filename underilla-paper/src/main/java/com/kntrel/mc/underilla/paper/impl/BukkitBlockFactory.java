@@ -7,7 +7,7 @@ import org.bukkit.Material;
 public final class BukkitBlockFactory implements BlockFactory {
 
     @Override
-    public Block air() { return BukkitBlock.AIR; }
+    public Block air() { return new BukkitBlock(Material.AIR.createBlockData()); }
 
     @Override
     public Block create(String name) {

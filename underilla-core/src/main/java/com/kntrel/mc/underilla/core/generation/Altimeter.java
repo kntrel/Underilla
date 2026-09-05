@@ -7,5 +7,5 @@ import com.kntrel.mc.underilla.core.api.WorldInfo;
 @FunctionalInterface
 public interface Altimeter {
 
-    int baseHeight(WorldInfo worldInfo, int x, int z, HeightMapType heightMap);
+    int heightAt(WorldInfo worldInfo, int x, int z, HeightMapType heightMap);
 }

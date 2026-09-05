@@ -8,8 +8,6 @@ import org.bukkit.block.data.Waterlogged;
 import org.bukkit.entity.EntityType;
 
 public class BukkitBlock implements Block {
-    public static final BukkitBlock AIR = new BukkitBlock(Material.AIR.createBlockData());
-
     // FIELDS
     private BlockData blockData_;
     private Optional<EntityType> spawnedType;

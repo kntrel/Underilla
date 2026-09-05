@@ -57,7 +57,7 @@ class PatcherStrategyTest {
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
         Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
-        ChunkPatcher patcher = new SurfacePatcher(referenceWorld, boundary, context.config(), context.blocks());
+        ChunkPatcher patcher = surfacePatcher(referenceWorld, boundary, context);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
         patcher.patch(destination);
@@ -113,7 +113,7 @@ class PatcherStrategyTest {
         GenerationContext context = context(config);
         Boundary boundary = new AbsoluteBoundary(config.minimumY);
         FakeWorldReader referenceWorld = new FakeWorldReader();
-        ChunkPatcher terrainPatcher = new SurfacePatcher(referenceWorld, boundary, context.config(), context.blocks());
+        ChunkPatcher terrainPatcher = surfacePatcher(referenceWorld, boundary, context);
         PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, boundary, false);
 
         assertFalse(plan.generateNoise());
@@ -155,6 +155,25 @@ class PatcherStrategyTest {
             public Block create(String name) { return new TestBlock(name, true, false, false); }
         };
         return new GenerationContext(config, blockFactory);
+    }
+
+    private static ChunkPatcher surfacePatcher(
+            WorldReader surfaceWorld,
+            Boundary boundary,
+            GenerationContext context
+    ) {
+        GenerationConfig config = context.config();
+        BlockFactory blocks = context.blocks();
+        return new SurfacePatcher(
+                surfaceWorld,
+                boundary,
+                config.generationAreaMinY(),
+                blocks::air,
+                block -> config.shouldKeepSurfaceBlockInCaves(block.getName()),
+                block -> {
+                    String replacement = config.surfaceBlockReplacement(block.getName());
+                    return replacement == null ? block : blocks.create(replacement);
+                });
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, TestConfig config) {

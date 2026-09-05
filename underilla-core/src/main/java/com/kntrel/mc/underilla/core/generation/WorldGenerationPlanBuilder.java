@@ -1,9 +1,10 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.patch.BiomePatcher;
+import com.kntrel.mc.underilla.core.patch.BiomeProfiledPatcher;
+import com.kntrel.mc.underilla.core.patch.ChunkProfiledPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
-import com.kntrel.mc.underilla.core.patch.ProfiledPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 
 import java.util.Arrays;
@@ -18,7 +19,10 @@ public final class WorldGenerationPlanBuilder {
     private static final Instrumenter NO_OP_INSTRUMENTER = new Instrumenter(_ -> {});
     private static final ChunkPatcher NO_OP_CHUNK_PATCHER = _ -> {};
     private static final BiomePatcher NO_OP_BIOME_PATCHER = _ -> false;
+    private static final Altimeter NO_OP_ALTIMETER = (worldInfo, x, z, heightMap) -> 0;
+    private static final ChunkCoverage ALL_CHUNKS = (chunkX, chunkZ) -> true;
 
+    private ChunkCoverage coverage = ALL_CHUNKS;
     private List<ChunkPatcher> afterNoise = List.of();
     private List<ChunkPatcher> afterSurface = List.of();
     private List<ChunkPatcher> afterCarvers = List.of();
@@ -32,7 +36,13 @@ public final class WorldGenerationPlanBuilder {
     private boolean features = true;
     private boolean mobs = true;
     private boolean structures = true;
-    private Altimeter altimeter = (worldInfo, x, z, heightMap) -> 0;
+    private Altimeter altimeter = NO_OP_ALTIMETER;
+
+    /** Sets the chunks for which this plan should replace the platform fallback. */
+    public WorldGenerationPlanBuilder coverage(ChunkCoverage coverage) {
+        this.coverage = Objects.requireNonNull(coverage, "coverage");
+        return this;
+    }
 
     /**
      * Sets the ordered patch pipeline that runs after vanilla noise generation.
@@ -79,7 +89,7 @@ public final class WorldGenerationPlanBuilder {
         return this;
     }
 
-    /** Sets the recorder used to profile each supplied chunk patcher. */
+    /** Sets the recorder used to profile supplied patchers and the altimeter. */
     public WorldGenerationPlanBuilder instrumenter(Instrumenter instrumenter) {
         this.instrumenter = Objects.requireNonNull(instrumenter, "instrumenter");
         return this;
@@ -141,14 +151,15 @@ public final class WorldGenerationPlanBuilder {
                 structures
         );
         return new WorldGenerationPlan(
+                coverage,
                 profiledPipeline(afterNoise),
                 profiledPipeline(afterSurface),
                 profiledPipeline(afterCarvers),
                 profiledPipeline(afterFeatures),
                 profiledPipeline(afterLoad),
-                biomePatch,
+                profiledBiomePatcher(),
                 flags,
-                altimeter
+                profiledAltimeter()
         );
     }
 
@@ -166,9 +177,23 @@ public final class WorldGenerationPlanBuilder {
             return new ChunkPatcherPipeline(patchers);
         }
         List<ChunkPatcher> profiledPatchers = patchers.stream()
-                .map(p -> (ChunkPatcher) new ProfiledPatcher(p, instrumenter))
+                .map(p -> (ChunkPatcher) new ChunkProfiledPatcher(p, instrumenter))
                 .toList();
         return new ChunkPatcherPipeline(profiledPatchers);
+    }
+
+    private BiomePatcher profiledBiomePatcher() {
+        if (instrumenter == NO_OP_INSTRUMENTER || biomePatch == NO_OP_BIOME_PATCHER) {
+            return biomePatch;
+        }
+        return new BiomeProfiledPatcher(biomePatch, instrumenter);
+    }
+
+    private Altimeter profiledAltimeter() {
+        if (instrumenter == NO_OP_INSTRUMENTER || altimeter == NO_OP_ALTIMETER) {
+            return altimeter;
+        }
+        return new ProfiledAltimeter(altimeter, instrumenter);
     }
 
 }

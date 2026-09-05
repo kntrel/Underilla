@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
@@ -22,7 +23,7 @@ final class LegacyMergerPatcher {
         Boundary boundary = new AbsoluteBoundary(config.maxHeightOfCaves(),
                 config.generationAreaMinY(), config.generationAreaMaxY());
         this.patcher = pipeline(cavesWorld, boundary, merger.context(),
-                new SurfacePatcher(surfaceWorld, boundary, config, blocks));
+                surfacePatcher(surfaceWorld, boundary, config, blocks));
     }
 
     LegacyMergerPatcher(SurfaceMerger merger, WorldReader surfaceWorld, WorldReader cavesWorld) {
@@ -32,7 +33,7 @@ final class LegacyMergerPatcher {
         var blocks = merger.context().blocks();
         Boundary boundary = heightBoundary(surfaceWorld, merger.context());
         this.patcher = pipeline(cavesWorld, boundary, merger.context(),
-                new SurfacePatcher(surfaceWorld, boundary, config, blocks));
+                surfacePatcher(surfaceWorld, boundary, config, blocks));
     }
 
     void patch(ChunkData chunk) {
@@ -44,7 +45,27 @@ final class LegacyMergerPatcher {
         if (cavesWorld == null) {
             return strategyPatcher;
         }
-        return new ChunkPatcherPipeline(new CavePatcher(cavesWorld, boundary, context.config(), context.blocks()), strategyPatcher);
+        return new ChunkPatcherPipeline(
+                new CavePatcher(cavesWorld, boundary, context.config().generationAreaMinY(), context.blocks()::air),
+                strategyPatcher);
+    }
+
+    private static ChunkPatcher surfacePatcher(
+            WorldReader surfaceWorld,
+            Boundary boundary,
+            GenerationConfig config,
+            BlockFactory blocks
+    ) {
+        return new SurfacePatcher(
+                surfaceWorld,
+                boundary,
+                config.generationAreaMinY(),
+                blocks::air,
+                block -> config.shouldKeepSurfaceBlockInCaves(block.getName()),
+                block -> {
+                    String replacement = config.surfaceBlockReplacement(block.getName());
+                    return replacement == null ? block : blocks.create(replacement);
+                });
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, GenerationContext context) {
