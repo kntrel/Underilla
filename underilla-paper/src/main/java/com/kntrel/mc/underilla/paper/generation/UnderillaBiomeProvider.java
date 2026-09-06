@@ -1,6 +1,6 @@
 package com.kntrel.mc.underilla.paper.generation;
 
-import com.kntrel.mc.underilla.core.UnderillaEngine;
+import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiome;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiomeData;
@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
 public final class UnderillaBiomeProvider extends BiomeProvider {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(UnderillaBiomeProvider.class);
-    private final UnderillaEngine underillaEngine;
+    private final WorldGenerationPlan generationPlan;
     private final ChunkGenerationProfiler chunkProfiler;
     private volatile BiomeProvider vanillaProvider;
     private final @Nullable BiomeProvider outOfBoundsProvider;
@@ -28,11 +28,11 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
     private long lastWarningPrinted;
 
     public UnderillaBiomeProvider(
-            UnderillaEngine underillaEngine,
+            WorldGenerationPlan generationPlan,
             @Nullable BiomeProvider outOfBoundsBiomeProvider,
             ChunkGenerationProfiler chunkProfiler
     ) {
-        this.underillaEngine = underillaEngine;
+        this.generationPlan = generationPlan;
         this.outOfBoundsProvider = outOfBoundsBiomeProvider;
         this.chunkProfiler = chunkProfiler;
     }
@@ -51,7 +51,7 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
     private @NotNull Biome getBiomeForPosition(@NotNull WorldInfo worldInfo, int x, int y, int z) {
         Biome vanillaBiome = getVanillaBiomeProvider(worldInfo).getBiome(worldInfo, x, y, z);
         BukkitBiomeData biomeData = new BukkitBiomeData(vanillaBiome, x, y, z);
-        if (!underillaEngine.tryPatchBiome(biomeData) && outOfBoundsProvider != null) {
+        if (!generationPlan.biomePatch().patch(biomeData) && outOfBoundsProvider != null) {
             Biome fallbackBiome = outOfBoundsProvider.getBiome(worldInfo, x, y, z);
             countBiome(fallbackBiome.getKey().asString());
             return fallbackBiome;

@@ -1,25 +1,20 @@
 package com.kntrel.mc.underilla.paper.generation;
 
 import com.kntrel.mc.underilla.core.api.HeightMapType;
-import com.kntrel.mc.underilla.core.generation.GenerationContext;
-import com.kntrel.mc.underilla.core.generation.PatchingPlan;
-import com.kntrel.mc.underilla.core.UnderillaEngine;
-import com.kntrel.mc.underilla.core.profiling.Instrumenter;
-import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocks;
 import com.kntrel.mc.underilla.paper.impl.BukkitChunkData;
+import com.kntrel.mc.underilla.paper.impl.BukkitLoadedChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitRegionChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldInfo;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
-import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
 import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bukkit.Bukkit;
 import org.bukkit.HeightMap;
@@ -50,7 +45,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
 
 
     // FIELDS
-    private final UnderillaEngine engine;
+    private final WorldGenerationPlan generationPlan;
     private final ChunkGenerationProfiler chunkProfiler;
     private final String worldName;
     private volatile UnderillaBiomeProvider biomeProvider;
@@ -59,16 +54,13 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
 
     // CONSTRUCTORS
     public UnderillaChunkGenerator(
-            @Nonnull WorldReader worldSurfaceReader,
+            WorldGenerationPlan generationPlan,
             @Nullable ChunkGenerator outOfTheSurfaceWorldGenerator,
-            PatchingPlan patchingPlan,
-            GenerationContext generationContext,
-            Instrumenter instrumenter,
             ChunkGenerationProfiler chunkProfiler,
             String worldName
     ) {
+        this.generationPlan = generationPlan;
         this.outOfTheSurfaceWorldGenerator = outOfTheSurfaceWorldGenerator;
-        this.engine = new UnderillaEngine(worldSurfaceReader, patchingPlan, generationContext, instrumenter);
         this.chunkProfiler = chunkProfiler;
         this.worldName = worldName;
     }
@@ -80,7 +72,14 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
         if (!event.isNewChunk() || !event.getWorld().getName().equals(worldName)) {
             return;
         }
-        this.chunkProfiler.complete(event.getWorld().getUID(), event.getChunk().getX(), event.getChunk().getZ());
+        int chunkX = event.getChunk().getX();
+        int chunkZ = event.getChunk().getZ();
+        try {
+            this.chunkProfiler.run(event.getWorld().getUID(), chunkX, chunkZ,
+                    () -> generationPlan.tryAfterLoad(new BukkitLoadedChunkData(event.getChunk())));
+        } finally {
+            this.chunkProfiler.complete(event.getWorld().getUID(), chunkX, chunkZ);
+        }
     }
 
     @Override
@@ -88,148 +87,95 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
         // Do not use base height from VoidWorldGenerator if it is outside of the surface world, else it broke structures generation.
         // We only use UnderillaChunkGenerator base height to avoid a bug with the structure generation height.
         BukkitWorldInfo info = new BukkitWorldInfo(worldInfo);
-        return this.engine.getBaseHeight(info, x, z, HEIGHTMAPS_MAP.get(heightMap));
+        return this.generationPlan.altimeter().heightAt(info, x, z, HEIGHTMAPS_MAP.get(heightMap));
     }
 
     @Override
-    public void generateSurface(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
-            @NotNull ChunkData chunkData) {
-        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ,
-                () -> generateSurfaceStep(worldInfo, random, chunkX, chunkZ, chunkData));
+    public void generateNoise(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
+        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ, () -> {
+            if (!generationPlan.tryAfterNoise(new BukkitChunkData(chunkData, chunkX, chunkZ)) && outOfTheSurfaceWorldGenerator != null) {
+                outOfTheSurfaceWorldGenerator.generateNoise(worldInfo, random, chunkX, chunkZ, chunkData);
+            }
+        });
     }
 
-    private void generateSurfaceStep(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
-            @NotNull ChunkData chunkData) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
-            outOfTheSurfaceWorldGenerator.generateSurface(worldInfo, random, chunkX, chunkZ, chunkData);
-            return;
-        }
-
-        String biomeKey = getBiomeKeyStringFromChunkCoordinates(worldInfo, chunkX, chunkZ);
-        // if is a biome that should not be carved OR surface should not be preserved from carvers (== merge the world before).
-        if (!Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey) || !Underilla
-                .getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            if (!tryPatchTerrain(chunkX, chunkZ, chunkData) && outOfTheSurfaceWorldGenerator != null) {
-                outOfTheSurfaceWorldGenerator.generateSurface(worldInfo, random, chunkX, chunkZ, chunkData);
+    @Override
+    public void generateSurface(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
+        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ, () -> {
+                if (!generationPlan.tryAfterSurface(new BukkitChunkData(chunkData, chunkX, chunkZ)) && outOfTheSurfaceWorldGenerator != null) {
+                    outOfTheSurfaceWorldGenerator.generateSurface(worldInfo, random, chunkX, chunkZ, chunkData);
+                }
             }
-        }
+        );
     }
 
     @Override
     public void generateCaves(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
-        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ,
-                () -> generateCavesStep(worldInfo, random, chunkX, chunkZ, chunkData));
-    }
-
-    private void generateCavesStep(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ,
-            @NotNull ChunkData chunkData) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
-            outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
-            return;
-        }
-
-        String biomeKey = getBiomeKeyStringFromChunkCoordinates(worldInfo, chunkX, chunkZ);
-        // if is a biome that should be carved and surface should be preserved from carvers (== merge the world after).
-        if (Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey) && Underilla
-                .getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            if (!tryPatchTerrain(chunkX, chunkZ, chunkData) && outOfTheSurfaceWorldGenerator != null) {
-                outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
+        chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ, () -> {
+                if (!generationPlan.tryAfterCarvers(new BukkitChunkData(chunkData, chunkX, chunkZ)) && outOfTheSurfaceWorldGenerator != null) {
+                    outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
+                }
             }
-        }
-
-        // Paper invokes this callback after vanilla carvers, so restore liquids here before decoration and lighting.
-        if (Underilla.getUnderillaConfig().getBoolean(BooleanKeys.PRESERVE_LIQUID_FROM_CAVERS)
-                && Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey)
-                && !Underilla.getUnderillaConfig()
-                        .isBiomeInSet(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, biomeKey)) {
-            this.engine.tryPatchLiquids(new BukkitChunkData(chunkData, chunkX, chunkZ));
-        }
+        );
     }
-
-    private boolean tryPatchTerrain(int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
-        BukkitChunkData data = new BukkitChunkData(chunkData, chunkX, chunkZ);
-        return this.engine.tryPatchTerrain(data);
-    }
-    private static String getBiomeKeyStringFromChunkCoordinates(@NotNull WorldInfo worldInfo, int chunkX, int chunkZ) {
-        return Bukkit.getWorld(worldInfo.getUID()).getBiome(chunkX * Underilla.CHUNK_SIZE, 0, chunkZ * Underilla.CHUNK_SIZE).getKey()
-                .asString();
-    }
-
 
     @Override
     public List<BlockPopulator> getDefaultPopulators(World world) {
-        // Caves are vanilla generated, but they are carved underwater, this re-places the water blocks in case they were carved into.
-        return List.of(new Populator(this.engine, this.chunkProfiler));
+        return List.of(new Populator(this.generationPlan, this.chunkProfiler));
     }
 
     @Override
     public boolean shouldGenerateNoise(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
+        if (usesFallback(chunkX, chunkZ)) {
             return outOfTheSurfaceWorldGenerator.shouldGenerateNoise(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.engine.getFlags().noise();
+        return this.generationPlan.flags().noise();
     }
-
 
     @Override
     public boolean shouldGenerateSurface(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
+        if (usesFallback(chunkX, chunkZ)) {
             return outOfTheSurfaceWorldGenerator.shouldGenerateSurface(worldInfo, random, chunkX, chunkZ);
         }
 
-        // Must always return true, bedrock and deepslate layers are generated in this step
-        return this.engine.getFlags().surface();
+        return this.generationPlan.flags().surface();
     }
 
-
-    /**
-     * Should generate caves with carvers.
-     */
     @Override
     public boolean shouldGenerateCaves(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
+        if (usesFallback(chunkX, chunkZ)) {
             return outOfTheSurfaceWorldGenerator.shouldGenerateCaves(worldInfo, random, chunkX, chunkZ);
         }
 
-        String biomeKey = getBiomeKeyStringFromChunkCoordinates(worldInfo, chunkX, chunkZ);
-        return this.engine.getFlags().carvers()
-                && Underilla.getUnderillaConfig().isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biomeKey);
+        return this.generationPlan.flags().carvers();
     }
 
     @Override
     public boolean shouldGenerateDecorations(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
+        if (usesFallback(chunkX, chunkZ)) {
             return outOfTheSurfaceWorldGenerator.shouldGenerateDecorations(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.engine.getFlags().features();
+        return this.generationPlan.flags().features();
     }
 
     @Override
     public boolean shouldGenerateMobs(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
+        if (usesFallback(chunkX, chunkZ)) {
             return outOfTheSurfaceWorldGenerator.shouldGenerateMobs(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.engine.getFlags().mobs();
+        return this.generationPlan.flags().mobs();
     }
 
     @Override
     public boolean shouldGenerateStructures(WorldInfo worldInfo, Random random, int chunkX, int chunkZ) {
-        if (outOfTheSurfaceWorldGenerator != null
-                && isOutsideOfTheSurfaceWorld(chunkX * Underilla.CHUNK_SIZE, chunkZ * Underilla.CHUNK_SIZE)) {
+        if (usesFallback(chunkX, chunkZ)) {
             return outOfTheSurfaceWorldGenerator.shouldGenerateStructures(worldInfo, random, chunkX, chunkZ);
         }
 
-        return this.engine.getFlags().structures();
+        return this.generationPlan.flags().structures();
     }
 
     @Override
@@ -241,13 +187,12 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
         return new Location(world, x, 100, z);
     }
 
-    // Since 1.21.3 custom biomes are supported by paper.
     @Override
     public synchronized BiomeProvider getDefaultBiomeProvider(@NotNull WorldInfo worldInfo) {
         if (biomeProvider == null) {
             BiomeProvider outsideSurfaceWorldBiomeProvider = outOfTheSurfaceWorldGenerator == null ? null
                     : outOfTheSurfaceWorldGenerator.getDefaultBiomeProvider(worldInfo);
-            biomeProvider = new UnderillaBiomeProvider(engine, outsideSurfaceWorldBiomeProvider, chunkProfiler);
+            biomeProvider = new UnderillaBiomeProvider(generationPlan, outsideSurfaceWorldBiomeProvider, chunkProfiler);
         }
         return biomeProvider;
     }
@@ -258,36 +203,36 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
     }
 
 
-    private boolean isOutsideOfTheSurfaceWorld(int x, int z) {
-        return x < Underilla.getUnderillaConfig().getInt(IntegerKeys.GENERATION_AREA_MIN_X)
-                || x >= Underilla.getUnderillaConfig().getInt(IntegerKeys.GENERATION_AREA_MAX_X)
-                || z < Underilla.getUnderillaConfig().getInt(IntegerKeys.GENERATION_AREA_MIN_Z)
-                || z >= Underilla.getUnderillaConfig().getInt(IntegerKeys.GENERATION_AREA_MAX_Z);
+    //HELPERS
+    private boolean usesFallback(int chunkX, int chunkZ) {
+        return outOfTheSurfaceWorldGenerator != null && !generationPlan.coverage().covers(chunkX, chunkZ);
     }
 
 
-    // CLASSES
+    // INNER CLASSES
     private static class Populator extends BlockPopulator {
 
         // FIELDS
-        private final UnderillaEngine underillaEngine;
+        private final WorldGenerationPlan generationPlan;
         private final ChunkGenerationProfiler chunkProfiler;
 
 
         // CONSTRUCTORS
-        public Populator(UnderillaEngine underillaEngine, ChunkGenerationProfiler chunkProfiler) {
-            this.underillaEngine = underillaEngine;
+        public Populator(WorldGenerationPlan generationPlan, ChunkGenerationProfiler chunkProfiler) {
+            this.generationPlan = generationPlan;
             this.chunkProfiler = chunkProfiler;
         }
 
 
-        // OVERRITES
+        // IMPLEMENTATION
         @Override
         public void populate(WorldInfo worldInfo, Random random, int chunkX, int chunkZ, LimitedRegion limitedRegion) {
             chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ,
                     () -> populateStep(worldInfo, chunkX, chunkZ, limitedRegion));
         }
 
+
+        //HELPERS
         private void populateStep(WorldInfo worldInfo, int chunkX, int chunkZ, LimitedRegion limitedRegion) {
             BukkitRegionChunkData chunkData = new BukkitRegionChunkData(
                     limitedRegion, chunkX, chunkZ, worldInfo.getMinHeight(), worldInfo.getMaxHeight());
@@ -298,7 +243,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
             if (Underilla.getUnderillaConfig().getBoolean(UnderillaConfig.BooleanKeys.CLEAN_BLOCKS_ENABLED)) {
                 CleanBlocks.cleanBlocks(worldInfo, chunkX, chunkZ, limitedRegion);
             }
-            this.underillaEngine.tryPatchEntities(chunkData);
+            this.generationPlan.tryAfterFeatures(chunkData);
         }
     }
 

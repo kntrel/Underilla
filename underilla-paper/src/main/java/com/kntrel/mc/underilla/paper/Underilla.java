@@ -1,8 +1,6 @@
 package com.kntrel.mc.underilla.paper;
 
-import com.kntrel.mc.underilla.core.generation.GenerationContext;
-import com.kntrel.mc.underilla.core.generation.PatcherFactory;
-import com.kntrel.mc.underilla.core.generation.PatchingPlan;
+import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.cleaning.CleanBlocksTask;
@@ -10,6 +8,7 @@ import com.kntrel.mc.underilla.paper.cleaning.CleanEntitiesTask;
 import com.kntrel.mc.underilla.paper.cleaning.FollowableProgressTask;
 import com.kntrel.mc.underilla.paper.generation.GeneratorAccessor;
 import com.kntrel.mc.underilla.paper.generation.UnderillaChunkGenerator;
+import com.kntrel.mc.underilla.paper.generation.PaperGenerationPlanFactory;
 import com.kntrel.mc.underilla.paper.impl.BukkitBlockFactory;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldReader;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
@@ -26,7 +25,6 @@ import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.io.File;
 import java.io.IOException;
 import java.util.EnumMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -48,7 +46,6 @@ public final class Underilla extends JavaPlugin {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(Underilla.class);
     private UnderillaConfig underillaConfig;
-    private GenerationContext generationContext;
     private WorldReader worldSurfaceReader;
     private @Nullable WorldReader worldCavesReader;
     public static final int CHUNK_SIZE = 16;
@@ -86,21 +83,21 @@ public final class Underilla extends JavaPlugin {
         WorldReader cavesBlocksWorld = getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BLOCKS_FROM_CAVES_WORLD)
                 ? worldCavesReader
                 : null;
-        String configuredStrategy = getUnderillaConfig().getString(StringKeys.STRATEGY);
-        if (configuredStrategy == null) {
+        String strategy = getUnderillaConfig().getString(StringKeys.STRATEGY);
+        if (strategy == null) {
             throw new IllegalArgumentException("Patch strategy must be configured");
         }
-        PatchingPlan patchingPlan = switch (configuredStrategy.trim().toUpperCase(Locale.ROOT)) {
-            case "SURFACE" -> PatcherFactory.surface(worldSurfaceReader, cavesBlocksWorld, generationContext);
-            case "ABSOLUTE" -> PatcherFactory.absolute(worldSurfaceReader, cavesBlocksWorld, generationContext);
-            case "NONE" -> PatcherFactory.none(worldSurfaceReader, cavesBlocksWorld, generationContext);
-            default -> throw new IllegalArgumentException("Unknown patch strategy: " + configuredStrategy);
-        };
+        WorldGenerationPlan generationPlan = PaperGenerationPlanFactory.create(
+                strategy,
+                worldSurfaceReader,
+                cavesBlocksWorld,
+                getUnderillaConfig(),
+                new BukkitBlockFactory(),
+                instrumenter);
         LOGGER.info("Using Underilla as main world generator (with {} as outOfTheSurfaceWorldGenerator)!",
                 outOfTheSurfaceWorldGenerator);
-        UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(this.worldSurfaceReader,
-                outOfTheSurfaceWorldGenerator, patchingPlan, generationContext, instrumenter, chunkGenerationProfiler,
-                worldName);
+        UnderillaChunkGenerator worldGenerator = new UnderillaChunkGenerator(
+                generationPlan, outOfTheSurfaceWorldGenerator, chunkGenerationProfiler, worldName);
         UnderillaChunkGenerator existingGenerator = this.worldGenerators.putIfAbsent(worldName, worldGenerator);
         if (existingGenerator != null) {
             return existingGenerator;
@@ -118,57 +115,56 @@ public final class Underilla extends JavaPlugin {
         reloadConfig();
 
         runStepsOnEnabled();
+        if (allStepsDone()) { return; }
 
-        if (!allStepsDone()) {
-            this.profilingRecorder = new JsonStatsRecorder(getDataFolder().toPath().resolve("metrics.json"));
-            this.instrumenter = new Instrumenter(profilingRecorder);
-            this.chunkGenerationProfiler = new ChunkGenerationProfiler(instrumenter);
-            LOGGER.info("Profiling metrics will be written to '{}'", profilingRecorder.outputPath());
-            generationContext = new GenerationContext(getUnderillaConfig(), new BukkitBlockFactory());
-            // Loading reference world
-            File surfaceRegionDirectory = getUnderillaConfig().getSurfaceRegionPath().toFile();
-            File surfaceEntitiesDirectory = null;
-            if (getUnderillaConfig().getSurfaceEntitiesPath() != null) {
-                File configuredEntitiesDirectory = getUnderillaConfig().getSurfaceEntitiesPath().toFile();
-                if (configuredEntitiesDirectory.isDirectory()) {
-                    surfaceEntitiesDirectory = configuredEntitiesDirectory;
-                    LOGGER.info("Surface entity region directory '{}' found.", surfaceEntitiesDirectory);
-                } else {
-                    LOGGER.info("No surface entity region directory at '{}'; reference entities are disabled.",
-                            configuredEntitiesDirectory);
-                }
-            }
-            try {
-                this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, surfaceEntitiesDirectory,
-                        getUnderillaConfig().cacheSize());
-                LOGGER.info("Surface region directory '{}' found.", surfaceRegionDirectory);
-            } catch (NoSuchFieldException e) {
-                LOGGER.warn("No surface region directory at '{}' found", surfaceRegionDirectory, e);
-            }
-            // Loading caves world if we should use it.
-            if (getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BLOCKS_FROM_CAVES_WORLD)
-                    || getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BIOMES_FROM_CAVES_WORLD)) {
-                try {
-                    LOGGER.info("Loading caves world");
-                    File cavesRegionDirectory = getUnderillaConfig().getCavesRegionPath().toFile();
-                    this.worldCavesReader = new BukkitWorldReader(cavesRegionDirectory, getUnderillaConfig().cacheSize());
-                } catch (NoSuchFieldException e) {
-                    LOGGER.warn("No caves region directory at '{}' found", getUnderillaConfig().getCavesRegionPath(), e);
-                }
-            }
-
-            // Registering listeners
-            if (getUnderillaConfig().getBoolean(BooleanKeys.STRUCTURES_ENABLED)) {
-                structureEventListener = new StructureEventListener();
-                this.getServer().getPluginManager().registerEvents(structureEventListener, this);
-            }
-            this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
-
-            if (getUnderillaConfig().getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
-                LOGGER.info("Cleaning listener for blocks and/or entities have been init.");
-                this.getServer().getPluginManager().registerEvents(new ChunkGeneratedListener(), this);
+        this.profilingRecorder = new JsonStatsRecorder(getDataFolder().toPath().resolve("metrics.json"));
+        this.instrumenter = new Instrumenter(profilingRecorder);
+        this.chunkGenerationProfiler = new ChunkGenerationProfiler(instrumenter);
+        LOGGER.info("Profiling metrics will be written to '{}'", profilingRecorder.outputPath());
+        // Loading reference world
+        File surfaceRegionDirectory = getUnderillaConfig().getSurfaceRegionPath().toFile();
+        File surfaceEntitiesDirectory = null;
+        if (getUnderillaConfig().getSurfaceEntitiesPath() != null) {
+            File configuredEntitiesDirectory = getUnderillaConfig().getSurfaceEntitiesPath().toFile();
+            if (configuredEntitiesDirectory.isDirectory()) {
+                surfaceEntitiesDirectory = configuredEntitiesDirectory;
+                LOGGER.info("Surface entity region directory '{}' found.", surfaceEntitiesDirectory);
+            } else {
+                LOGGER.info("No surface entity region directory at '{}'; reference entities are disabled.",
+                        configuredEntitiesDirectory);
             }
         }
+        try {
+            this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, surfaceEntitiesDirectory,
+                    getUnderillaConfig().cacheSize());
+            LOGGER.info("Surface region directory '{}' found.", surfaceRegionDirectory);
+        } catch (NoSuchFieldException e) {
+            LOGGER.warn("No surface region directory at '{}' found", surfaceRegionDirectory, e);
+        }
+        // Loading caves world if we should use it.
+        if (getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BLOCKS_FROM_CAVES_WORLD)
+                || getUnderillaConfig().getBoolean(BooleanKeys.TRANSFER_BIOMES_FROM_CAVES_WORLD)) {
+            try {
+                LOGGER.info("Loading caves world");
+                File cavesRegionDirectory = getUnderillaConfig().getCavesRegionPath().toFile();
+                this.worldCavesReader = new BukkitWorldReader(cavesRegionDirectory, getUnderillaConfig().cacheSize());
+            } catch (NoSuchFieldException e) {
+                LOGGER.warn("No caves region directory at '{}' found", getUnderillaConfig().getCavesRegionPath(), e);
+            }
+        }
+
+        // Registering listeners
+        if (getUnderillaConfig().getBoolean(BooleanKeys.STRUCTURES_ENABLED)) {
+            structureEventListener = new StructureEventListener();
+            this.getServer().getPluginManager().registerEvents(structureEventListener, this);
+        }
+        this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
+
+        if (getUnderillaConfig().getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
+            LOGGER.info("Cleaning listener for blocks and/or entities have been init.");
+            this.getServer().getPluginManager().registerEvents(new ChunkGeneratedListener(), this);
+        }
+
     }
 
     @Override

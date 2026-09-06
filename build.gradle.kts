@@ -7,8 +7,8 @@ group = "com.kntrel.mc.underilla"
 version = "2.3.4"
 description = "Generate vanilla caves in custom worlds."
 
-extra["mainMinecraftVersion"] = "1.21.11"
-extra["supportedMinecraftVersions"] = "1.21.5 - 26.1.2"
+extra["mainMinecraftVersion"] = "26.2"
+extra["supportedMinecraftVersions"] = "1.21.5 - 26.2"
 extra["voidWorldGeneratorVersion"] = "1.3.12"
 extra["chunkyVersion"] = "1.4.55"
 

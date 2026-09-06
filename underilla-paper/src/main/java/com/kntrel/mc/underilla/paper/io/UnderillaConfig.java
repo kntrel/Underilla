@@ -1,6 +1,5 @@
 package com.kntrel.mc.underilla.paper.io;
 
-import com.kntrel.mc.underilla.core.generation.GenerationConfig;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiome;
 import com.kntrel.mc.underilla.paper.selector.Selector;
@@ -27,7 +26,7 @@ import org.bukkit.generator.structure.Structure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class UnderillaConfig implements GenerationConfig {
+public class UnderillaConfig {
     private static final Logger LOGGER = LoggerFactory.getLogger(UnderillaConfig.class);
     private final EnumMap<BooleanKeys, Boolean> booleanMap;
     private final EnumMap<IntegerKeys, Integer> integerMap;
@@ -85,81 +84,60 @@ public class UnderillaConfig implements GenerationConfig {
         Underilla.getInstance().saveConfig();
     }
 
-    @Override
     public int cacheSize() { return getInt(IntegerKeys.CACHE_SIZE); }
 
-    @Override
     public int generationAreaMinX() { return getInt(IntegerKeys.GENERATION_AREA_MIN_X); }
 
-    @Override
     public int generationAreaMinY() { return getInt(IntegerKeys.GENERATION_AREA_MIN_Y); }
 
-    @Override
     public int generationAreaMinZ() { return getInt(IntegerKeys.GENERATION_AREA_MIN_Z); }
 
-    @Override
     public int generationAreaMaxX() { return getInt(IntegerKeys.GENERATION_AREA_MAX_X); }
 
-    @Override
     public int generationAreaMaxY() { return getInt(IntegerKeys.GENERATION_AREA_MAX_Y); }
 
-    @Override
     public int generationAreaMaxZ() { return getInt(IntegerKeys.GENERATION_AREA_MAX_Z); }
 
-    @Override
     public int maxHeightOfCaves() { return getInt(IntegerKeys.MAX_HEIGHT_OF_CAVES); }
 
-    @Override
     public int mergeDepth() { return getInt(IntegerKeys.MERGE_DEPTH); }
 
-    @Override
     public int adaptiveMaxMergeDepth() { return getInt(IntegerKeys.ADAPTATIVE_MAX_MERGE_DEPTH); }
 
-    @Override
     public int adaptiveMinHiddenBlocksMergeDepth() {
         return getInt(IntegerKeys.ADAPTATIVE_MIN_HIDDEN_BLOCKS_MERGE_DEPTH);
     }
 
-    @Override
     public boolean carversEnabled() { return getBoolean(BooleanKeys.CARVERS_ENABLED); }
 
-    @Override
     public boolean vanillaPopulationEnabled() { return getBoolean(BooleanKeys.VANILLA_POPULATION_ENABLED); }
 
-    @Override
     public boolean structuresEnabled() { return getBoolean(BooleanKeys.STRUCTURES_ENABLED); }
 
-    @Override
     public boolean surfaceBiomeUseTopYOnly() { return getBoolean(BooleanKeys.SURFACE_WORLD_BIOME_USE_TOP_Y_VALUE_ONLY); }
 
-    @Override
     public boolean shouldPreserveBiome(String biomeName) {
         return isBiomeInSet(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES, biomeName);
     }
 
-    @Override
     public boolean preserveBiomesOnlyUnderSurface() {
         return getBoolean(BooleanKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_UNDER_SURFACE);
     }
 
-    @Override
     public boolean isSurfaceWorldOnlyBiome(String biomeName) {
         return isBiomeInSet(SetBiomeStringKeys.SURFACE_WORLD_ONLY_ON_THIS_BIOMES, biomeName);
     }
 
-    @Override
     public boolean isIgnoredForSurfaceCalculation(String blockName) {
         Material material = Material.matchMaterial(blockName);
         return material != null && isMaterialInSet(SetMaterialKeys.IGNORED_BLOCK_FOR_SURFACE_CALCULATION, material);
     }
 
-    @Override
     public boolean shouldKeepSurfaceBlockInCaves(String blockName) {
         Material material = Material.matchMaterial(blockName);
         return material != null && isMaterialInSet(SetMaterialKeys.BLOCK_TO_KEEP_FROM_SURFACE_WORLD_IN_CAVES, material);
     }
 
-    @Override
     public String surfaceBlockReplacement(String blockName) {
         Material material = Material.matchMaterial(blockName);
         if (material == null) {

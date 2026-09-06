@@ -1,7 +1,7 @@
 plugins {
     java
     id("com.gradleup.shadow") version "9.4.1"
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.21"
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.22"
     `maven-publish`
     signing
     id("xyz.jpenilla.run-paper") version "3.0.2"
@@ -20,7 +20,7 @@ val chunkyVersion = rootProject.extra["chunkyVersion"] as String
 dependencies {
     implementation(project(":underilla-core"))
 
-    paperweight.paperDevBundle("$mainMinecraftVersion-R0.1-SNAPSHOT")
+    paperweight.paperDevBundle("$mainMinecraftVersion.build.+")
     compileOnly("net.kyori:adventure-text-serializer-ansi:4.17.0")
 
     implementation("com.github.FormikoLudo:Utils:0.0.9")
