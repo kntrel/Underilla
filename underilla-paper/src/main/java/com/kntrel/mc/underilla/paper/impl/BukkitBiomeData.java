@@ -3,7 +3,6 @@ package com.kntrel.mc.underilla.paper.impl;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import java.util.Objects;
-import org.bukkit.NamespacedKey;
 
 /** Paper-backed mutable biome data passed to the platform-neutral engine. */
 public final class BukkitBiomeData implements BiomeData {
@@ -36,7 +35,6 @@ public final class BukkitBiomeData implements BiomeData {
     public int getZ() { return z; }
 
     public org.bukkit.block.Biome getBukkitBiome() {
-        NamespacedKey key = NamespacedKey.fromString(biome.getName());
-        return key == null ? null : BukkitBiome.getBiomeRegistryAccess().get(key);
+        return BukkitBiome.getBiomeRegistryAccess().get(BukkitIDs.toKey(biome.id()));
     }
 }

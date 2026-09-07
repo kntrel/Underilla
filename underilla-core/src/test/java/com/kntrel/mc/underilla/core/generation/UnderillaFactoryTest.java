@@ -75,7 +75,7 @@ class UnderillaFactoryTest {
         assertSame(NoodleCavesPolicy.underground(), NoodleCavesPolicy.underground());
 
         NoodleCavesPolicy.Surface policy = NoodleCavesPolicy.surface(biome -> true, true);
-        assertTrue(policy.predicate().test(() -> "minecraft:plains"));
+        assertTrue(policy.predicate().test(() -> com.kntrel.mc.underilla.core.api.ID.of("plains")));
         assertTrue(policy.restoreLiquids());
     }
 
@@ -194,8 +194,10 @@ class UnderillaFactoryTest {
                 .maximumCaveY(0)
                 .blocks(blocks)
                 .blockCleanup(
-                        name -> name.equals("minecraft:sand") ? "minecraft:sandstone" : null,
-                        _ -> null)
+                        id -> id.equals(com.kntrel.mc.underilla.core.api.ID.of("sand"))
+                                ? java.util.Optional.of(com.kntrel.mc.underilla.core.api.ID.of("sandstone"))
+                                : java.util.Optional.empty(),
+                        _ -> java.util.Optional.empty())
                 .build();
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS);
         target.setBlock(0, 1, 0, sand);
@@ -208,11 +210,11 @@ class UnderillaFactoryTest {
     @Test
     void finalPlanRunsConfiguredEntityCleanupAfterLoad() {
         TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS);
-        TestEntity item = new TestEntity("ITEM");
+        TestEntity item = new TestEntity("item");
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS).addLiveEntity(item);
         WorldGenerationPlan plan = configured(UnderillaFactory.absolute(
                         new TestWorld().addChunk(referenceChunk)))
-                .entityCleanup(entity -> entity.getType().equals("ITEM"), _ -> {})
+                .entityCleanup(entity -> entity.id().equals(com.kntrel.mc.underilla.core.api.ID.of("item")), _ -> {})
                 .build();
 
         assertTrue(plan.tryAfterLoad(target));
@@ -279,13 +281,13 @@ class UnderillaFactoryTest {
     }
 
     private static final class TestEntity implements Entity {
-        private final String type;
+        private final com.kntrel.mc.underilla.core.api.ID id;
         private boolean removed;
 
-        private TestEntity(String type) { this.type = type; }
+        private TestEntity(String id) { this.id = com.kntrel.mc.underilla.core.api.ID.of(id); }
 
         @Override
-        public String getType() { return type; }
+        public com.kntrel.mc.underilla.core.api.ID id() { return id; }
 
         @Override
         public void remove() { removed = true; }

@@ -61,10 +61,9 @@ final class LegacyMergerPatcher {
                 boundary,
                 config.generationAreaMinY(),
                 blocks::air,
-                block -> config.shouldKeepSurfaceBlockInCaves(block.getName()),
+                block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
                 block -> {
-                    String replacement = config.surfaceBlockReplacement(block.getName());
-                    return replacement == null ? block : blocks.create(replacement);
+                    return config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block);
                 });
     }
 

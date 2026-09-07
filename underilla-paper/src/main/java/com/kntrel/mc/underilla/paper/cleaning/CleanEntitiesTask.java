@@ -1,15 +1,17 @@
 package com.kntrel.mc.underilla.paper.cleaning;
 
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.paper.Underilla;
+import com.kntrel.mc.underilla.paper.impl.BukkitIDs;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetEntityTypeKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.StringKeys;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.time.Duration;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.bukkit.Chunk;
+import org.bukkit.Registry;
 import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +24,8 @@ public class CleanEntitiesTask extends FollowableProgressTask {
 
     public void run() {
         final long startTime = System.currentTimeMillis();
-        final Map<EntityType, Long> removedEntity = new EnumMap<>(EntityType.class);
-        final Map<EntityType, Long> finalEntity = new EnumMap<>(EntityType.class);
+        final Map<ID, Long> removedEntity = new HashMap<>();
+        final Map<ID, Long> finalEntity = new HashMap<>();
         new BukkitRunnable() {
             private long processedEntities = 0;
             @Override
@@ -32,15 +34,17 @@ public class CleanEntitiesTask extends FollowableProgressTask {
                 while (selector != null && execTime + 45 > System.currentTimeMillis() && selector.hasNextBlock() && !stop) {
                     Chunk currentChunk = selector.nextChunk();
                     for (Entity entity : currentChunk.getEntities()) {
-                        if (Underilla.getUnderillaConfig().isEntityTypeInSet(SetEntityTypeKeys.CLEAN_ENTITY_TO_REMOVE, entity.getType())) {
+                        ID entityType = BukkitIDs.from(Registry.ENTITY_TYPE.getKeyOrThrow(entity.getType()));
+                        if (Underilla.getUnderillaConfig().isEntityTypeInSet(
+                                SetEntityTypeKeys.CLEAN_ENTITY_TO_REMOVE, entityType)) {
                             entity.remove();
-                            removedEntity.put(entity.getType(), removedEntity.getOrDefault(entity.getType(), 0l) + 1);
+                            removedEntity.put(entityType, removedEntity.getOrDefault(entityType, 0L) + 1);
                         } else {
                             // Final transformation that can be override by other plugins
                             if (Underilla.getInstance().hasEndEntityTransformer()) {
                                 Underilla.getInstance().getEndEntityTransformer().accept(entity);
                             }
-                            finalEntity.put(entity.getType(), finalEntity.getOrDefault(entity.getType(), 0l) + 1);
+                            finalEntity.put(entityType, finalEntity.getOrDefault(entityType, 0L) + 1);
                         }
                     }
                 }

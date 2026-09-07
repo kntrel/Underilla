@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.generation;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.patch.BiomePatcher;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
@@ -16,8 +17,8 @@ public final class SurfaceBiomePatcher implements BiomePatcher {
     private final GenerationArea generationArea;
     private final int topY;
     private final boolean useTopYOnly;
-    private final Predicate<String> surfaceOnlyBiome;
-    private final Predicate<String> preservedGeneratedBiome;
+    private final Predicate<ID> surfaceOnlyBiome;
+    private final Predicate<ID> preservedGeneratedBiome;
     private final boolean preserveGeneratedBiomesOnlyUnderSurface;
 
     public SurfaceBiomePatcher(
@@ -26,8 +27,8 @@ public final class SurfaceBiomePatcher implements BiomePatcher {
             GenerationArea generationArea,
             int topY,
             boolean useTopYOnly,
-            Predicate<String> surfaceOnlyBiome,
-            Predicate<String> preservedGeneratedBiome,
+            Predicate<ID> surfaceOnlyBiome,
+            Predicate<ID> preservedGeneratedBiome,
             boolean preserveGeneratedBiomesOnlyUnderSurface
     ) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
@@ -56,8 +57,8 @@ public final class SurfaceBiomePatcher implements BiomePatcher {
             return false;
         }
 
-        if (!surfaceOnlyBiome.test(referenceBiome.getName())
-                && preservedGeneratedBiome.test(biomeData.get().getName())
+        if (!surfaceOnlyBiome.test(referenceBiome.id())
+                && preservedGeneratedBiome.test(biomeData.get().id())
                 && isUnderSurface(biomeData)) {
             return true;
         }

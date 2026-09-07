@@ -6,6 +6,7 @@ import com.jkantrell.mca.MCAUtil;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -111,8 +112,8 @@ public abstract class DiskWorldReader implements WorldReader {
     }
 
     @Override
-    public String getBiomeName(int globalX, int globalY, int globalZ) {
-        return biomeAt(globalX, globalY, globalZ).map(Biome::getName).orElse(null);
+    public ID getBiomeID(int globalX, int globalY, int globalZ) {
+        return biomeAt(globalX, globalY, globalZ).map(Biome::id).orElse(null);
     }
 
     protected abstract ChunkReader newChunkReader(Chunk chunk, List<EntityView> entities);

@@ -1,12 +1,13 @@
 package com.kntrel.mc.underilla.core.impl;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ID;
 import java.util.Objects;
 
 /** In-memory block implementation for generation tests. */
 public final class TestBlock implements Block {
 
-    private final String name;
+    private final ID id;
     private final boolean solid;
     private final boolean liquid;
     private final boolean air;
@@ -14,7 +15,7 @@ public final class TestBlock implements Block {
     private boolean waterlogged;
 
     private TestBlock(String name, boolean solid, boolean liquid, boolean air, boolean waterloggable) {
-        this.name = Objects.requireNonNull(name, "name");
+        this.id = ID.of(Objects.requireNonNull(name, "name"));
         this.solid = solid;
         this.liquid = liquid;
         this.air = air;
@@ -63,14 +64,8 @@ public final class TestBlock implements Block {
     public boolean isWaterlogged() { return waterlogged; }
 
     @Override
-    public String getName() { return name; }
+    public ID id() { return id; }
 
     @Override
-    public String getNameSpace() {
-        int separator = name.indexOf(':');
-        return separator < 0 ? "minecraft" : name.substring(0, separator);
-    }
-
-    @Override
-    public String toString() { return name; }
+    public String toString() { return id.toString(); }
 }

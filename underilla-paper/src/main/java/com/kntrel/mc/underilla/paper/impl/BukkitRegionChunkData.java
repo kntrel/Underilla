@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.zip.GZIPOutputStream;
 import org.bukkit.Bukkit;
+import org.bukkit.Registry;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.generator.LimitedRegion;
 import org.slf4j.Logger;
@@ -76,7 +77,8 @@ public class BukkitRegionChunkData implements ChunkData {
         if (bukkitBlock.getSpawnedType().isPresent()) {
             if (region.getWorld().getBlockAt(this.absX_ + x, y,
                     this.absZ_ + z) instanceof org.bukkit.block.CreatureSpawner creatureSpawner) {
-                creatureSpawner.setSpawnedType(bukkitBlock.getSpawnedType().get());
+                creatureSpawner.setSpawnedType(Registry.ENTITY_TYPE.getOrThrow(
+                        BukkitIDs.toKey(bukkitBlock.getSpawnedType().get())));
                 creatureSpawner.update();
                 LOGGER.info("Set spawner type to {}", bukkitBlock.getSpawnedType().get());
             }

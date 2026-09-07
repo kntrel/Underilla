@@ -64,7 +64,7 @@ class SurfaceBiomePatcherTest {
                 64,
                 false,
                 _ -> false,
-                DEEP_DARK.getName()::equals,
+                DEEP_DARK.id()::equals,
                 true
         );
         TestBiomeData below = new TestBiomeData(DEEP_DARK, 0, 32, 0);
@@ -84,8 +84,8 @@ class SurfaceBiomePatcherTest {
                 GenerationArea.everywhere(),
                 64,
                 false,
-                SURFACE_ONLY.getName()::equals,
-                DEEP_DARK.getName()::equals,
+                SURFACE_ONLY.id()::equals,
+                DEEP_DARK.id()::equals,
                 false
         );
         TestBiomeData data = new TestBiomeData(DEEP_DARK, 0, 10, 0);

@@ -5,12 +5,14 @@ import com.jkantrell.nbt.tag.CompoundTag;
 import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.TagInterpreter;
 import java.util.List;
 import java.util.Optional;
-import org.bukkit.Material;
+import org.bukkit.Registry;
+import org.bukkit.block.BlockType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,15 +27,25 @@ public class BukkitChunkReader extends ChunkReader {
     // IMPLEMENTATION
     @Override
     public Optional<Block> blockFromTag(CompoundTag tag) {
-        Material m = Optional.ofNullable(tag).map(t -> t.getString("Name")).map(Material::matchMaterial).orElse(null);
-        if (m == null) {
+        String name = Optional.ofNullable(tag).map(t -> t.getString("Name")).orElse(null);
+        if (name == null) {
+            return Optional.empty();
+        }
+        ID id;
+        try {
+            id = ID.of(name);
+        } catch (IllegalArgumentException exception) {
+            return Optional.empty();
+        }
+        BlockType type = Registry.BLOCK.get(BukkitIDs.toKey(id));
+        if (type == null) {
             return Optional.empty();
         }
 
         CompoundTag properties = tag != null ? tag.getCompoundTag("Properties") : null;
         BukkitBlock block;
         if (properties == null) {
-            block = new BukkitBlock(m.createBlockData());
+            block = new BukkitBlock(type.createBlockData());
             return Optional.of(block);
         } else {
             block = null;
@@ -46,13 +58,13 @@ public class BukkitChunkReader extends ChunkReader {
             // if (dataString != null && dataString.length() > 90) {
             // LOGGER.debug("{}", dataString);
             // }
-            if (m.equals(Material.VINE)) {
+            if (id.equals(ID.of("vine"))) {
                 dataString = removeVineDownProperty(dataString);
             }
-            block = new BukkitBlock(m.createBlockData(dataString));
+            block = new BukkitBlock(type.createBlockData(dataString));
         } catch (IllegalArgumentException e) {
-            LOGGER.warn("Failed to create block data {}", m, e);
-            block = new BukkitBlock(m.createBlockData());
+            LOGGER.warn("Failed to create block data {}", id, e);
+            block = new BukkitBlock(type.createBlockData());
         }
         return Optional.of(block);
     }

@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
 import java.util.Optional;
@@ -18,8 +19,8 @@ public final class HeightBoundary implements Boundary {
     private final int mergeDepth;
     private final int adaptiveMaximumDepth;
     private final int adaptiveMinimumHiddenDepth;
-    private final Predicate<String> surfaceWorldOnlyBiome;
-    private final Predicate<String> ignoredSurfaceBlock;
+    private final Predicate<ID> surfaceWorldOnlyBiome;
+    private final Predicate<ID> ignoredSurfaceBlock;
 
     public HeightBoundary(
             WorldReader surfaceWorld,
@@ -30,8 +31,8 @@ public final class HeightBoundary implements Boundary {
             int mergeDepth,
             int adaptiveMaximumDepth,
             int adaptiveMinimumHiddenDepth,
-            Predicate<String> surfaceWorldOnlyBiome,
-            Predicate<String> ignoredSurfaceBlock
+            Predicate<ID> surfaceWorldOnlyBiome,
+            Predicate<ID> ignoredSurfaceBlock
     ) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
         this.air = Objects.requireNonNull(air, "air");
@@ -52,8 +53,8 @@ public final class HeightBoundary implements Boundary {
             return minimumY;
         }
 
-        String biomeName = surfaceWorld.getBiomeName(globalX, maximumY, globalZ);
-        if (surfaceWorldOnlyBiome.test(biomeName)) {
+        ID biome = surfaceWorld.getBiomeID(globalX, maximumY, globalZ);
+        if (surfaceWorldOnlyBiome.test(biome)) {
             return minimumY;
         }
 
@@ -80,7 +81,7 @@ public final class HeightBoundary implements Boundary {
     }
 
     private boolean isSurfaceBlock(Block block) {
-        return block.isSolid() && !ignoredSurfaceBlock.test(block.getName());
+        return block.isSolid() && !ignoredSurfaceBlock.test(block.id());
     }
 
     private static boolean haveNonSolidNeighbour(WorldReader world, int x, int y, int z) {

@@ -47,10 +47,10 @@ public final class PaperGenerationPlanFactory {
         }
 
         Predicate<com.kntrel.mc.underilla.core.api.Biome> exposedToCarvers = biome ->
-                config.isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biome.getName())
+                config.isBiomeInSet(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, biome.id())
                         && !config.isBiomeInSet(
                                 SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES,
-                                biome.getName());
+                                biome.id());
 
         builder
                 .instrumenter(instrumenter)
@@ -71,7 +71,7 @@ public final class PaperGenerationPlanFactory {
                 .preservedGeneratedBiomes(config::shouldPreserveBiome)
                 .preserveGeneratedBiomesOnlyUnderSurface(config.preserveBiomesOnlyUnderSurface())
                 .ignoredSurfaceBlocks(config::isIgnoredForSurfaceCalculation)
-                .keptSurfaceBlocks(block -> config.shouldKeepSurfaceBlockInCaves(block.getName()))
+                .keptSurfaceBlocks(block -> config.shouldKeepSurfaceBlockInCaves(block.id()))
                 .surfaceBlockTransformer(block -> transformSurfaceBlock(block, config, blocks))
                 .surfaceBiomeUseTopYOnly(config.surfaceBiomeUseTopYOnly())
                 .carvers(config.carversEnabled())
@@ -86,7 +86,7 @@ public final class PaperGenerationPlanFactory {
         }
         if (config.getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
             builder.entityCleanup(
-                    entity -> config.shouldRemoveEntity(entity.getType()),
+                    entity -> config.shouldRemoveEntity(entity.id()),
                     entity -> {
                         if (entity instanceof BukkitEntity bukkitEntity
                                 && Underilla.getInstance().hasEndEntityTransformer()) {
@@ -98,7 +98,6 @@ public final class PaperGenerationPlanFactory {
     }
 
     private static Block transformSurfaceBlock(Block block, UnderillaConfig config, BlockFactory blocks) {
-        String replacement = config.surfaceBlockReplacement(block.getName());
-        return replacement == null ? block : blocks.create(replacement);
+        return config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block);
     }
 }

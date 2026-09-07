@@ -1,6 +1,7 @@
 debug: false
 
-# For all the biome config option, biomes must be defined as Paper Biome or as biome resource key for example `minecraft:plains` or as a biome tag for example `#minecraft:is_ocean`. https://jd.papermc.io/paper/26.2/org/bukkit/block/Biome.html
+# Block, biome, and entity identifiers use `namespace:value`. Unqualified values use the `minecraft` namespace.
+# Biome tags use `#namespace:value`, for example `#minecraft:is_ocean`.
 
 # The number of seconds between each progress message. < 1 values will disable the progress messages.
 printProgressEveryXSeconds: 10 
@@ -38,8 +39,7 @@ surfaceWorld:
     # List of blocks of surface world to replace by another block. It will replace the block defined here by the block defined in the value.
     # Remove blocks by replacing them with AIR.
     # You might use a world that you didn't build yourself in world painter. Often that world will contains some blocks that you don't want in your final world.
-    # Must be define as Material from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/Material.html.
-    # Example: ["SAND": "SANDSTONE", "GRAVEL": "ANDESITE"]
+    # Values are block identifiers. Example: ["minecraft:sand": "minecraft:sandstone"]
     toReplace: {}
   # If true, only the top y biome value of the surface world will be copied. This increase performance a bit and remove any cave biome that might be in the surface world. If you have various biomes at the same x, z values with different y values, and want to keep them, set this to false.
   useTopYBiomeOnly: true
@@ -64,7 +64,7 @@ generationArea:
 outOfTheSurfaceWorldGenerator: "VoidWorldGenerator"
 
 # If true caves block will be transferred from cavesWorld to the merged world. Else it will be generated from a new vanilla world.
-# This is useful if you want to have a custom underground from an existing world. This is mandatory if you wich to transfer underground biomes as "LUSH_CAVES".
+# This is useful if you want to have a custom underground from an existing world. This is mandatory if you wish to transfer underground biomes such as `minecraft:lush_caves`.
 transferBlocksFromCavesWorld: false
 # If true caves biomes in the list transferedCavesWorldBiomes will be transferred from cavesWorld to the merged world.
 # DISABLED FOR NOW.
@@ -109,21 +109,21 @@ surface:
     minHiddenBlocksDepth: 2
 
 # Non solid blocks are always ignored for surface calculation.
-# Must be define as Material from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/Material.html. Regular expression is allowed.
-# Example : ["ICE", ".*_LOG", "IRON_ORE"]
+# Entries are block-identifier regular expressions matched against the complete `namespace:value`.
+# Example: ["minecraft:ice", "minecraft:.*_log", "minecraft:iron_ore"]
 ignoredBlockForSurfaceCalculation:
-  - ".*_LEAVES"
-  - ".*_LOG"
-  - ".*_WOOD"
-  - ".*_PLANKS"
-  - ".*_FENCE"
-  - ".*_FENCE_GATE"
-  - ".*_WALL"
-  - ".*_DOOR"
-  - ".*_TRAPDOOR"
-  - ".*_STEM"
-  - ".*_HYPHAE"
-  - "ICE"
+  - "minecraft:.*_leaves"
+  - "minecraft:.*_log"
+  - "minecraft:.*_wood"
+  - "minecraft:.*_planks"
+  - "minecraft:.*_fence"
+  - "minecraft:.*_fence_gate"
+  - "minecraft:.*_wall"
+  - "minecraft:.*_door"
+  - "minecraft:.*_trapdoor"
+  - "minecraft:.*_stem"
+  - "minecraft:.*_hyphae"
+  - "minecraft:ice"
 
 
 # The biomes where vanilla underground will not be generated.
@@ -135,16 +135,16 @@ vanillaPopulation:
 
 # Weather or not to keep ores from reference world underground.
 # It is usefull when vanillaPopulation is set to false.
-# Must be define as Material from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/Material.html. Regular expression is allowed.
-# Example : ["ICE", ".*_LOG", "IRON_ORE"]
+# Entries are block-identifier regular expressions matched against the complete `namespace:value`.
+# Example: ["minecraft:ice", "minecraft:.*_log", "minecraft:iron_ore"]
 keptReferenceWorldBlocks: []
 
 structures:
   # Weather or not to allow vanilla Minecraft generate structures in the world.
   enabled: true
   # Structures defines here won't ever generate, regardless of the above setting.
-  # Structures must be defined as minecraft key or Structure enum from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/generator/structure/Structure.html
-  # Example: ["minecraft:mineshaft","MONUMENT"]
+  # Structures use resource identifiers; unqualified values use the `minecraft` namespace.
+  # Example: ["minecraft:mineshaft", "minecraft:monument"]
   except: []
   only: []
 
@@ -203,26 +203,24 @@ clean:
 
     # List of blocks to support by another block. It will replace the lower block of a column by the block defined here.
     # This is useful to avoid having floating sand or gravel.
-    # Must be define as Material from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/Material.html.
-    # Example: ["SAND": "SANDSTONE", "GRAVEL": "ANDESITE"]
+    # Keys and values are block identifiers.
     toSupport:
-      "SAND": "SANDSTONE"
-      "RED_SAND": "RED_SANDSTONE"
-      "GRAVEL": "ANDESITE"
+      "minecraft:sand": "minecraft:sandstone"
+      "minecraft:red_sand": "minecraft:red_sandstone"
+      "minecraft:gravel": "minecraft:andesite"
     
     # List of blocks to replace by another block. It will replace the block defined here by the block defined in the value.
     # Remove blocks by replacing them with AIR.
     # To replace will be run after toSupport.
-    # Must be define as Material from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/Material.html.
-    # Example: ["SAND": "SANDSTONE", "GRAVEL": "ANDESITE"]
+    # Keys and values are block identifiers.
     toReplace: {}
 
   entities:
     enabled: true
-    # Must be define as an EntityType from Paper API: https://jd.papermc.io/paper/26.2/org/bukkit/entity/EntityType.html. Regular expression is allowed.
-    # Example: ["ITEM", "ACACIA.*"]
+    # Entries are entity-type identifier regular expressions matched against the complete `namespace:value`.
+    # Example: ["minecraft:item", "minecraft:.*_minecart"]
     toRemove:
-      - "ITEM" # Items resting on the ground.
+      - "minecraft:item" # Items resting on the ground.
 
 # Cache settings ------------------------------------------------------------------------------------------------------
 # Most memory is used by the server itself to interact with the world, we have no control over this.

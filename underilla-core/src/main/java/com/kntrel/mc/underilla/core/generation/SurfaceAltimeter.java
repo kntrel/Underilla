@@ -34,7 +34,7 @@ public final class SurfaceAltimeter implements Altimeter {
             case WORLD_SURFACE, WORLD_SURFACE_WG -> Block::isAir;
             case OCEAN_FLOOR, OCEAN_FLOOR_WG, MOTION_BLOCKING -> block -> !block.isSolid();
             case MOTION_BLOCKING_NO_LEAVES -> block -> !block.isSolid()
-                    || block.getName().toLowerCase().contains("leaves");
+                    || block.id().value().contains("leaves");
         };
 
         int y = surfaceChunk.airSectionsBottom();

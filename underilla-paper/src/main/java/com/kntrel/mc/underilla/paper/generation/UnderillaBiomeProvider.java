@@ -63,7 +63,7 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
             return selectedBiome;
         }
 
-        warning("Use vanilla biome because selected biome '" + biomeData.get().getName()
+        warning("Use vanilla biome because selected biome '" + biomeData.get().id()
                 + "' is unavailable at " + x + " " + y + " " + z);
         countBiome(vanillaBiome.getKey().asString());
         return vanillaBiome;

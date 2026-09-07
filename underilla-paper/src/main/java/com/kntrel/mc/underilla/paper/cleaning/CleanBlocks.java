@@ -1,13 +1,17 @@
 package com.kntrel.mc.underilla.paper.cleaning;
 
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.paper.Underilla;
+import com.kntrel.mc.underilla.paper.impl.BukkitIDs;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
-import com.kntrel.mc.underilla.paper.io.UnderillaConfig.MapMaterialKeys;
+import com.kntrel.mc.underilla.paper.io.UnderillaConfig.MapBlockKeys;
 import java.util.Set;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.LevelReader;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
+import org.bukkit.Registry;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
@@ -58,24 +62,28 @@ public class CleanBlocks {
                     Material startMaterial = blockData.getMaterial();
 
                     // If there is no block to support, do not load the underCurrentBlock to save time
-                    if (!Underilla.getUnderillaConfig().getMapMaterial(MapMaterialKeys.CLEAN_BLOCK_TO_SUPPORT).isEmpty() && y > minY) {
+                    if (!Underilla.getUnderillaConfig().getBlockReplacements(MapBlockKeys.CLEAN_BLOCK_TO_SUPPORT).isEmpty() && y > minY) {
                         // Block underCurrentBlock = currentBlock.getRelative(BlockFace.DOWN);
                         BlockData underCurrentBlock = limitedRegion.getBlockData(x, y - 1, z);
                         if (!underCurrentBlock.getMaterial().isSolid() && !(startMaterial == Material.AIR)) {
                             // if currentBlock is a block to support (sand, gravel, etc) then replace it by the support block
-                            Material toSupport = Underilla.getUnderillaConfig().getMaterialFromMap(MapMaterialKeys.CLEAN_BLOCK_TO_SUPPORT,
-                                    startMaterial);
-                            if (toSupport != null) {
-                                limitedRegion.setBlockData(x, y, z, toSupport.createBlockData());
+                            ID startID = BukkitIDs.from(Registry.BLOCK.getKeyOrThrow(startMaterial.asBlockType()));
+                            Optional<ID> toSupport = Underilla.getUnderillaConfig().getBlockReplacement(
+                                    MapBlockKeys.CLEAN_BLOCK_TO_SUPPORT, startID);
+                            if (toSupport.isPresent()) {
+                                limitedRegion.setBlockData(x, y, z, Registry.BLOCK.getOrThrow(
+                                        BukkitIDs.toKey(toSupport.get())).createBlockData());
                             }
                         }
                     }
 
 
-                    Material toReplace = Underilla.getUnderillaConfig().getMaterialFromMap(MapMaterialKeys.CLEAN_BLOCK_TO_REPLACE,
-                            startMaterial);
-                    if (toReplace != null) {
-                        limitedRegion.setBlockData(x, y, z, toReplace.createBlockData());
+                    ID startID = BukkitIDs.from(Registry.BLOCK.getKeyOrThrow(startMaterial.asBlockType()));
+                    Optional<ID> toReplace = Underilla.getUnderillaConfig().getBlockReplacement(
+                            MapBlockKeys.CLEAN_BLOCK_TO_REPLACE, startID);
+                    if (toReplace.isPresent()) {
+                        limitedRegion.setBlockData(x, y, z, Registry.BLOCK.getOrThrow(
+                                BukkitIDs.toKey(toReplace.get())).createBlockData());
                     }
                 }
             }

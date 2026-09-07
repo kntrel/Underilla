@@ -12,6 +12,7 @@ import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
@@ -78,7 +79,7 @@ class PatcherStrategyTest {
         config.maximumCaveY = 6;
         config.depth = 2;
         config.adaptiveMaximumDepth = 2;
-        config.ignoredSurfaceBlocks = Set.of(LEAVES.getName());
+        config.ignoredSurfaceBlocks = Set.of(LEAVES.id());
         FakeWorldReader world = new FakeWorldReader();
         world.putBlock(0, 4, 0, STONE);
         world.putBlock(0, 5, 0, LEAVES);
@@ -96,7 +97,7 @@ class PatcherStrategyTest {
         config.minimumY = -64;
         config.maximumY = 320;
         config.maximumCaveY = 200;
-        config.preservedBiomes = Set.of("example:preserved");
+        config.preservedBiomes = Set.of(ID.of("example:preserved"));
         FakeWorldReader world = new FakeWorldReader();
         world.putBiome(12, config.maximumY, -4, "example:preserved");
 
@@ -152,7 +153,7 @@ class PatcherStrategyTest {
             public Block air() { return AIR; }
 
             @Override
-            public Block create(String name) { return new TestBlock(name, true, false, false); }
+            public Block create(ID id) { return new TestBlock(id.toString(), true, false, false); }
         };
         return new GenerationContext(config, blockFactory);
     }
@@ -169,11 +170,8 @@ class PatcherStrategyTest {
                 boundary,
                 config.generationAreaMinY(),
                 blocks::air,
-                block -> config.shouldKeepSurfaceBlockInCaves(block.getName()),
-                block -> {
-                    String replacement = config.surfaceBlockReplacement(block.getName());
-                    return replacement == null ? block : blocks.create(replacement);
-                });
+                block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
+                block -> config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block));
     }
 
     private static Boundary heightBoundary(WorldReader surfaceWorld, TestConfig config) {
@@ -190,8 +188,8 @@ class PatcherStrategyTest {
         private int depth;
         private int adaptiveMaximumDepth;
         private int adaptiveMinimumHiddenDepth;
-        private Set<String> preservedBiomes = Set.of();
-        private Set<String> ignoredSurfaceBlocks = Set.of();
+        private Set<ID> preservedBiomes = Set.of();
+        private Set<ID> ignoredSurfaceBlocks = Set.of();
 
         @Override
         public int cacheSize() { return 1; }
@@ -239,33 +237,33 @@ class PatcherStrategyTest {
         public boolean surfaceBiomeUseTopYOnly() { return false; }
 
         @Override
-        public boolean shouldPreserveBiome(String biomeName) { return false; }
+        public boolean shouldPreserveBiome(ID biome) { return false; }
 
         @Override
         public boolean preserveBiomesOnlyUnderSurface() { return false; }
 
         @Override
-        public boolean isSurfaceWorldOnlyBiome(String biomeName) { return preservedBiomes.contains(biomeName); }
+        public boolean isSurfaceWorldOnlyBiome(ID biome) { return preservedBiomes.contains(biome); }
 
         @Override
-        public boolean isIgnoredForSurfaceCalculation(String blockName) { return ignoredSurfaceBlocks.contains(blockName); }
+        public boolean isIgnoredForSurfaceCalculation(ID block) { return ignoredSurfaceBlocks.contains(block); }
 
         @Override
-        public boolean shouldKeepSurfaceBlockInCaves(String blockName) { return false; }
+        public boolean shouldKeepSurfaceBlockInCaves(ID block) { return false; }
 
         @Override
-        public String surfaceBlockReplacement(String blockName) { return null; }
+        public Optional<ID> surfaceBlockReplacement(ID block) { return Optional.empty(); }
     }
 
     private static final class TestBlock implements Block {
-        private final String name;
+        private final ID id;
         private final boolean solid;
         private final boolean liquid;
         private final boolean air;
         private boolean waterlogged;
 
         private TestBlock(String name, boolean solid, boolean liquid, boolean air) {
-            this.name = name;
+            this.id = ID.of(name);
             this.solid = solid;
             this.liquid = liquid;
             this.air = air;
@@ -289,10 +287,7 @@ class PatcherStrategyTest {
         boolean isWaterlogged() { return waterlogged; }
 
         @Override
-        public String getName() { return name; }
-
-        @Override
-        public String getNameSpace() { return name.substring(0, name.indexOf(':')); }
+        public ID id() { return id; }
     }
 
     private record Position(int x, int y, int z) {}
@@ -373,7 +368,7 @@ class PatcherStrategyTest {
 
         void putBlock(int x, int y, int z, Block block) { blocks.put(new Position(x, y, z), block); }
 
-        void putBiome(int x, int y, int z, String name) { biomes.put(new Position(x, y, z), () -> name); }
+        void putBiome(int x, int y, int z, String name) { biomes.put(new Position(x, y, z), () -> ID.of(name)); }
 
         void putChunk(ChunkReader chunk) { chunks.put(new Position(chunk.getX(), 0, chunk.getZ()), chunk); }
 
@@ -420,7 +415,7 @@ class PatcherStrategyTest {
         public Block getBlock(int x, int y, int z) { return blocks.getOrDefault(new Position(x, y, z), defaultBlock); }
 
         @Override
-        public Biome getBiome(int x, int y, int z) { return () -> "minecraft:plains"; }
+        public Biome getBiome(int x, int y, int z) { return () -> ID.of("plains"); }
 
         @Override
         public void setRegion(int xMin, int yMin, int zMin, int xMax, int yMax, int zMax, Block block) {

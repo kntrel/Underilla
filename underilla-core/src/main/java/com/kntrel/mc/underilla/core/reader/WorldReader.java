@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.reader;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.vector.Vector;
 import java.util.Optional;
 
@@ -37,12 +38,12 @@ public interface WorldReader {
 
     Optional<ChunkReader> readChunk(int chunkX, int chunkZ);
 
-    default String getBiomeName(int globalX, int globalY, int globalZ) {
+    default ID getBiomeID(int globalX, int globalY, int globalZ) {
         int cellSize = GenerationConstants.BIOME_CELL_SIZE;
         int cellX = Math.floorDiv(globalX, cellSize) * cellSize;
         int cellY = Math.floorDiv(globalY, cellSize) * cellSize;
         int cellZ = Math.floorDiv(globalZ, cellSize) * cellSize;
         Optional<Biome> biome = biomeAt(cellX, cellY, cellZ);
-        return biome.map(Biome::getName).orElse(null);
+        return biome.map(Biome::id).orElse(null);
     }
 }

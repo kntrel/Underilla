@@ -7,7 +7,6 @@ public interface Block {
     boolean isLiquid();
     boolean isWaterloggable();
     void waterlog();
-    String getName();
-    String getNameSpace();
+    ID id();
 
 }

@@ -15,6 +15,7 @@ import java.util.UUID;
 import org.bukkit.FeatureFlag;
 import org.bukkit.HeightMap;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.bukkit.block.data.BlockData;
@@ -135,6 +136,9 @@ class UnderillaChunkGeneratorTest {
     }
 
     private static final class TestWorldInfo implements WorldInfo {
+
+        @Override
+        public NamespacedKey getKey() { return NamespacedKey.minecraft("world"); }
 
         @Override
         public String getName() { return "world"; }

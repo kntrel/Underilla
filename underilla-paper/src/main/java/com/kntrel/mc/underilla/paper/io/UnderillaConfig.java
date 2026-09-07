@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.paper.io;
 
 import com.kntrel.mc.underilla.paper.Underilla;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiome;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import io.papermc.paper.registry.RegistryAccess;
@@ -8,20 +9,19 @@ import io.papermc.paper.registry.RegistryKey;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.Registry;
 import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.entity.EntityType;
 import org.bukkit.generator.structure.Structure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,11 +33,11 @@ public class UnderillaConfig {
     private final EnumMap<IntegerKeys, Integer> integerAutoMap;
     private final EnumMap<StringKeys, String> stringMap;
     private final EnumMap<SetStringKeys, Set<String>> listStringMap;
-    private final EnumMap<SetBiomeStringKeys, Set<String>> listBiomeStringMap;
-    private final EnumMap<SetMaterialKeys, Set<Material>> listMaterialMap;
-    private final EnumMap<MapMaterialKeys, Map<Material, Material>> listMapMaterialMap;
+    private final EnumMap<SetBiomeStringKeys, Set<ID>> listBiomeStringMap;
+    private final EnumMap<SetBlockKeys, Set<ID>> blockIDSetMap;
+    private final EnumMap<MapBlockKeys, Map<ID, ID>> blockReplacementMap;
     private final EnumMap<SetStructureKeys, Set<Structure>> listStructureMap;
-    private final EnumMap<SetEntityTypeKeys, Set<EntityType>> listEntityTypeMap;
+    private final EnumMap<SetEntityTypeKeys, Set<ID>> listEntityTypeMap;
     private Path surfaceRegionPath;
     private Path surfaceEntitiesPath;
     private Path cavesRegionPath;
@@ -50,8 +50,8 @@ public class UnderillaConfig {
         stringMap = new EnumMap<>(StringKeys.class);
         listStringMap = new EnumMap<>(SetStringKeys.class);
         listBiomeStringMap = new EnumMap<>(SetBiomeStringKeys.class);
-        listMaterialMap = new EnumMap<>(SetMaterialKeys.class);
-        listMapMaterialMap = new EnumMap<>(MapMaterialKeys.class);
+        blockIDSetMap = new EnumMap<>(SetBlockKeys.class);
+        blockReplacementMap = new EnumMap<>(MapBlockKeys.class);
         listStructureMap = new EnumMap<>(SetStructureKeys.class);
         listEntityTypeMap = new EnumMap<>(SetEntityTypeKeys.class);
         reload(fileConfiguration);
@@ -61,19 +61,19 @@ public class UnderillaConfig {
     public int getInt(IntegerKeys key) { return integerMap.get(key); }
     public String getString(StringKeys key) { return stringMap.get(key); }
     public Set<String> getSetString(SetStringKeys key) { return listStringMap.get(key); }
-    public Set<String> getSetBiomeString(SetBiomeStringKeys key) { return listBiomeStringMap.get(key); }
-    public Set<Material> getSetMaterial(SetMaterialKeys key) { return listMaterialMap.get(key); }
-    public Map<Material, Material> getMapMaterial(MapMaterialKeys key) { return listMapMaterialMap.get(key); }
+    public Set<ID> getSetBiomeString(SetBiomeStringKeys key) { return listBiomeStringMap.get(key); }
+    public Set<ID> getBlockIDs(SetBlockKeys key) { return blockIDSetMap.get(key); }
+    public Map<ID, ID> getBlockReplacements(MapBlockKeys key) { return blockReplacementMap.get(key); }
     public Set<Structure> getSetStructure(SetStructureKeys key) { return listStructureMap.get(key); }
-    public Set<EntityType> getSetEntityType(SetEntityTypeKeys key) { return listEntityTypeMap.get(key); }
+    public Set<ID> getSetEntityType(SetEntityTypeKeys key) { return listEntityTypeMap.get(key); }
     public boolean isStringInSet(SetStringKeys key, String value) { return getSetString(key).contains(value); }
-    public boolean isBiomeInSet(SetBiomeStringKeys key, String biome) { return getSetBiomeString(key).contains(biome); }
-    public boolean isMaterialInSet(SetMaterialKeys key, Material material) { return getSetMaterial(key).contains(material); }
-    public @Nullable Material getMaterialFromMap(MapMaterialKeys key, Material material) {
-        return getMapMaterial(key).getOrDefault(material, null);
+    public boolean isBiomeInSet(SetBiomeStringKeys key, ID biome) { return getSetBiomeString(key).contains(biome); }
+    public boolean isBlockInSet(SetBlockKeys key, ID block) { return getBlockIDs(key).contains(block); }
+    public Optional<ID> getBlockReplacement(MapBlockKeys key, ID block) {
+        return Optional.ofNullable(getBlockReplacements(key).get(block));
     }
     public boolean isStructureInSet(SetStructureKeys key, Structure structure) { return getSetStructure(key).contains(structure); }
-    public boolean isEntityTypeInSet(SetEntityTypeKeys key, EntityType entityType) { return getSetEntityType(key).contains(entityType); }
+    public boolean isEntityTypeInSet(SetEntityTypeKeys key, ID entityType) { return getSetEntityType(key).contains(entityType); }
     public Path getSurfaceRegionPath() { return surfaceRegionPath; }
     public @Nullable Path getSurfaceEntitiesPath() { return surfaceEntitiesPath; }
     public Path getCavesRegionPath() { return cavesRegionPath; }
@@ -116,53 +116,40 @@ public class UnderillaConfig {
 
     public boolean surfaceBiomeUseTopYOnly() { return getBoolean(BooleanKeys.SURFACE_WORLD_BIOME_USE_TOP_Y_VALUE_ONLY); }
 
-    public boolean shouldPreserveBiome(String biomeName) {
-        return isBiomeInSet(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES, biomeName);
+    public boolean shouldPreserveBiome(ID biome) {
+        return isBiomeInSet(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES, biome);
     }
 
     public boolean preserveBiomesOnlyUnderSurface() {
         return getBoolean(BooleanKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_UNDER_SURFACE);
     }
 
-    public boolean isSurfaceWorldOnlyBiome(String biomeName) {
-        return isBiomeInSet(SetBiomeStringKeys.SURFACE_WORLD_ONLY_ON_THIS_BIOMES, biomeName);
+    public boolean isSurfaceWorldOnlyBiome(ID biome) {
+        return isBiomeInSet(SetBiomeStringKeys.SURFACE_WORLD_ONLY_ON_THIS_BIOMES, biome);
     }
 
-    public boolean isIgnoredForSurfaceCalculation(String blockName) {
-        Material material = Material.matchMaterial(blockName);
-        return material != null && isMaterialInSet(SetMaterialKeys.IGNORED_BLOCK_FOR_SURFACE_CALCULATION, material);
+    public boolean isIgnoredForSurfaceCalculation(ID block) {
+        return isBlockInSet(SetBlockKeys.IGNORED_BLOCK_FOR_SURFACE_CALCULATION, block);
     }
 
-    public boolean shouldKeepSurfaceBlockInCaves(String blockName) {
-        Material material = Material.matchMaterial(blockName);
-        return material != null && isMaterialInSet(SetMaterialKeys.BLOCK_TO_KEEP_FROM_SURFACE_WORLD_IN_CAVES, material);
+    public boolean shouldKeepSurfaceBlockInCaves(ID block) {
+        return isBlockInSet(SetBlockKeys.BLOCK_TO_KEEP_FROM_SURFACE_WORLD_IN_CAVES, block);
     }
 
-    public String surfaceBlockReplacement(String blockName) {
-        Material material = Material.matchMaterial(blockName);
-        if (material == null) {
-            return null;
-        }
-        Material replacement = getMaterialFromMap(MapMaterialKeys.SURFACE_WORLD_BLOCK_TO_REPLACE, material);
-        return replacement == null ? null : replacement.getKey().asString();
+    public Optional<ID> surfaceBlockReplacement(ID block) {
+        return getBlockReplacement(MapBlockKeys.SURFACE_WORLD_BLOCK_TO_REPLACE, block);
     }
-    public String cleanupSupportReplacement(String blockName) {
-        return cleanupBlockReplacement(MapMaterialKeys.CLEAN_BLOCK_TO_SUPPORT, blockName);
+    public Optional<ID> cleanupSupportReplacement(ID block) {
+        return cleanupBlockReplacement(MapBlockKeys.CLEAN_BLOCK_TO_SUPPORT, block);
     }
-    public String cleanupBlockReplacement(String blockName) {
-        return cleanupBlockReplacement(MapMaterialKeys.CLEAN_BLOCK_TO_REPLACE, blockName);
+    public Optional<ID> cleanupBlockReplacement(ID block) {
+        return cleanupBlockReplacement(MapBlockKeys.CLEAN_BLOCK_TO_REPLACE, block);
     }
-    public boolean shouldRemoveEntity(String entityType) {
-        return getSetEntityType(SetEntityTypeKeys.CLEAN_ENTITY_TO_REMOVE).stream()
-                .anyMatch(type -> type.toString().equals(entityType));
+    public boolean shouldRemoveEntity(ID entityType) {
+        return getSetEntityType(SetEntityTypeKeys.CLEAN_ENTITY_TO_REMOVE).contains(entityType);
     }
-    private String cleanupBlockReplacement(MapMaterialKeys key, String blockName) {
-        Material material = Material.matchMaterial(blockName);
-        if (material == null) {
-            return null;
-        }
-        Material replacement = getMaterialFromMap(key, material);
-        return replacement == null ? null : replacement.getKey().asString();
+    private Optional<ID> cleanupBlockReplacement(MapBlockKeys key, ID block) {
+        return getBlockReplacement(key, block);
     }
     public Selector getSelector() {
         return new Selector(getInt(IntegerKeys.GENERATION_AREA_MIN_X), getInt(IntegerKeys.GENERATION_AREA_MIN_Y),
@@ -232,8 +219,8 @@ public class UnderillaConfig {
             }
         }
 
-        listMaterialMap.clear();
-        for (SetMaterialKeys key : SetMaterialKeys.values()) {
+        blockIDSetMap.clear();
+        for (SetBlockKeys key : SetBlockKeys.values()) {
             List<String> regexList = new ArrayList<>();
             if (fileConfiguration.contains(key.path)) {
                 regexList.addAll(fileConfiguration.getStringList(key.path));
@@ -241,9 +228,12 @@ public class UnderillaConfig {
                 warnKeyMissing(key);
                 regexList.addAll(key.defaultValue);
             }
-            Set<Material> materialSet = Arrays.stream(Material.values())
-                    .filter(material -> regexList.stream().anyMatch(s -> material.toString().matches(s))).collect(Collectors.toSet());
-            listMaterialMap.put(key, materialSet);
+            List<String> patterns = regexList.stream().map(UnderillaConfig::normalizePattern).toList();
+            Set<ID> blockIDs = Registry.BLOCK.keyStream()
+                    .map(namespacedKey -> ID.of(namespacedKey.namespace(), namespacedKey.value()))
+                    .filter(id -> patterns.stream().anyMatch(pattern -> id.toString().matches(pattern)))
+                    .collect(Collectors.toSet());
+            blockIDSetMap.put(key, blockIDs);
         }
 
         initMapMaterialMap(fileConfiguration);
@@ -342,40 +332,55 @@ public class UnderillaConfig {
                 warnKeyMissing(key);
                 regexList.addAll(key.defaultValue);
             }
-            Set<EntityType> entityTypeSet = Arrays.stream(EntityType.values())
-                    .filter(entityType -> regexList.stream().anyMatch(s -> entityType.toString().matches(s))).collect(Collectors.toSet());
-            listEntityTypeMap.put(key, entityTypeSet);
+            List<String> patterns = regexList.stream().map(UnderillaConfig::normalizePattern).toList();
+            Set<ID> entityTypes = Registry.ENTITY_TYPE.keyStream()
+                    .map(namespacedKey -> ID.of(namespacedKey.namespace(), namespacedKey.value()))
+                    .filter(id -> patterns.stream().anyMatch(pattern -> id.toString().matches(pattern)))
+                    .collect(Collectors.toSet());
+            listEntityTypeMap.put(key, entityTypes);
         }
     }
 
     public void initMapMaterialMap(FileConfiguration fileConfiguration) {
-        for (MapMaterialKeys key : MapMaterialKeys.values()) {
-            Map<Material, Material> map = new EnumMap<>(Material.class);
+        for (MapBlockKeys key : MapBlockKeys.values()) {
+            Map<ID, ID> map = new java.util.HashMap<>();
             if (fileConfiguration.contains(key.path)) {
-                fileConfiguration.getConfigurationSection(key.path).getKeys(false).forEach(materialKey -> {
-                    Material material = Material.matchMaterial(materialKey);
-                    if (material == null) {
-                        LOGGER.warn("Material {} not found in the material list of the server.", materialKey);
+                fileConfiguration.getConfigurationSection(key.path).getKeys(false).forEach(blockKey -> {
+                    ID block;
+                    try {
+                        block = ID.of(blockKey.toLowerCase(Locale.ROOT));
+                    } catch (IllegalArgumentException exception) {
+                        LOGGER.warn("Invalid block identifier {}.", blockKey);
                         return;
                     }
-                    String value = fileConfiguration.getString(key.path + "." + materialKey);
-                    Material valueMaterial = Material.matchMaterial(value);
-                    if (valueMaterial == null) {
-                        LOGGER.warn("Material {} not found in the material list of the server.", value);
+                    String value = fileConfiguration.getString(key.path + "." + blockKey);
+                    ID replacement;
+                    try {
+                        replacement = ID.of(value.toLowerCase(Locale.ROOT));
+                    } catch (IllegalArgumentException exception) {
+                        LOGGER.warn("Invalid block identifier {}.", value);
                         return;
                     }
-                    map.put(material, valueMaterial);
+                    if (Registry.BLOCK.get(new org.bukkit.NamespacedKey(block.namespace(), block.value())) == null) {
+                        LOGGER.warn("Block {} not found in the block registry.", block);
+                        return;
+                    }
+                    if (Registry.BLOCK.get(new org.bukkit.NamespacedKey(replacement.namespace(), replacement.value())) == null) {
+                        LOGGER.warn("Block {} not found in the block registry.", replacement);
+                        return;
+                    }
+                    map.put(block, replacement);
                 });
             } else {
                 warnKeyMissing(key);
                 map.putAll(key.defaultValue);
             }
-            listMapMaterialMap.put(key, map);
+            blockReplacementMap.put(key, map);
         }
     }
 
     private void initSetBiomeStringMap(FileConfiguration fileConfiguration) {
-        Collection<String> allBiomes = BukkitBiome.getAllBiomesNames();
+        Collection<ID> allBiomes = BukkitBiome.getAllBiomeIDs();
         listBiomeStringMap.clear();
         for (SetBiomeStringKeys key : SetBiomeStringKeys.values()) {
             List<String> biomesOrTags = new ArrayList<>();
@@ -385,16 +390,26 @@ public class UnderillaConfig {
                 warnKeyMissing(key);
                 biomesOrTags.addAll(key.defaultValue);
             }
-            biomesOrTags = Tools.normalizeNameList(biomesOrTags);
-            Set<String> existingBiomes = new HashSet<>();
+            Set<ID> existingBiomes = new HashSet<>();
             for (String biomeOrTag : biomesOrTags) {
                 if (biomeOrTag.startsWith("#")) {
-                    existingBiomes.addAll(BukkitBiome.getAllBiomesOfTag(biomeOrTag.substring(1)).stream()
-                            .map(biome -> biome.getKey().toString()).collect(Collectors.toSet()));
-                } else if (allBiomes.contains(biomeOrTag)) {
-                    existingBiomes.add(biomeOrTag);
+                    String tag = normalizePattern(biomeOrTag.substring(1));
+                    existingBiomes.addAll(BukkitBiome.getAllBiomesOfTag(tag).stream()
+                            .map(biome -> ID.of(biome.getKey().getNamespace(), biome.getKey().getKey()))
+                            .collect(Collectors.toSet()));
                 } else {
-                    LOGGER.warn("Biome or tag {} not found in the biome list of the server.", biomeOrTag);
+                    ID biome;
+                    try {
+                        biome = ID.of(biomeOrTag.toLowerCase(Locale.ROOT));
+                    } catch (IllegalArgumentException exception) {
+                        LOGGER.warn("Invalid biome identifier {}.", biomeOrTag);
+                        continue;
+                    }
+                    if (allBiomes.contains(biome)) {
+                        existingBiomes.add(biome);
+                    } else {
+                        LOGGER.warn("Biome or tag {} not found in the biome registry.", biomeOrTag);
+                    }
                 }
             }
             listBiomeStringMap.put(key, existingBiomes);
@@ -473,11 +488,12 @@ public class UnderillaConfig {
                 + "\nsurfaceRegionPath=" + surfaceRegionPath + "\nsurfaceEntitiesPath=" + surfaceEntitiesPath
                 + "\ncavesRegionPath=" + cavesRegionPath
         // + "\nlistStringMap=" + toString(listStringMap)
-                + "\nlistBiomeStringMap=" + toString(listBiomeStringMap) + "\nlistMaterialMap=" + toString(listMaterialMap)
-                + "\nlistMapMaterialMap=" + listMapMaterialMap + "\nlistStructureMap=" + listStructureMapToString() + '}';
+                + "\nlistBiomeStringMap=" + toString(listBiomeStringMap) + "\nblockIDSetMap=" + toString(blockIDSetMap)
+                + "\nblockReplacementMap=" + blockReplacementMap + "\nlistStructureMap=" + listStructureMapToString() + '}';
     }
     private String toString(Map<?, ? extends Collection<?>> map) {
-        return map.entrySet().stream().map(e -> e.getKey() + " (" + e.getValue().size() + ") = " + e.getValue().stream().sorted().toList())
+        return map.entrySet().stream().map(e -> e.getKey() + " (" + e.getValue().size() + ") = "
+                + e.getValue().stream().map(Object::toString).sorted().toList())
                 .collect(Collectors.joining(",\n", "{", "}"));
     }
     private String listStructureMapToString() {
@@ -490,9 +506,9 @@ public class UnderillaConfig {
 
     // private --------------------------------------------------------------------------------------------------------
 
-    private void mergeOnlyOnAndExceptOn(SetBiomeStringKeys onlyOnKey, SetBiomeStringKeys exceptOnKey, Collection<String> allBiomes) {
-        Set<String> onlyOn = listBiomeStringMap.get(onlyOnKey);
-        Set<String> exceptOn = listBiomeStringMap.get(exceptOnKey);
+    private void mergeOnlyOnAndExceptOn(SetBiomeStringKeys onlyOnKey, SetBiomeStringKeys exceptOnKey, Collection<ID> allBiomes) {
+        Set<ID> onlyOn = listBiomeStringMap.get(onlyOnKey);
+        Set<ID> exceptOn = listBiomeStringMap.get(exceptOnKey);
         boolean onlyOnEmpty = onlyOn.isEmpty();
         boolean exceptOnEmpty = exceptOn.isEmpty();
 
@@ -508,6 +524,11 @@ public class UnderillaConfig {
     }
 
     private void warnKeyMissing(Object key) { LOGGER.warn("Key {} not found in config", key); }
+
+    private static String normalizePattern(String pattern) {
+        String normalized = pattern.toLowerCase(Locale.ROOT);
+        return normalized.contains(":") ? normalized : "minecraft:" + normalized;
+    }
 
 
     // enum keys ------------------------------------------------------------------------------------------------------
@@ -621,33 +642,36 @@ public class UnderillaConfig {
         }
         SetBiomeStringKeys(String path) { this(path, Set.of()); }
     }
-    public enum SetMaterialKeys {
+    public enum SetBlockKeys {
         // @formatter:off
         IGNORED_BLOCK_FOR_SURFACE_CALCULATION("ignoredBlockForSurfaceCalculation"),
         BLOCK_TO_KEEP_FROM_SURFACE_WORLD_IN_CAVES("keptReferenceWorldBlocks");
         // @formatter:on
         private final String path;
         private final Set<String> defaultValue;
-        SetMaterialKeys(String path, Set<String> defaultValue) {
+        SetBlockKeys(String path, Set<String> defaultValue) {
             this.path = path;
             this.defaultValue = defaultValue;
         }
-        SetMaterialKeys(String path) { this(path, Set.of()); }
+        SetBlockKeys(String path) { this(path, Set.of()); }
     }
-    public enum MapMaterialKeys {
+    public enum MapBlockKeys {
         // @formatter:off
-        CLEAN_BLOCK_TO_SUPPORT("clean.blocks.toSupport", Map.of(Material.SAND, Material.SANDSTONE, Material.RED_SAND, Material.RED_SANDSTONE, Material.GRAVEL, Material.ANDESITE)),
+        CLEAN_BLOCK_TO_SUPPORT("clean.blocks.toSupport", Map.of(
+                ID.of("sand"), ID.of("sandstone"),
+                ID.of("red_sand"), ID.of("red_sandstone"),
+                ID.of("gravel"), ID.of("andesite"))),
         CLEAN_BLOCK_TO_REPLACE("clean.blocks.toReplace"),
         SURFACE_WORLD_BLOCK_TO_REPLACE("surfaceWorld.blocks.toReplace");
         // @formatter:on
 
         private final String path;
-        private final Map<Material, Material> defaultValue;
-        MapMaterialKeys(String path, Map<Material, Material> defaultValue) {
+        private final Map<ID, ID> defaultValue;
+        MapBlockKeys(String path, Map<ID, ID> defaultValue) {
             this.path = path;
             this.defaultValue = defaultValue;
         }
-        MapMaterialKeys(String path) { this(path, Map.of()); }
+        MapBlockKeys(String path) { this(path, Map.of()); }
     }
 
     public enum SetStructureKeys {
@@ -667,7 +691,7 @@ public class UnderillaConfig {
 
     public enum SetEntityTypeKeys {
         // @formatter:off
-        CLEAN_ENTITY_TO_REMOVE("clean.entities.toRemove", Set.of("ITEM"));
+        CLEAN_ENTITY_TO_REMOVE("clean.entities.toRemove", Set.of("minecraft:item"));
         // @formatter:on
 
         private final String path;

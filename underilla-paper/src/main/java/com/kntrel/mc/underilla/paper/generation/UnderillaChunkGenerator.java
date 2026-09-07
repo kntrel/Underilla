@@ -8,7 +8,6 @@ import com.kntrel.mc.underilla.paper.impl.BukkitLoadedChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitRegionChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldInfo;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
-import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
 import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import java.util.List;
 import java.util.Map;

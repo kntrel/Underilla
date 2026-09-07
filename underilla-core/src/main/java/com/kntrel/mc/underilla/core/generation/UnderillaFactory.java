@@ -6,6 +6,7 @@ import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cleanup.BlockCleanupPatcher;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
@@ -16,6 +17,7 @@ import com.kntrel.mc.underilla.core.vector.Vector;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -67,13 +69,13 @@ public final class UnderillaFactory {
         private int chunkCacheSize = 1;
         private BlockFactory blocks;
         private GenerationArea generationArea = GenerationArea.everywhere();
-        private Predicate<String> surfaceOnlyBiome = _ -> false;
-        private Predicate<String> preservedGeneratedBiome = _ -> false;
-        private Predicate<String> ignoredSurfaceBlock = _ -> false;
+        private Predicate<ID> surfaceOnlyBiome = _ -> false;
+        private Predicate<ID> preservedGeneratedBiome = _ -> false;
+        private Predicate<ID> ignoredSurfaceBlock = _ -> false;
         private Predicate<Block> keptSurfaceBlock = _ -> false;
         private UnaryOperator<Block> surfaceBlockTransformer = UnaryOperator.identity();
-        private Function<String, String> cleanupSupportReplacement;
-        private Function<String, String> cleanupBlockReplacement;
+        private Function<ID, Optional<ID>> cleanupSupportReplacement;
+        private Function<ID, Optional<ID>> cleanupBlockReplacement;
         private Predicate<Entity> cleanupEntityRemoval;
         private Consumer<Entity> cleanupEntityTransformer;
         private boolean surfaceBiomeUseTopYOnly;
@@ -138,12 +140,12 @@ public final class UnderillaFactory {
             return this;
         }
 
-        public Builder surfaceOnlyBiomes(Predicate<String> surfaceOnlyBiome) {
+        public Builder surfaceOnlyBiomes(Predicate<ID> surfaceOnlyBiome) {
             this.surfaceOnlyBiome = Objects.requireNonNull(surfaceOnlyBiome, "surfaceOnlyBiome");
             return this;
         }
 
-        public Builder preservedGeneratedBiomes(Predicate<String> preservedGeneratedBiome) {
+        public Builder preservedGeneratedBiomes(Predicate<ID> preservedGeneratedBiome) {
             this.preservedGeneratedBiome = Objects.requireNonNull(
                     preservedGeneratedBiome, "preservedGeneratedBiome");
             return this;
@@ -154,7 +156,7 @@ public final class UnderillaFactory {
             return this;
         }
 
-        public Builder ignoredSurfaceBlocks(Predicate<String> ignoredSurfaceBlock) {
+        public Builder ignoredSurfaceBlocks(Predicate<ID> ignoredSurfaceBlock) {
             this.ignoredSurfaceBlock = Objects.requireNonNull(ignoredSurfaceBlock, "ignoredSurfaceBlock");
             return this;
         }
@@ -171,8 +173,8 @@ public final class UnderillaFactory {
 
         /** Configures block support and replacement cleanup after vanilla features are generated. */
         public Builder blockCleanup(
-                Function<String, String> supportReplacement,
-                Function<String, String> blockReplacement
+                Function<ID, Optional<ID>> supportReplacement,
+                Function<ID, Optional<ID>> blockReplacement
         ) {
             this.cleanupSupportReplacement = Objects.requireNonNull(supportReplacement, "supportReplacement");
             this.cleanupBlockReplacement = Objects.requireNonNull(blockReplacement, "blockReplacement");

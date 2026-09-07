@@ -1,8 +1,10 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.api.ID;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /** Mutable generation configuration intended for characterization fixtures. */
@@ -19,11 +21,11 @@ final class TestGenerationConfig implements GenerationConfig {
     private int adaptiveMaximumDepth;
     private int adaptiveMinimumHiddenDepth;
     private boolean preserveGeneratedBiomesOnlyUnderSurface;
-    private final Set<String> surfaceOnlyBiomes = new HashSet<>();
-    private final Set<String> preservedGeneratedBiomes = new HashSet<>();
-    private final Set<String> ignoredSurfaceBlocks = new HashSet<>();
-    private final Set<String> keptSurfaceBlocks = new HashSet<>();
-    private final Map<String, String> surfaceReplacements = new HashMap<>();
+    private final Set<ID> surfaceOnlyBiomes = new HashSet<>();
+    private final Set<ID> preservedGeneratedBiomes = new HashSet<>();
+    private final Set<ID> ignoredSurfaceBlocks = new HashSet<>();
+    private final Set<ID> keptSurfaceBlocks = new HashSet<>();
+    private final Map<ID, ID> surfaceReplacements = new HashMap<>();
 
     TestGenerationConfig(int minimumY, int maximumY) {
         this.minimumY = minimumY;
@@ -45,7 +47,7 @@ final class TestGenerationConfig implements GenerationConfig {
     }
 
     TestGenerationConfig preserveGeneratedBiome(String biomeName) {
-        preservedGeneratedBiomes.add(biomeName);
+        preservedGeneratedBiomes.add(ID.of(biomeName));
         return this;
     }
 
@@ -70,22 +72,22 @@ final class TestGenerationConfig implements GenerationConfig {
     }
 
     TestGenerationConfig preserveBiome(String biomeName) {
-        surfaceOnlyBiomes.add(biomeName);
+        surfaceOnlyBiomes.add(ID.of(biomeName));
         return this;
     }
 
     TestGenerationConfig ignoreSurfaceBlock(String blockName) {
-        ignoredSurfaceBlocks.add(blockName);
+        ignoredSurfaceBlocks.add(ID.of(blockName));
         return this;
     }
 
     TestGenerationConfig keepSurfaceBlock(String blockName) {
-        keptSurfaceBlocks.add(blockName);
+        keptSurfaceBlocks.add(ID.of(blockName));
         return this;
     }
 
     TestGenerationConfig replaceSurfaceBlock(String blockName, String replacementName) {
-        surfaceReplacements.put(blockName, replacementName);
+        surfaceReplacements.put(ID.of(blockName), ID.of(replacementName));
         return this;
     }
 
@@ -135,24 +137,24 @@ final class TestGenerationConfig implements GenerationConfig {
     public boolean surfaceBiomeUseTopYOnly() { return false; }
 
     @Override
-    public boolean shouldPreserveBiome(String biomeName) { return preservedGeneratedBiomes.contains(biomeName); }
+    public boolean shouldPreserveBiome(ID biome) { return preservedGeneratedBiomes.contains(biome); }
 
     @Override
     public boolean preserveBiomesOnlyUnderSurface() { return preserveGeneratedBiomesOnlyUnderSurface; }
 
     @Override
-    public boolean isSurfaceWorldOnlyBiome(String biomeName) { return surfaceOnlyBiomes.contains(biomeName); }
+    public boolean isSurfaceWorldOnlyBiome(ID biome) { return surfaceOnlyBiomes.contains(biome); }
 
     @Override
-    public boolean isIgnoredForSurfaceCalculation(String blockName) {
-        return ignoredSurfaceBlocks.contains(blockName);
+    public boolean isIgnoredForSurfaceCalculation(ID block) {
+        return ignoredSurfaceBlocks.contains(block);
     }
 
     @Override
-    public boolean shouldKeepSurfaceBlockInCaves(String blockName) {
-        return keptSurfaceBlocks.contains(blockName);
+    public boolean shouldKeepSurfaceBlockInCaves(ID block) {
+        return keptSurfaceBlocks.contains(block);
     }
 
     @Override
-    public String surfaceBlockReplacement(String blockName) { return surfaceReplacements.get(blockName); }
+    public Optional<ID> surfaceBlockReplacement(ID block) { return Optional.ofNullable(surfaceReplacements.get(block)); }
 }

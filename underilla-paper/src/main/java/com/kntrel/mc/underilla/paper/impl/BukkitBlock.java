@@ -1,16 +1,20 @@
 package com.kntrel.mc.underilla.paper.impl;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ID;
 import java.util.Optional;
-import org.bukkit.Material;
+import java.util.Set;
+import org.bukkit.Registry;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Waterlogged;
-import org.bukkit.entity.EntityType;
 
 public class BukkitBlock implements Block {
+    private static final Set<ID> LIQUID_BLOCKS = Set.of(
+            ID.of("water"), ID.of("lava"), ID.of("bubble_column"), ID.of("seagrass"),
+            ID.of("tall_seagrass"), ID.of("kelp"), ID.of("kelp_plant"));
     // FIELDS
     private BlockData blockData_;
-    private Optional<EntityType> spawnedType;
+    private Optional<ID> spawnedType;
 
 
     // CONSTRUCTORS
@@ -23,9 +27,13 @@ public class BukkitBlock implements Block {
     // GETTERS
     public BlockData getBlockData() { return this.blockData_; }
 
-    public Optional<EntityType> getSpawnedType() { return this.spawnedType; }
+    public Optional<ID> getSpawnedType() { return this.spawnedType; }
     public void setSpawnedType(String spawnedType) {
-        this.spawnedType = Optional.ofNullable(EntityType.valueOf(spawnedType.replace("minecraft:", "").toUpperCase()));
+        ID id = ID.of(spawnedType);
+        if (Registry.ENTITY_TYPE.get(BukkitIDs.toKey(id)) == null) {
+            throw new IllegalArgumentException("Unknown Bukkit entity type: " + id);
+        }
+        this.spawnedType = Optional.of(id);
     }
 
     // IMPLEMENTATIONS
@@ -37,10 +45,7 @@ public class BukkitBlock implements Block {
 
     @Override
     public boolean isLiquid() {
-        Material m = this.blockData_.getMaterial();
-        return m.equals(Material.WATER) || m.equals(Material.LAVA) || isWaterLogged() || m.equals(Material.BUBBLE_COLUMN)
-                || m.equals(Material.SEAGRASS) || m.equals(Material.TALL_SEAGRASS) || m.equals(Material.KELP)
-                || m.equals(Material.KELP_PLANT);
+        return LIQUID_BLOCKS.contains(id()) || isWaterLogged();
     }
 
     @Override
@@ -51,7 +56,7 @@ public class BukkitBlock implements Block {
     @Override
     public void waterlog() {
         if (this.isAir()) {
-            this.blockData_ = Material.WATER.createBlockData();
+            this.blockData_ = Registry.BLOCK.getOrThrow(BukkitIDs.toKey(ID.of("water"))).createBlockData();
             return;
         }
         if (!(this.blockData_ instanceof Waterlogged waterlogged)) {
@@ -62,9 +67,8 @@ public class BukkitBlock implements Block {
     }
 
     @Override
-    public String getName() { return this.blockData_.getMaterial().toString().toLowerCase(); }
-    public Material getMaterial() { return this.blockData_.getMaterial(); }
-
-    @Override
-    public String getNameSpace() { return null; }
+    public ID id() {
+        return BukkitIDs.from(blockData_.getMaterial().asBlockType().getKey());
+    }
+    public org.bukkit.Material getMaterial() { return this.blockData_.getMaterial(); }
 }

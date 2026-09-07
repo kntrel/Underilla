@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.cleanup;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import com.kntrel.mc.underilla.core.impl.TestBiome;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
@@ -72,6 +73,9 @@ class BlockCleanupPatcherTest {
     }
 
     private static BlockCleanupPatcher patcher(Map<String, String> support, Map<String, String> replacements) {
-        return new BlockCleanupPatcher(BLOCKS, support::get, replacements::get);
+        return new BlockCleanupPatcher(
+                BLOCKS,
+                id -> java.util.Optional.ofNullable(support.get(id.toString())).map(ID::of),
+                id -> java.util.Optional.ofNullable(replacements.get(id.toString())).map(ID::of));
     }
 }

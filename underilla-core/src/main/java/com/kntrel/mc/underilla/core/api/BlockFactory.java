@@ -6,5 +6,5 @@ public interface BlockFactory {
     /** Creates an air block value that callers may safely mutate. */
     Block air();
 
-    Block create(String name);
+    Block create(ID id);
 }

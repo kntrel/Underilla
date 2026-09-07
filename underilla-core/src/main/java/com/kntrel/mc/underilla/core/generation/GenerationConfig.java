@@ -1,5 +1,8 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.api.ID;
+import java.util.Optional;
+
 /** Platform-neutral configuration consumed by the generation and world-reading layers. */
 public interface GenerationConfig {
 
@@ -33,21 +36,20 @@ public interface GenerationConfig {
 
     boolean surfaceBiomeUseTopYOnly();
 
-    boolean shouldPreserveBiome(String biomeName);
+    boolean shouldPreserveBiome(ID biome);
 
     boolean preserveBiomesOnlyUnderSurface();
 
-    boolean isSurfaceWorldOnlyBiome(String biomeName);
+    boolean isSurfaceWorldOnlyBiome(ID biome);
 
     default boolean isInsideGenerationArea(int x, int z) {
         return x >= generationAreaMinX() && x < generationAreaMaxX()
                 && z >= generationAreaMinZ() && z < generationAreaMaxZ();
     }
 
-    boolean isIgnoredForSurfaceCalculation(String blockName);
+    boolean isIgnoredForSurfaceCalculation(ID block);
 
-    boolean shouldKeepSurfaceBlockInCaves(String blockName);
+    boolean shouldKeepSurfaceBlockInCaves(ID block);
 
-    /** Returns the replacement block name, or {@code null} when the block should not be replaced. */
-    String surfaceBlockReplacement(String blockName);
+    Optional<ID> surfaceBlockReplacement(ID block);
 }

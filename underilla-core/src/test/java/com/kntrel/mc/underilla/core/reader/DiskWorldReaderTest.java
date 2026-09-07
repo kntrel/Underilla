@@ -54,7 +54,7 @@ class DiskWorldReaderTest {
                 arbitraryTerrainDirectory.toFile(), 1,
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
 
-        assertEquals("minecraft:stone", reader.blockAt(0, 0, 0).orElseThrow().getName());
+        assertEquals("minecraft:stone", reader.blockAt(0, 0, 0).orElseThrow().id().toString());
     }
 
     @Test
@@ -88,7 +88,7 @@ class DiskWorldReaderTest {
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
 
         ChunkReader chunk = reader.readChunk(0, 0).orElseThrow();
-        assertEquals("minecraft:stone", chunk.blockAt(0, 0, 0).orElseThrow().getName());
+        assertEquals("minecraft:stone", chunk.blockAt(0, 0, 0).orElseThrow().id().toString());
         assertEquals(0, chunk.getEntities().size());
     }
 

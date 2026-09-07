@@ -40,7 +40,7 @@ public final class PatcherFactory {
                 boundary,
                 config.generationAreaMinY(),
                 blocks::air,
-                block -> config.shouldKeepSurfaceBlockInCaves(block.getName()),
+                block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
                 surfaceBlockTransformer(config, blocks));
         List<ChunkPatcher> terrainPatchers = cavesWorld == null
                 ? List.of(surfacePatcher)
@@ -64,8 +64,7 @@ public final class PatcherFactory {
             BlockFactory blocks
     ) {
         return block -> {
-            String replacement = config.surfaceBlockReplacement(block.getName());
-            return replacement == null ? block : blocks.create(replacement);
+            return config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block);
         };
     }
 }

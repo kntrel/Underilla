@@ -139,7 +139,7 @@ class MergerCharacterizationTest {
             for (int y = MINIMUM_Y; y < MAXIMUM_Y; y++) {
                 for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
                     ExpectedBlock expected = expectedAbsoluteBlock(surface, caves, surfaceAirBoundary, x, y, z);
-                    String actualName = destination.getBlock(x, y, z).getName();
+                    String actualName = destination.getBlock(x, y, z).id().toString();
                     if (!expected.name().equals(actualName)) {
                         fail("Chunk " + coordinate + " differs at local position " + x + ", " + y + ", " + z
                                 + ": expected " + expected.name() + " from " + expected.source()
@@ -169,7 +169,7 @@ class MergerCharacterizationTest {
                 for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
                     ExpectedBlock expected = expectedSurfaceBlock(surface, caves, surfaceAirBoundary,
                             columnBoundaries[x][z], x, y, z);
-                    String actualName = destination.getBlock(x, y, z).getName();
+                    String actualName = destination.getBlock(x, y, z).id().toString();
                     if (!expected.name().equals(actualName)) {
                         fail("Chunk " + coordinate + " differs at local position " + x + ", " + y + ", " + z
                                 + " with surface boundary " + columnBoundaries[x][z] + ": expected "
@@ -215,8 +215,9 @@ class MergerCharacterizationTest {
             return minimumY;
         }
 
-        String biomeName = surfaceWorld.getBiomeName(globalX, surfaceConfig.generationAreaMaxY(), globalZ);
-        if (surfaceConfig.isSurfaceWorldOnlyBiome(biomeName)) {
+        com.kntrel.mc.underilla.core.api.ID biome = surfaceWorld.getBiomeID(
+                globalX, surfaceConfig.generationAreaMaxY(), globalZ);
+        if (surfaceConfig.isSurfaceWorldOnlyBiome(biome)) {
             return minimumY;
         }
 
@@ -239,7 +240,7 @@ class MergerCharacterizationTest {
 
     private boolean isExpectedSurfaceBlock(int globalX, int y, int globalZ) {
         Block block = surfaceWorld.blockAt(globalX, y, globalZ).orElse(blocks.air());
-        return block.isSolid() && !surfaceConfig.isIgnoredForSurfaceCalculation(block.getName());
+        return block.isSolid() && !surfaceConfig.isIgnoredForSurfaceCalculation(block.id());
     }
 
     private boolean hasNonSolidHorizontalNeighbour(int globalX, int y, int globalZ) {
@@ -263,7 +264,7 @@ class MergerCharacterizationTest {
     private ExpectedBlock expectedAbsoluteBlock(ChunkReader surface, ChunkReader caves, int surfaceAirBoundary,
             int x, int y, int z) {
         if (y >= surfaceAirBoundary) {
-            return new ExpectedBlock(blocks.air().getName(), BlockSource.CLEARED_UPPER_REGION);
+            return new ExpectedBlock(blocks.air().id().toString(), BlockSource.CLEARED_UPPER_REGION);
         }
         if (y > ABSOLUTE_MERGE_BOUNDARY_Y) {
             return new ExpectedBlock(blockNameOrAir(surface, x, y, z), BlockSource.SURFACE);
@@ -274,7 +275,7 @@ class MergerCharacterizationTest {
     private ExpectedBlock expectedSurfaceBlock(ChunkReader surface, ChunkReader caves, int surfaceAirBoundary,
             int columnBoundary, int x, int y, int z) {
         if (y >= surfaceAirBoundary) {
-            return new ExpectedBlock(blocks.air().getName(), BlockSource.CLEARED_UPPER_REGION);
+            return new ExpectedBlock(blocks.air().id().toString(), BlockSource.CLEARED_UPPER_REGION);
         }
         if (y > columnBoundary) {
             return new ExpectedBlock(blockNameOrAir(surface, x, y, z), BlockSource.SURFACE);
@@ -282,15 +283,15 @@ class MergerCharacterizationTest {
         if (caves != null) {
             return new ExpectedBlock(blockNameOrAir(caves, x, y, z), BlockSource.CAVES);
         }
-        return new ExpectedBlock(VOID.getName(), BlockSource.UNTOUCHED_DESTINATION);
+        return new ExpectedBlock(VOID.id().toString(), BlockSource.UNTOUCHED_DESTINATION);
     }
 
     private String blockNameOrAir(ChunkReader reader, int x, int y, int z) {
-        return reader.blockAt(x, y, z).orElse(blocks.air()).getName();
+        return reader.blockAt(x, y, z).orElse(blocks.air()).id().toString();
     }
 
     private static String blockName(ChunkReader reader, int x, int y, int z) {
-        return reader.blockAt(x, y, z).orElseThrow().getName();
+        return reader.blockAt(x, y, z).orElseThrow().id().toString();
     }
 
     private TestDiskWorldReader worldReader(String worldName, String resourcePath) throws Exception {

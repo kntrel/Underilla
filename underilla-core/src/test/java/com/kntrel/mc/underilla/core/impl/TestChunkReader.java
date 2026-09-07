@@ -5,6 +5,7 @@ import com.jkantrell.nbt.tag.CompoundTag;
 import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import java.util.List;
@@ -31,7 +32,7 @@ public final class TestChunkReader extends ChunkReader {
             return Optional.empty();
         }
         String name = tag.getString("Name");
-        return name == null || name.isBlank() ? Optional.empty() : Optional.of(blocks.create(name));
+        return name == null || name.isBlank() ? Optional.empty() : Optional.of(blocks.create(ID.of(name)));
     }
 
     @Override

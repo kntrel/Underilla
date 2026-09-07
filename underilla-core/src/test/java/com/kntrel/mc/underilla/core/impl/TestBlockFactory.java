@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.core.impl;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
+import com.kntrel.mc.underilla.core.api.ID;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -54,7 +55,7 @@ public final class TestBlockFactory implements BlockFactory {
             "minecraft:wildflowers");
 
     private final TestBlock air;
-    private final Map<String, Block> blocks = new HashMap<>();
+    private final Map<ID, Block> blocks = new HashMap<>();
 
     public TestBlockFactory(TestBlock air, TestBlock... knownBlocks) {
         this.air = Objects.requireNonNull(air, "air");
@@ -65,7 +66,7 @@ public final class TestBlockFactory implements BlockFactory {
     }
 
     public TestBlockFactory register(TestBlock block) {
-        blocks.put(block.getName(), block);
+        blocks.put(block.id(), block);
         return this;
     }
 
@@ -73,11 +74,12 @@ public final class TestBlockFactory implements BlockFactory {
     public Block air() { return air; }
 
     @Override
-    public Block create(String name) {
-        return blocks.computeIfAbsent(name, TestBlockFactory::createBlock);
+    public Block create(ID id) {
+        return blocks.computeIfAbsent(id, TestBlockFactory::createBlock);
     }
 
-    private static TestBlock createBlock(String name) {
+    private static TestBlock createBlock(ID id) {
+        String name = id.toString();
         if (AIR_BLOCKS.contains(name)) {
             return TestBlock.air(name);
         }
