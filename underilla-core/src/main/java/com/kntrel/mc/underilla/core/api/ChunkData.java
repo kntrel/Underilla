@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.core.api;
 
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.Vector;
+import java.util.List;
 
 public interface ChunkData {
 
@@ -19,5 +20,8 @@ public interface ChunkData {
     void setBiome(int x, int y, int z, Biome biome);
     default void setBiome(Vector<Integer> pos, Biome biome) { this.setBiome(pos.x(), pos.y(), pos.z(), biome); }
     void addEntity(EntityView entity);
+
+    /** Returns mutable entities when this chunk represents a live world chunk. */
+    default Iterable<Entity> entities() { return List.of(); }
 
 }

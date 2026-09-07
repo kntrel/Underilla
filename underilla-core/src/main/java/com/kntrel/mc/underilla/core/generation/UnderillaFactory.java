@@ -4,7 +4,10 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.cleanup.BlockCleanupPatcher;
+import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
@@ -14,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
@@ -67,6 +72,10 @@ public final class UnderillaFactory {
         private Predicate<String> ignoredSurfaceBlock = _ -> false;
         private Predicate<Block> keptSurfaceBlock = _ -> false;
         private UnaryOperator<Block> surfaceBlockTransformer = UnaryOperator.identity();
+        private Function<String, String> cleanupSupportReplacement;
+        private Function<String, String> cleanupBlockReplacement;
+        private Predicate<Entity> cleanupEntityRemoval;
+        private Consumer<Entity> cleanupEntityTransformer;
         private boolean surfaceBiomeUseTopYOnly;
         private boolean preserveGeneratedBiomesOnlyUnderSurface;
         private boolean carversEnabled = true;
@@ -160,6 +169,27 @@ public final class UnderillaFactory {
             return this;
         }
 
+        /** Configures block support and replacement cleanup after vanilla features are generated. */
+        public Builder blockCleanup(
+                Function<String, String> supportReplacement,
+                Function<String, String> blockReplacement
+        ) {
+            this.cleanupSupportReplacement = Objects.requireNonNull(supportReplacement, "supportReplacement");
+            this.cleanupBlockReplacement = Objects.requireNonNull(blockReplacement, "blockReplacement");
+            return this;
+        }
+
+        /** Configures entity removal and final transformation after the generated chunk becomes live. */
+        public Builder entityCleanup(
+                Predicate<Entity> shouldRemove,
+                Consumer<Entity> survivingEntityTransformer
+        ) {
+            this.cleanupEntityRemoval = Objects.requireNonNull(shouldRemove, "shouldRemove");
+            this.cleanupEntityTransformer = Objects.requireNonNull(
+                    survivingEntityTransformer, "survivingEntityTransformer");
+            return this;
+        }
+
         public Builder surfaceBiomeUseTopYOnly(boolean surfaceBiomeUseTopYOnly) {
             this.surfaceBiomeUseTopYOnly = surfaceBiomeUseTopYOnly;
             return this;
@@ -208,6 +238,15 @@ public final class UnderillaFactory {
                 plan.instrumenter(instrumenter);
             }
 
+            List<ChunkPatcher> afterFeatures = new ArrayList<>();
+            if (cleanupSupportReplacement != null) {
+                afterFeatures.add(new BlockCleanupPatcher(
+                        configuredBlocks,
+                        cleanupSupportReplacement,
+                        cleanupBlockReplacement));
+            }
+            afterFeatures.add(new ReferenceWorldEntityPatcher(referenceWorld));
+
             plan.coverage(this::coversChunk)
                     .biomePatch(new SurfaceBiomePatcher(
                             referenceWorld,
@@ -219,7 +258,10 @@ public final class UnderillaFactory {
                             preservedGeneratedBiome,
                             preserveGeneratedBiomesOnlyUnderSurface
                     ))
-                    .afterFeatures(new ReferenceWorldEntityPatcher(referenceWorld));
+                    .afterFeatures(afterFeatures.toArray(ChunkPatcher[]::new));
+            if (cleanupEntityRemoval != null) {
+                plan.afterLoad(new EntityCleanupPatcher(cleanupEntityRemoval, cleanupEntityTransformer));
+            }
             plan.altimeter(new SurfaceAltimeter(referenceWorld, configuredAir));
 
             if (noodleCavesPolicy instanceof NoodleCavesPolicy.Underground) {

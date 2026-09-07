@@ -7,6 +7,8 @@ import com.kntrel.mc.underilla.core.generation.UnderillaFactory;
 import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.paper.Underilla;
+import com.kntrel.mc.underilla.paper.impl.BukkitEntity;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
@@ -50,7 +52,7 @@ public final class PaperGenerationPlanFactory {
                                 SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES,
                                 biome.getName());
 
-        return builder
+        builder
                 .instrumenter(instrumenter)
                 .verticalRange(config.generationAreaMinY(), config.generationAreaMaxY())
                 .maximumCaveY(config.maxHeightOfCaves())
@@ -78,8 +80,21 @@ public final class PaperGenerationPlanFactory {
                 .structures(config.structuresEnabled())
                 .noodleCaves(NoodleCavesPolicy.surface(
                         exposedToCarvers,
-                        config.getBoolean(BooleanKeys.PRESERVE_LIQUID_FROM_CAVERS)))
-                .build();
+                        config.getBoolean(BooleanKeys.PRESERVE_LIQUID_FROM_CAVERS)));
+        if (config.getBoolean(BooleanKeys.CLEAN_BLOCKS_ENABLED)) {
+            builder.blockCleanup(config::cleanupSupportReplacement, config::cleanupBlockReplacement);
+        }
+        if (config.getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
+            builder.entityCleanup(
+                    entity -> config.shouldRemoveEntity(entity.getType()),
+                    entity -> {
+                        if (entity instanceof BukkitEntity bukkitEntity
+                                && Underilla.getInstance().hasEndEntityTransformer()) {
+                            Underilla.getInstance().getEndEntityTransformer().accept(bukkitEntity.getEntity());
+                        }
+                    });
+        }
+        return builder.build();
     }
 
     private static Block transformSurfaceBlock(Block block, UnderillaConfig config, BlockFactory blocks) {

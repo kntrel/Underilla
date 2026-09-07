@@ -15,7 +15,6 @@ import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.StringKeys;
-import com.kntrel.mc.underilla.paper.listener.ChunkGeneratedListener;
 import com.kntrel.mc.underilla.paper.listener.StructureEventListener;
 import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
@@ -159,11 +158,6 @@ public final class Underilla extends JavaPlugin {
             this.getServer().getPluginManager().registerEvents(structureEventListener, this);
         }
         this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
-
-        if (getUnderillaConfig().getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
-            LOGGER.info("Cleaning listener for blocks and/or entities have been init.");
-            this.getServer().getPluginManager().registerEvents(new ChunkGeneratedListener(), this);
-        }
 
     }
 

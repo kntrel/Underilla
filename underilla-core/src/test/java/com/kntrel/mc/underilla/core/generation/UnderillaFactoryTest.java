@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.api.WorldInfo;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
@@ -183,6 +184,43 @@ class UnderillaFactoryTest {
     }
 
     @Test
+    void finalPlanRunsConfiguredBlockCleanupAfterFeatures() {
+        TestBlock sand = TestBlock.solid("minecraft:sand");
+        TestBlock sandstone = TestBlock.solid("minecraft:sandstone");
+        TestBlockFactory blocks = new TestBlockFactory(AIR, GENERATED, REFERENCE, WATER, sand, sandstone);
+        TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS);
+        WorldGenerationPlan plan = UnderillaFactory.absolute(new TestWorld().addChunk(referenceChunk))
+                .verticalRange(0, 4)
+                .maximumCaveY(0)
+                .blocks(blocks)
+                .blockCleanup(
+                        name -> name.equals("minecraft:sand") ? "minecraft:sandstone" : null,
+                        _ -> null)
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS);
+        target.setBlock(0, 1, 0, sand);
+
+        assertTrue(plan.tryAfterFeatures(target));
+
+        assertSame(sandstone, target.getBlock(0, 1, 0));
+    }
+
+    @Test
+    void finalPlanRunsConfiguredEntityCleanupAfterLoad() {
+        TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS);
+        TestEntity item = new TestEntity("ITEM");
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS).addLiveEntity(item);
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(
+                        new TestWorld().addChunk(referenceChunk)))
+                .entityCleanup(entity -> entity.getType().equals("ITEM"), _ -> {})
+                .build();
+
+        assertTrue(plan.tryAfterLoad(target));
+
+        assertTrue(item.removed);
+    }
+
+    @Test
     void finalPlanCoverageRequiresConfiguredBoundsAndAReferenceChunk() {
         TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
         TestChunkGrid outOfBoundsChunk = new TestChunkGrid(2, 0, 0, 5, AIR, PLAINS);
@@ -238,5 +276,18 @@ class UnderillaFactoryTest {
 
         @Override
         public int getMinHeight() { return minimumY; }
+    }
+
+    private static final class TestEntity implements Entity {
+        private final String type;
+        private boolean removed;
+
+        private TestEntity(String type) { this.type = type; }
+
+        @Override
+        public String getType() { return type; }
+
+        @Override
+        public void remove() { removed = true; }
     }
 }

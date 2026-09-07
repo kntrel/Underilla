@@ -3,12 +3,10 @@ package com.kntrel.mc.underilla.paper.generation;
 import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.paper.Underilla;
-import com.kntrel.mc.underilla.paper.cleaning.CleanBlocks;
 import com.kntrel.mc.underilla.paper.impl.BukkitChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitLoadedChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitRegionChunkData;
 import com.kntrel.mc.underilla.paper.impl.BukkitWorldInfo;
-import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.IntegerKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
 import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
@@ -240,9 +238,6 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
             // The block populators are called after addVanillaDecorations(...) before light and mod spawn.
             // It is the final generation-time opportunity to clean decorated blocks and add reference entities.
             // Calling it here is thread-safe and lag-safe because Chunky waits for generation to finish before starting more chunks.
-            if (Underilla.getUnderillaConfig().getBoolean(UnderillaConfig.BooleanKeys.CLEAN_BLOCKS_ENABLED)) {
-                CleanBlocks.cleanBlocks(worldInfo, chunkX, chunkZ, limitedRegion);
-            }
             this.generationPlan.tryAfterFeatures(chunkData);
         }
     }

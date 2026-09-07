@@ -3,9 +3,11 @@ package com.kntrel.mc.underilla.paper.impl;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.VectorIterable;
 import com.kntrel.mc.underilla.paper.Underilla;
+import java.util.Arrays;
 import java.util.Objects;
 import org.bukkit.Chunk;
 import org.bukkit.World;
@@ -76,5 +78,10 @@ public final class BukkitLoadedChunkData implements ChunkData {
     @Override
     public void addEntity(EntityView entity) {
         throw new UnsupportedOperationException("Loaded chunk data cannot add entities");
+    }
+
+    @Override
+    public Iterable<Entity> entities() {
+        return Arrays.stream(chunk.getEntities()).<Entity>map(BukkitEntity::new).toList();
     }
 }

@@ -146,6 +146,24 @@ public class UnderillaConfig {
         Material replacement = getMaterialFromMap(MapMaterialKeys.SURFACE_WORLD_BLOCK_TO_REPLACE, material);
         return replacement == null ? null : replacement.getKey().asString();
     }
+    public String cleanupSupportReplacement(String blockName) {
+        return cleanupBlockReplacement(MapMaterialKeys.CLEAN_BLOCK_TO_SUPPORT, blockName);
+    }
+    public String cleanupBlockReplacement(String blockName) {
+        return cleanupBlockReplacement(MapMaterialKeys.CLEAN_BLOCK_TO_REPLACE, blockName);
+    }
+    public boolean shouldRemoveEntity(String entityType) {
+        return getSetEntityType(SetEntityTypeKeys.CLEAN_ENTITY_TO_REMOVE).stream()
+                .anyMatch(type -> type.toString().equals(entityType));
+    }
+    private String cleanupBlockReplacement(MapMaterialKeys key, String blockName) {
+        Material material = Material.matchMaterial(blockName);
+        if (material == null) {
+            return null;
+        }
+        Material replacement = getMaterialFromMap(key, material);
+        return replacement == null ? null : replacement.getKey().asString();
+    }
     public Selector getSelector() {
         return new Selector(getInt(IntegerKeys.GENERATION_AREA_MIN_X), getInt(IntegerKeys.GENERATION_AREA_MIN_Y),
                 getInt(IntegerKeys.GENERATION_AREA_MIN_Z), getInt(IntegerKeys.GENERATION_AREA_MAX_X),

@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.impl;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ public final class TestChunkGrid implements ChunkData {
     private final Block[][][] blocks;
     private final Biome[][][] biomes;
     private final List<EntityView> entities = new ArrayList<>();
+    private final List<Entity> liveEntities = new ArrayList<>();
 
     public TestChunkGrid(int chunkX, int chunkZ, int minimumY, int maximumY, Block defaultBlock, Biome defaultBiome) {
         if (maximumY <= minimumY) {
@@ -110,6 +112,10 @@ public final class TestChunkGrid implements ChunkData {
     public boolean containsY(int y) { return y >= minimumY && y < maximumY; }
 
     public List<EntityView> getEntities() { return List.copyOf(entities); }
+    public TestChunkGrid addLiveEntity(Entity entity) {
+        liveEntities.add(Objects.requireNonNull(entity, "entity"));
+        return this;
+    }
 
     @Override
     public int getMaxHeight() { return maximumY; }
@@ -162,6 +168,9 @@ public final class TestChunkGrid implements ChunkData {
     public void addEntity(EntityView entity) {
         entities.add(Objects.requireNonNull(entity, "entity"));
     }
+
+    @Override
+    public Iterable<Entity> entities() { return List.copyOf(liveEntities); }
 
     private void requirePosition(int x, int y, int z) {
         requireHorizontalPosition(x, z);

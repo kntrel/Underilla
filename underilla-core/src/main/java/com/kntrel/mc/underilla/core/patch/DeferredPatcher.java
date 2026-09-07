@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.patch;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.IntVector;
 import com.kntrel.mc.underilla.core.vector.Vector;
@@ -156,6 +157,9 @@ public final class DeferredPatcher implements ChunkPatcher {
                 delegate.addEntity(entity);
             }
         }
+
+        @Override
+        public Iterable<Entity> entities() { return delegate.entities(); }
     }
 
     private record Applier(
