@@ -43,6 +43,13 @@ public final class TestBlock implements Block {
     }
 
     @Override
+    public TestBlock clone() {
+        TestBlock block = new TestBlock(id.toString(), solid, liquid, air, waterloggable);
+        block.waterlogged = waterlogged;
+        return block;
+    }
+
+    @Override
     public boolean isAir() { return air; }
 
     @Override

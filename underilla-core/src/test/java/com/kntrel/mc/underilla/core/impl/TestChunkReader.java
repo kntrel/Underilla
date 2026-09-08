@@ -27,7 +27,7 @@ public final class TestChunkReader extends ChunkReader {
     }
 
     @Override
-    public Optional<Block> blockFromTag(CompoundTag tag) {
+    protected Optional<Block> decodeBlockFromTag(CompoundTag tag) {
         if (tag == null) {
             return Optional.empty();
         }

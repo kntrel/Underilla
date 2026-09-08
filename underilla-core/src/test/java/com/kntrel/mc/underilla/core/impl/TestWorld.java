@@ -117,7 +117,7 @@ public final class TestWorld implements WorldReader {
         }
 
         @Override
-        public Optional<Block> blockFromTag(CompoundTag tag) { return Optional.empty(); }
+        protected Optional<Block> decodeBlockFromTag(CompoundTag tag) { return Optional.empty(); }
 
         @Override
         public Optional<Block> blockFromTag(CompoundTag tag, CompoundTag entityTag) { return Optional.empty(); }

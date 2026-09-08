@@ -384,6 +384,13 @@ class PatcherStrategyTest {
         }
 
         @Override
+        public TestBlock clone() {
+            TestBlock block = new TestBlock(id.toString(), solid, liquid, air);
+            block.waterlogged = waterlogged;
+            return block;
+        }
+
+        @Override
         public boolean isAir() { return air; }
 
         @Override
@@ -466,7 +473,7 @@ class PatcherStrategyTest {
         }
 
         @Override
-        public Optional<Block> blockFromTag(CompoundTag tag) { return Optional.empty(); }
+        protected Optional<Block> decodeBlockFromTag(CompoundTag tag) { return Optional.empty(); }
 
         @Override
         public Optional<Block> blockFromTag(CompoundTag tag, CompoundTag entityTag) { return Optional.empty(); }

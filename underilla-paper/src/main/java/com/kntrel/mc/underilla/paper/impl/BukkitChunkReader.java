@@ -26,8 +26,8 @@ public class BukkitChunkReader extends ChunkReader {
 
     // IMPLEMENTATION
     @Override
-    public Optional<Block> blockFromTag(CompoundTag tag) {
-        String name = Optional.ofNullable(tag).map(t -> t.getString("Name")).orElse(null);
+    protected Optional<Block> decodeBlockFromTag(CompoundTag tag) {
+        String name = tag.getString("Name");
         if (name == null) {
             return Optional.empty();
         }
@@ -43,12 +43,8 @@ public class BukkitChunkReader extends ChunkReader {
         }
 
         CompoundTag properties = tag != null ? tag.getCompoundTag("Properties") : null;
-        BukkitBlock block;
         if (properties == null) {
-            block = new BukkitBlock(type.createBlockData());
-            return Optional.of(block);
-        } else {
-            block = null;
+            return Optional.of(new BukkitBlock(type.createBlockData()));
         }
 
         // IllegalArgumentException might be thrown if block data is not compatible with current version of Minecraft
@@ -61,12 +57,11 @@ public class BukkitChunkReader extends ChunkReader {
             if (id.equals(ID.of("vine"))) {
                 dataString = removeVineDownProperty(dataString);
             }
-            block = new BukkitBlock(type.createBlockData(dataString));
+            return Optional.of(new BukkitBlock(type.createBlockData(dataString)));
         } catch (IllegalArgumentException e) {
             LOGGER.warn("Failed to create block data {}", id, e);
-            block = new BukkitBlock(type.createBlockData());
+            return Optional.of(new BukkitBlock(type.createBlockData()));
         }
-        return Optional.of(block);
     }
 
     // From minecraft:vine[west=false,east=false,up=false,south=false,down=false,north=true]

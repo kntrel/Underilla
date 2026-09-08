@@ -10,6 +10,7 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,7 @@ public abstract class ChunkReader {
     // FIELDS
     private final Chunk chunk_;
     private final List<EntityView> entities_;
+    private final Map<CompoundTag, Optional<Block>> blockPalette_ = new IdentityHashMap<>();
     private Integer airColumnHeight_ = null;
 
 
@@ -150,9 +152,30 @@ public abstract class ChunkReader {
         return this.locationsOf(materialList::contains);
     }
 
+    /**
+     * Decodes each KntNBT palette entry once and returns an independent block for each caller.
+     * KntNBT section lookups return the palette tag instance, so identity keys avoid depending
+     * on equality or hash-code behavior of mutable NBT tags.
+     */
+    public final Optional<Block> blockFromTag(CompoundTag tag) {
+        if (tag == null) {
+            return Optional.empty();
+        }
+
+        Optional<Block> template;
+        synchronized (blockPalette_) {
+            template = blockPalette_.get(tag);
+            if (template == null) {
+                template = decodeBlockFromTag(tag);
+                blockPalette_.put(tag, template);
+            }
+        }
+        return template.map(Block::clone);
+    }
+
 
     // ABSTRACT
-    public abstract Optional<Block> blockFromTag(CompoundTag tag);
+    protected abstract Optional<Block> decodeBlockFromTag(CompoundTag tag);
     public abstract Optional<Block> blockFromTag(CompoundTag tag, CompoundTag entityTag);
     public abstract Optional<Biome> biomeFromTag(StringTag tag);
 

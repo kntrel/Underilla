@@ -38,6 +38,13 @@ public class BukkitBlock implements Block {
 
     // IMPLEMENTATIONS
     @Override
+    public BukkitBlock clone() {
+        BukkitBlock block = new BukkitBlock(this.blockData_.clone());
+        block.spawnedType = this.spawnedType;
+        return block;
+    }
+
+    @Override
     public boolean isAir() { return this.blockData_.getMaterial().isAir(); }
 
     @Override

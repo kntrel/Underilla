@@ -87,7 +87,7 @@ public final class ChunkCache {
             ChunkBucket bucket = chunks.get(coordinate);
             if (bucket == null) {
                 misses++;
-                LOGGER.info("ChunkCache {} miss at ({}, {}): resident={}, capacity={}, accesses={}, misses={}, evictions={}",
+                LOGGER.trace("ChunkCache {} miss at ({}, {}): resident={}, capacity={}, accesses={}, misses={}, evictions={}",
                         id, chunkX, chunkZ, chunks.size(), maximumCapacity, accesses, misses, evictions);
             }
             if (bucket == null && create) {
