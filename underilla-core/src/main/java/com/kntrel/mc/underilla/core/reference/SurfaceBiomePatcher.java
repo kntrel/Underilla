@@ -1,9 +1,11 @@
-package com.kntrel.mc.underilla.core.generation;
+package com.kntrel.mc.underilla.core.reference;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.generation.GenerationArea;
+import com.kntrel.mc.underilla.core.generation.WorldMask;
 import com.kntrel.mc.underilla.core.patch.BiomePatcher;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;

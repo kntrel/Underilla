@@ -16,6 +16,7 @@ import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
+import com.kntrel.mc.underilla.core.reference.*;
 import com.kntrel.mc.underilla.core.vector.Vector;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,10 +1,11 @@
-package com.kntrel.mc.underilla.core.generation;
+package com.kntrel.mc.underilla.core.reference;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
+import com.kntrel.mc.underilla.core.generation.WorldMask;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
 import java.util.Optional;

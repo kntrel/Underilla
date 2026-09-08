@@ -12,6 +12,8 @@ import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.kntrel.mc.underilla.core.reference.ReferenceHeightWorldMask;
 import org.junit.jupiter.api.Test;
 
 class ReferenceHeightWorldMaskTest {

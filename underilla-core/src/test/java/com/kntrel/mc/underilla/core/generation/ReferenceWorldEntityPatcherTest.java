@@ -9,6 +9,7 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.reader.EntityView;
+import com.kntrel.mc.underilla.core.reference.ReferenceWorldEntityPatcher;
 import org.junit.jupiter.api.Test;
 
 class ReferenceWorldEntityPatcherTest {

@@ -1,9 +1,10 @@
-package com.kntrel.mc.underilla.core.generation;
+package com.kntrel.mc.underilla.core.reference;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.api.WorldInfo;
+import com.kntrel.mc.underilla.core.generation.Altimeter;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;

@@ -10,6 +10,7 @@ import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.reference.SurfaceBiomePatcher;
 import org.junit.jupiter.api.Test;
 
 class SurfaceBiomePatcherTest {

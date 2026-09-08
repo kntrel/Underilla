@@ -18,6 +18,8 @@ import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reference.ReferenceHeightWorldMask;
+import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
 import java.util.ArrayList;
 import java.util.HashMap;

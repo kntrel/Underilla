@@ -7,6 +7,9 @@ import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
+import com.kntrel.mc.underilla.core.reference.ReferenceHeightWorldMask;
+import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
+
 import java.util.List;
 import java.util.function.UnaryOperator;
 
