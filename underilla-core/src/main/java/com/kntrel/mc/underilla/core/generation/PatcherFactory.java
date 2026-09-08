@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
@@ -59,13 +60,11 @@ public final class PatcherFactory {
 
     private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, GenerationContext context) {
         GenerationConfig config = context.config();
-        return new CachedWorldMask(
-                new SurfaceWorldMask(surfaceWorld, context.blocks().air(),
+        return new ReferenceHeightWorldMask(surfaceWorld, context.blocks().air(),
                         config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                         config.mergeDepth(), config.adaptiveMaxMergeDepth(),
                         config.adaptiveMinHiddenBlocksMergeDepth(), config::isSurfaceWorldOnlyBiome,
-                        config::isIgnoredForSurfaceCalculation),
-                config.cacheSize()
+                        config::isIgnoredForSurfaceCalculation, new ChunkCache(config.cacheSize())
         );
     }
 

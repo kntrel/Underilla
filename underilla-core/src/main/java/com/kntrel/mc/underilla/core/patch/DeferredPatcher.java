@@ -4,29 +4,27 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
+import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.IntVector;
 import com.kntrel.mc.underilla.core.vector.Vector;
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 
 /**
  * Runs a patcher against a chunk-data view that caches selected writes for a later phase.
  *
- * <p>The cache is FIFO and chunk-bounded. A missing batch is recomputed by the applier through a
- * view that applies only writes selected by {@code shouldDefer}.</p>
+ * <p>The supplied cache is shared and uses chunk-level LRU eviction. A missing batch is recomputed
+ * by the applier through a view that applies only writes selected by {@code shouldDefer}.
+ * Use one deferred patcher per cache instance: its topic identifies one batch per chunk.</p>
  */
 public final class DeferredPatcher implements ChunkPatcher {
 
-    private static final int DEFAULT_CACHE_CAPACITY = 256;
-
     //FIELDS
     private final ChunkPatcher delegate;
-    private final DeferredTasks deferredWrites;
+    private final TopicChunkCache<DeferredBlockWrites> deferredWrites;
     private final BiPredicate<Vector<Integer>, ChunkData> shouldDefer;
     private final Applier applier;
 
@@ -34,18 +32,11 @@ public final class DeferredPatcher implements ChunkPatcher {
     //CONSTRUCTORS
     public DeferredPatcher(
             ChunkPatcher delegate,
-            BiPredicate<Vector<Integer>, ChunkData> shouldDefer
-    ) {
-        this(delegate, shouldDefer, DEFAULT_CACHE_CAPACITY);
-    }
-
-    public DeferredPatcher(
-            ChunkPatcher delegate,
             BiPredicate<Vector<Integer>, ChunkData> shouldDefer,
-            int cacheCapacity
+            ChunkCache cache
     ) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
-        this.deferredWrites = new DeferredTasks(cacheCapacity);
+        this.deferredWrites = cache.topicView(DeferredBlockWrites.class);
         this.shouldDefer = Objects.requireNonNull(shouldDefer, "shouldDefer");
         this.applier = new Applier(this.delegate, this.deferredWrites, this.shouldDefer);
     }
@@ -63,20 +54,11 @@ public final class DeferredPatcher implements ChunkPatcher {
         Objects.requireNonNull(targetChunk, "targetChunk");
         DeferredBlockWrites writes = new DeferredBlockWrites();
         delegate.patch(new ChunkDataProxy(targetChunk, writes, shouldDefer));
-        deferredWrites.put(coordinateOf(targetChunk), writes);
+        deferredWrites.put(targetChunk.getChunkX(), targetChunk.getChunkZ(), writes);
     }
-
-
-    //HELPERS
-    private static ChunkCoordinate coordinateOf(ChunkData chunk) {
-        return new ChunkCoordinate(chunk.getChunkX(), chunk.getChunkZ());
-    }
-
 
 
     //SUBTYPES -----------------------------------------------------------------------------------------
-
-    private record ChunkCoordinate(int x, int z) {}
 
     private record ChunkDataProxy(
             ChunkData delegate,
@@ -164,7 +146,7 @@ public final class DeferredPatcher implements ChunkPatcher {
 
     private record Applier(
             ChunkPatcher delegate,
-            DeferredTasks deferredWrites,
+            TopicChunkCache<DeferredBlockWrites> deferredWrites,
             BiPredicate<Vector<Integer>, ChunkData> shouldDefer
     ) implements ChunkPatcher {
 
@@ -177,7 +159,7 @@ public final class DeferredPatcher implements ChunkPatcher {
         @Override
         public void patch(ChunkData targetChunk) {
             Objects.requireNonNull(targetChunk, "targetChunk");
-            DeferredBlockWrites writes = deferredWrites.remove(coordinateOf(targetChunk));
+            DeferredBlockWrites writes = deferredWrites.take(targetChunk.getChunkX(), targetChunk.getChunkZ()).orElse(null);
             if (writes != null) {
                 writes.applyTo(targetChunk);
             } else {
@@ -230,32 +212,4 @@ public final class DeferredPatcher implements ChunkPatcher {
         }
     }
 
-    private static final class DeferredTasks {
-
-        private final int capacity;
-        private final Map<ChunkCoordinate, DeferredBlockWrites> batches = new LinkedHashMap<>();
-
-        private DeferredTasks(int capacity) {
-            if (capacity < 1) {
-                throw new IllegalArgumentException("cacheCapacity must be at least 1");
-            }
-            this.capacity = capacity;
-        }
-
-        private synchronized void put(ChunkCoordinate coordinate, DeferredBlockWrites writes) {
-            // Reinsertion represents a newer computation. Remove first so the coordinate moves to
-            // the end of the insertion-ordered queue and its previous batch can be collected.
-            batches.remove(coordinate);
-            batches.put(coordinate, writes);
-            if (batches.size() > capacity) {
-                Iterator<ChunkCoordinate> coordinates = batches.keySet().iterator();
-                coordinates.next();
-                coordinates.remove();
-            }
-        }
-
-        private synchronized DeferredBlockWrites remove(ChunkCoordinate coordinate) {
-            return batches.remove(coordinate);
-        }
-    }
 }

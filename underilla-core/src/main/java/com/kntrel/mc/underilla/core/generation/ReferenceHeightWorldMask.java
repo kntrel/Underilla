@@ -2,14 +2,23 @@ package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
+import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-/** Selects a shell beneath the reference world's terrain surface. */
-public final class SurfaceWorldMask implements WorldMask {
+/**
+ * Selects positions above the reference world's final merge boundary.
+ * Boundaries are calculated lazily per column and retained in the shared chunk cache.
+ * Use one mask configuration per cache; its reference world and settings must remain fixed.
+ */
+public final class ReferenceHeightWorldMask implements WorldMask {
+
+    private final TopicChunkCache<ColumnBoundaries> boundaries;
 
     private final WorldReader surfaceWorld;
     private final Block air;
@@ -22,7 +31,7 @@ public final class SurfaceWorldMask implements WorldMask {
     private final Predicate<ID> surfaceWorldOnlyBiome;
     private final Predicate<ID> ignoredSurfaceBlock;
 
-    public SurfaceWorldMask(
+    public ReferenceHeightWorldMask(
             WorldReader surfaceWorld,
             Block air,
             int minimumY,
@@ -32,9 +41,11 @@ public final class SurfaceWorldMask implements WorldMask {
             int adaptiveMaximumDepth,
             int adaptiveMinimumHiddenDepth,
             Predicate<ID> surfaceWorldOnlyBiome,
-            Predicate<ID> ignoredSurfaceBlock
+            Predicate<ID> ignoredSurfaceBlock,
+            ChunkCache cache
     ) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
+        this.boundaries = new TopicChunkCache<>(cache, ColumnBoundaries.class);
         this.air = Objects.requireNonNull(air, "air");
         this.minimumY = minimumY;
         this.maximumY = maximumY;
@@ -48,7 +59,25 @@ public final class SurfaceWorldMask implements WorldMask {
 
     @Override
     public boolean contains(int globalX, int y, int globalZ) {
-        return y > boundaryAt(globalX, globalZ);
+        int size = GenerationConstants.CHUNK_SIZE;
+        ColumnBoundaries chunk = boundaries.getOrCompute(
+                Math.floorDiv(globalX, size),
+                Math.floorDiv(globalZ, size),
+                ColumnBoundaries::new
+        );
+        int column = Math.floorMod(globalZ, size) * size + Math.floorMod(globalX, size);
+        synchronized (chunk) {
+            if (!chunk.known[column]) {
+                chunk.heights[column] = boundaryAt(globalX, globalZ);
+                chunk.known[column] = true;
+            }
+            return y > chunk.heights[column];
+        }
+    }
+
+    private static final class ColumnBoundaries {
+        private final int[] heights = new int[GenerationConstants.CHUNK_SIZE * GenerationConstants.CHUNK_SIZE];
+        private final boolean[] known = new boolean[heights.length];
     }
 
     private int boundaryAt(int globalX, int globalZ) {

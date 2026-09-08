@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.kntrel.mc.underilla.core.impl.TestBiome;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -26,7 +27,7 @@ class DeferredPatcherTest {
             target.setBlock(2, 1, 0, OTHER_REFERENCE);
         };
         DeferredPatcher deferred = new DeferredPatcher(writesReferenceTerrain,
-                (position, ignored) -> position.x() == 0);
+                (position, ignored) -> position.x() == 0, new ChunkCache(2));
         ChunkPatcher restore = deferred.applier();
 
         deferred.patch(chunk);
@@ -59,7 +60,7 @@ class DeferredPatcherTest {
             if (fail.getAndSet(false)) {
                 throw new IllegalStateException("generation failed");
             }
-        }, (position, ignored) -> true);
+        }, (position, ignored) -> true, new ChunkCache(2));
 
         assertThrows(IllegalStateException.class, () -> deferred.patch(chunk));
         deferred.applier().patch(chunk);
@@ -68,7 +69,7 @@ class DeferredPatcherTest {
     }
 
     @Test
-    void recomputedCoordinateReplacesItsBatchAndMovesToTheEndOfTheFifoCache() {
+    void recomputedCoordinateReplacesItsBatchAndPromotesTheChunk() {
         TestChunkGrid first = new TestChunkGrid(1, 0, 0, 4, GENERATED, PLAINS);
         TestChunkGrid second = new TestChunkGrid(2, 0, 0, 4, GENERATED, PLAINS);
         TestChunkGrid third = new TestChunkGrid(3, 0, 0, 4, GENERATED, PLAINS);
@@ -85,7 +86,7 @@ class DeferredPatcherTest {
                 target.setBlock(0, 1, 0, REFERENCE);
             }
         };
-        DeferredPatcher deferred = new DeferredPatcher(delegate, (position, ignored) -> true, 2);
+        DeferredPatcher deferred = new DeferredPatcher(delegate, (position, ignored) -> true, new ChunkCache(2));
 
         deferred.patch(first);
         deferred.patch(second);
@@ -101,9 +102,39 @@ class DeferredPatcherTest {
     }
 
     @Test
-    void rejectsANonPositiveCacheCapacity() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new DeferredPatcher(_ -> {}, (position, ignored) -> true, 0));
+    void rejectsANullCache() {
+        assertThrows(NullPointerException.class,
+                () -> new DeferredPatcher(_ -> {}, (position, ignored) -> true, null));
+    }
+
+    @Test
+    void sharesChunkPromotionAndEvictionWithOtherTopicsAndConsumesOnlyItsOwn() {
+        ChunkCache cache = new ChunkCache(2);
+        AtomicInteger runs = new AtomicInteger();
+        DeferredPatcher deferred = new DeferredPatcher(target -> {
+            runs.incrementAndGet();
+            target.setBlock(0, 1, 0, REFERENCE);
+        }, (position, ignored) -> true, cache);
+        TestChunkGrid first = new TestChunkGrid(1, 0, 0, 4, GENERATED, PLAINS);
+        TestChunkGrid second = new TestChunkGrid(2, 0, 0, 4, GENERATED, PLAINS);
+
+        deferred.patch(first);
+        cache.put(1, 0, "other topic");
+        deferred.patch(second);
+        cache.get(1, 0, String.class);
+        cache.put(3, 0, "evicts second");
+
+        deferred.applier().patch(first);
+        assertEquals(2, runs.get());
+        assertSame(REFERENCE, first.getBlock(0, 1, 0));
+        assertEquals("other topic", cache.get(1, 0, String.class).orElseThrow());
+
+        deferred.applier().patch(second);
+        assertEquals(3, runs.get());
+        assertSame(REFERENCE, second.getBlock(0, 1, 0));
+
+        deferred.applier().patch(first);
+        assertEquals(4, runs.get());
     }
 
     private static TestChunkGrid chunk() {

@@ -9,6 +9,7 @@ import com.jkantrell.nbt.tag.CompoundTag;
 import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
@@ -288,10 +289,10 @@ class PatcherStrategyTest {
     }
 
     private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, TestConfig config) {
-        return new SurfaceWorldMask(surfaceWorld, AIR,
+        return new ReferenceHeightWorldMask(surfaceWorld, AIR,
                 config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                 config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
-                config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation);
+                config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation, new ChunkCache(2));
     }
 
     private static final class TestConfig implements GenerationConfig {

@@ -7,6 +7,7 @@ import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.BlockCleanupPatcher;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
@@ -67,7 +68,7 @@ public final class UnderillaFactory {
         private int mergeDepth;
         private int adaptiveMaximumDepth;
         private int adaptiveMinimumHiddenDepth;
-        private int chunkCacheSize = 1;
+        private int chunkCacheSize = 16;
         private BlockFactory blocks;
         private GenerationArea generationArea = GenerationArea.everywhere();
         private Predicate<ID> surfaceOnlyBiome = _ -> false;
@@ -235,13 +236,14 @@ public final class UnderillaFactory {
          * Builds the complete phase plan for this strategy and noodle-cave policy.
          */
         public WorldGenerationPlan build() {
+            ChunkCache chunkCache = new ChunkCache(chunkCacheSize);
             int configuredMinimumY = requiredValue(minimumY, "verticalRange");
             int configuredMaximumY = requiredValue(maximumY, "verticalRange");
             int configuredMaximumCaveY = maximumCaveY == null ? configuredMaximumY : maximumCaveY;
             BlockFactory configuredBlocks = Objects.requireNonNull(blocks, "blocks");
             Supplier<Block> configuredAir = configuredBlocks::air;
             WorldMask worldMask = worldMask(configuredMinimumY, configuredMaximumY, configuredMaximumCaveY,
-                    configuredAir.get());
+                    configuredAir.get(), chunkCache);
             WorldGenerationPlanBuilder plan = WorldGenerationPlan.build();
             if (instrumenter != null) {
                 plan.instrumenter(instrumenter);
@@ -287,7 +289,7 @@ public final class UnderillaFactory {
                 );
                 DeferredPatcher deferredSurface = new DeferredPatcher(referenceWorldPatcher,
                         deferredWritePredicate(surfacePolicy, surfaceBiomeUseTopYOnly, configuredMaximumY),
-                        chunkCacheSize);
+                        chunkCache);
                 List<ChunkPatcher> patchers = terrainPatchersBeforeSurface(
                         worldMask, configuredMinimumY, configuredAir);
                 patchers.add(deferredSurface);
@@ -305,24 +307,22 @@ public final class UnderillaFactory {
             return plan.done();
         }
 
-        private WorldMask worldMask(int minimumY, int maximumY, int maximumCaveY, Block air) {
+        private WorldMask worldMask(int minimumY, int maximumY, int maximumCaveY, Block air, ChunkCache cache) {
             return switch (strategy) {
                 case ABSOLUTE -> new AbsoluteWorldMask(maximumCaveY, minimumY, maximumY);
-                case SURFACE -> new CachedWorldMask(
-                        new SurfaceWorldMask(
-                                referenceWorld,
-                                air,
-                                minimumY,
-                                maximumY,
-                                maximumCaveY,
-                                mergeDepth,
-                                adaptiveMaximumDepth,
-                                adaptiveMinimumHiddenDepth,
-                                surfaceOnlyBiome,
-                                ignoredSurfaceBlock
-                        ),
-                        chunkCacheSize
-                    );
+                case SURFACE -> new ReferenceHeightWorldMask(
+                        referenceWorld,
+                        air,
+                        minimumY,
+                        maximumY,
+                        maximumCaveY,
+                        mergeDepth,
+                        adaptiveMaximumDepth,
+                        adaptiveMinimumHiddenDepth,
+                        surfaceOnlyBiome,
+                        ignoredSurfaceBlock,
+                        cache
+                );
                 case NONE -> new AbsoluteWorldMask(minimumY);
             };
         }
