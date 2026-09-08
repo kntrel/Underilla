@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A thread-safe, chunk-bounded LRU cache with one value per topic class per chunk.
@@ -23,6 +26,13 @@ import java.util.function.Supplier;
  * mutable values require their own synchronization.</p>
  */
 public final class ChunkCache {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChunkCache.class);
+    private static final AtomicLong NEXT_ID = new AtomicLong();
+    private final long id = NEXT_ID.incrementAndGet();
+    private long accesses;
+    private long misses;
+    private long evictions;
 
     private final int maximumCapacity;
     private final Map<ChunkCoordinate, ChunkBucket> chunks = new LinkedHashMap<>(16, 0.75f, true);
@@ -73,7 +83,13 @@ public final class ChunkCache {
     private ChunkBucket bucketAt(int chunkX, int chunkZ, boolean create) {
         ChunkCoordinate coordinate = new ChunkCoordinate(chunkX, chunkZ);
         synchronized (chunks) {
+            accesses++;
             ChunkBucket bucket = chunks.get(coordinate);
+            if (bucket == null) {
+                misses++;
+                LOGGER.info("ChunkCache {} miss at ({}, {}): resident={}, capacity={}, accesses={}, misses={}, evictions={}",
+                        id, chunkX, chunkZ, chunks.size(), maximumCapacity, accesses, misses, evictions);
+            }
             if (bucket == null && create) {
                 bucket = new ChunkBucket();
                 chunks.put(coordinate, bucket);
@@ -81,6 +97,7 @@ public final class ChunkCache {
                     var iterator = chunks.keySet().iterator();
                     iterator.next();
                     iterator.remove();
+                    evictions++;
                 }
             }
             return bucket;

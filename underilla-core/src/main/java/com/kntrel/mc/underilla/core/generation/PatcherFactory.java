@@ -6,6 +6,7 @@ import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
@@ -16,11 +17,17 @@ public final class PatcherFactory {
 
     public static PatchingPlan surface(WorldReader surfaceWorld,
             WorldReader cavesWorld, GenerationContext context) {
-        return plan(surfaceWorld, cavesWorld, context, surfaceWorldMask(surfaceWorld, context), true);
+        ChunkCache cache = new ChunkCache(context.config().cacheSize());
+        surfaceWorld = bindReader(surfaceWorld, cache);
+        cavesWorld = bindReader(cavesWorld, cache);
+        return plan(surfaceWorld, cavesWorld, context, surfaceWorldMask(surfaceWorld, context, cache), true);
     }
 
     public static PatchingPlan absolute(WorldReader surfaceWorld,
             WorldReader cavesWorld, GenerationContext context) {
+        ChunkCache cache = new ChunkCache(context.config().cacheSize());
+        surfaceWorld = bindReader(surfaceWorld, cache);
+        cavesWorld = bindReader(cavesWorld, cache);
         GenerationConfig config = context.config();
         WorldMask worldMask = new AbsoluteWorldMask(config.maxHeightOfCaves(),
                 config.generationAreaMinY(), config.generationAreaMaxY());
@@ -29,6 +36,9 @@ public final class PatcherFactory {
 
     public static PatchingPlan none(WorldReader surfaceWorld,
             WorldReader cavesWorld, GenerationContext context) {
+        ChunkCache cache = new ChunkCache(context.config().cacheSize());
+        surfaceWorld = bindReader(surfaceWorld, cache);
+        cavesWorld = bindReader(cavesWorld, cache);
         WorldMask worldMask = new AbsoluteWorldMask(context.config().generationAreaMinY());
         return plan(surfaceWorld, cavesWorld, context, worldMask, false);
     }
@@ -58,13 +68,17 @@ public final class PatcherFactory {
         return new PatchingPlan(terrainPatchers, liquidPatcher, worldMask, generateNoise);
     }
 
-    private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, GenerationContext context) {
+    private static WorldReader bindReader(WorldReader reader, ChunkCache cache) {
+        return reader instanceof DiskWorldReader disk ? disk.withChunkCache(cache) : reader;
+    }
+
+    private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, GenerationContext context, ChunkCache cache) {
         GenerationConfig config = context.config();
         return new ReferenceHeightWorldMask(surfaceWorld, context.blocks().air(),
                         config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                         config.mergeDepth(), config.adaptiveMaxMergeDepth(),
                         config.adaptiveMinHiddenBlocksMergeDepth(), config::isSurfaceWorldOnlyBiome,
-                        config::isIgnoredForSurfaceCalculation, new ChunkCache(config.cacheSize())
+                        config::isIgnoredForSurfaceCalculation, cache
         );
     }
 

@@ -4,6 +4,8 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 
 import com.jkantrell.nbt.io.NBTSerializer;
 import com.jkantrell.nbt.io.NamedTag;
@@ -14,6 +16,7 @@ import com.jkantrell.nbt.tag.ListTag;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestDiskWorldReader;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -55,6 +58,52 @@ class DiskWorldReaderTest {
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
 
         assertEquals("minecraft:stone", reader.blockAt(0, 0, 0).orElseThrow().id().toString());
+    }
+
+    @Test
+    void sharedCacheReusesReadersAndEvictsThemAlongWithOtherTopics() throws Exception {
+        writeEntityRegion(regionDirectory.resolve("r.0.0.mca"));
+        TestDiskWorldReader source = new TestDiskWorldReader(regionDirectory.toFile(), 1,
+                new TestBlockFactory(TestBlock.air("minecraft:air")));
+        ChunkCache cache = new ChunkCache(2);
+        DiskWorldReader reader = source.withChunkCache(cache);
+        ChunkReader first = reader.readChunk(0, 0).orElseThrow();
+        assertSame(first, reader.readChunk(0, 0).orElseThrow());
+        assertSame(first, source.withChunkCache(cache).readChunk(0, 0).orElseThrow());
+
+        cache.put(0, 0, "other topic");
+        cache.put(1, 0, "second chunk");
+        reader.readChunk(0, 0);
+        cache.put(2, 0, "third chunk");
+        assertSame(first, reader.readChunk(0, 0).orElseThrow());
+        assertEquals("other topic", cache.get(0, 0, String.class).orElseThrow());
+
+        // The region remains in memory, even when the generation cache evicts its reader.
+        Files.delete(regionDirectory.resolve("r.0.0.mca"));
+        cache.put(3, 0, "fourth chunk");
+        cache.put(4, 0, "fifth chunk");
+        assertNotSame(first, reader.readChunk(0, 0).orElseThrow());
+    }
+
+    @Test
+    void separatesSourceWorldsAndGenerationPlanCaches() throws Exception {
+        writeEntityRegion(regionDirectory.resolve("r.0.0.mca"));
+        writeEntityRegion(arbitraryTerrainDirectory.resolve("r.0.0.mca"));
+        TestBlockFactory blocks = new TestBlockFactory(TestBlock.air("minecraft:air"));
+        TestDiskWorldReader reference = new TestDiskWorldReader(regionDirectory.toFile(), 1, blocks);
+        TestDiskWorldReader caves = new TestDiskWorldReader(arbitraryTerrainDirectory.toFile(), 1, blocks);
+        ChunkCache firstPlan = new ChunkCache(1);
+        DiskWorldReader referenceView = reference.withChunkCache(firstPlan);
+        DiskWorldReader cavesView = caves.withChunkCache(firstPlan);
+        ChunkReader referenceChunk = referenceView.readChunk(0, 0).orElseThrow();
+        ChunkReader cavesChunk = cavesView.readChunk(0, 0).orElseThrow();
+        assertNotSame(referenceChunk, cavesChunk);
+        assertSame(referenceChunk, referenceView.readChunk(0, 0).orElseThrow());
+        assertSame(cavesChunk, cavesView.readChunk(0, 0).orElseThrow());
+
+        DiskWorldReader secondView = reference.withChunkCache(new ChunkCache(1));
+        assertNotSame(referenceChunk, secondView.readChunk(0, 0).orElseThrow());
+        assertSame(referenceChunk, referenceView.readChunk(0, 0).orElseThrow());
     }
 
     @Test

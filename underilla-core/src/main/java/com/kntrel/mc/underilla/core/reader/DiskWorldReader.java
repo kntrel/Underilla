@@ -7,15 +7,19 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
+import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +35,8 @@ public abstract class DiskWorldReader implements WorldReader {
     private final File regions;
     private final File entitites;
     private final RLUCache<RegionBucket> regionCache;
-    private final RLUCache<ChunkReader> chunkCache;
+    private final TopicChunkCache<ChunkReaders> chunkReaders;
+    private final DiskWorldReader source;
     private final RLUCacheTriple<Biome> biomeCache;
 
     protected DiskWorldReader(String regionPath, int cacheSize) throws NoSuchFieldException {
@@ -57,9 +62,33 @@ public abstract class DiskWorldReader implements WorldReader {
         this.entitites = entityDirectory;
         this.regionCache = new RLUCache<>(cacheSize);
         int chunkCacheSize = cacheSize * 64;
-        this.chunkCache = new RLUCache<>(chunkCacheSize);
+        this.chunkReaders = null;
+        this.source = this;
         this.biomeCache = new RLUCacheTriple<>(chunkCacheSize * GenerationConstants.BIOME_CELL_SIZE
                 * GenerationConstants.BIOME_CELL_SIZE);
+    }
+
+    private DiskWorldReader(DiskWorldReader reader, ChunkCache cache) {
+        this.regions = reader.regions;
+        this.entitites = reader.entitites;
+        this.regionCache = reader.regionCache;
+        this.biomeCache = reader.biomeCache;
+        this.source = reader.source;
+        this.chunkReaders = Objects.requireNonNull(cache, "cache").topicView(ChunkReaders.class);
+    }
+
+    /**
+     * Creates a plan-local view using the supplied cache for chunk readers. Region and biome
+     * storage remain shared with this reader. The original reader is unchanged and reads chunks
+     * without retaining their wrappers until a cache is supplied through this method.
+     */
+    public final DiskWorldReader withChunkCache(ChunkCache cache) {
+        return new DiskWorldReader(this, cache) {
+            @Override
+            protected ChunkReader newChunkReader(Chunk chunk, List<EntityView> entities) {
+                return DiskWorldReader.this.source.newChunkReader(chunk, entities);
+            }
+        };
     }
 
     @Override
@@ -91,10 +120,22 @@ public abstract class DiskWorldReader implements WorldReader {
 
     @Override
     public Optional<ChunkReader> readChunk(int x, int z) {
-        ChunkReader cachedChunk = chunkCache.get(x, z);
-        if (cachedChunk != null) {
-            return Optional.of(cachedChunk);
+        if (chunkReaders == null) {
+            return readUncachedChunk(x, z);
         }
+        ChunkReaders readers = chunkReaders.getOrCompute(x, z, ChunkReaders::new);
+        synchronized (readers) {
+            ChunkReader cached = readers.bySource.get(source);
+            if (cached != null) {
+                return Optional.of(cached);
+            }
+            Optional<ChunkReader> loaded = readUncachedChunk(x, z);
+            loaded.ifPresent(value -> readers.bySource.put(source, value));
+            return loaded;
+        }
+    }
+
+    private Optional<ChunkReader> readUncachedChunk(int x, int z) {
         RegionBucket region = readRegion(x >> 5, z >> 5);
         if (region == null) {
             return Optional.empty();
@@ -107,7 +148,6 @@ public abstract class DiskWorldReader implements WorldReader {
         }
         Chunk entityChunk = region.entities() == null ? null : region.entities().getChunk(localX, localZ);
         ChunkReader chunkReader = newChunkReader(chunk, entityViews(entityChunk));
-        chunkCache.put(x, z, chunkReader);
         return Optional.of(chunkReader);
     }
 
@@ -155,6 +195,10 @@ public abstract class DiskWorldReader implements WorldReader {
             entities.add(new EntityView(entity, chunk.getDataVersion()));
         }
         return List.copyOf(entities);
+    }
+
+    private static final class ChunkReaders {
+        private final Map<DiskWorldReader, ChunkReader> bySource = new IdentityHashMap<>();
     }
 
     private static final class RLUCache<T> {
