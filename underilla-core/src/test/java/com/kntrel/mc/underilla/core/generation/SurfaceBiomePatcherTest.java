@@ -21,7 +21,7 @@ class SurfaceBiomePatcherTest {
 
     @Test
     void unavailableReferenceDoesNotHandleOrChangeTheBiome() {
-        SurfaceBiomePatcher patcher = patcher(new TestWorld(), new AbsoluteBoundary(32));
+        SurfaceBiomePatcher patcher = patcher(new TestWorld(), new AbsoluteWorldMask(32));
         TestBiomeData data = new TestBiomeData(PLAINS, 0, 10, 0);
 
         assertFalse(patcher.patch(data));
@@ -32,7 +32,7 @@ class SurfaceBiomePatcherTest {
     void positionOutsideGenerationAreaDoesNotHandleOrChangeTheBiome() {
         SurfaceBiomePatcher patcher = new SurfaceBiomePatcher(
                 referenceWorld(REFERENCE),
-                new AbsoluteBoundary(32),
+                new AbsoluteWorldMask(32),
                 new GenerationArea(0, 0, 8, 8),
                 32,
                 false,
@@ -48,7 +48,7 @@ class SurfaceBiomePatcherTest {
 
     @Test
     void referenceBiomeReplacesTheGeneratedBiome() {
-        SurfaceBiomePatcher patcher = patcher(referenceWorld(REFERENCE), new AbsoluteBoundary(32));
+        SurfaceBiomePatcher patcher = patcher(referenceWorld(REFERENCE), new AbsoluteWorldMask(32));
         TestBiomeData data = new TestBiomeData(PLAINS, 0, 10, 0);
 
         assertTrue(patcher.patch(data));
@@ -59,7 +59,7 @@ class SurfaceBiomePatcherTest {
     void selectedGeneratedBiomeIsPreservedOnlyBelowTheWholeSurfaceCell() {
         SurfaceBiomePatcher patcher = new SurfaceBiomePatcher(
                 referenceWorld(REFERENCE),
-                new AbsoluteBoundary(32),
+                new AbsoluteWorldMask(32),
                 GenerationArea.everywhere(),
                 64,
                 false,
@@ -80,7 +80,7 @@ class SurfaceBiomePatcherTest {
     void surfaceOnlyReferenceBiomeOverridesGeneratedBiomePreservation() {
         SurfaceBiomePatcher patcher = new SurfaceBiomePatcher(
                 referenceWorld(SURFACE_ONLY),
-                new AbsoluteBoundary(32),
+                new AbsoluteWorldMask(32),
                 GenerationArea.everywhere(),
                 64,
                 false,
@@ -101,7 +101,7 @@ class SurfaceBiomePatcherTest {
         chunk.fillBiomeLayer(4, REFERENCE);
         SurfaceBiomePatcher patcher = new SurfaceBiomePatcher(
                 new TestWorld().addChunk(chunk),
-                new AbsoluteBoundary(32),
+                new AbsoluteWorldMask(32),
                 GenerationArea.everywhere(),
                 4,
                 true,
@@ -115,10 +115,10 @@ class SurfaceBiomePatcherTest {
         assertSame(REFERENCE, data.get());
     }
 
-    private static SurfaceBiomePatcher patcher(TestWorld referenceWorld, Boundary boundary) {
+    private static SurfaceBiomePatcher patcher(TestWorld referenceWorld, WorldMask worldMask) {
         return new SurfaceBiomePatcher(
                 referenceWorld,
-                boundary,
+                worldMask,
                 GenerationArea.everywhere(),
                 64,
                 false,

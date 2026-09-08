@@ -13,13 +13,13 @@ import java.util.function.Supplier;
 public final class CavePatcher implements ChunkPatcher {
 
     private final WorldReader cavesWorld;
-    private final Boundary boundary;
+    private final WorldMask worldMask;
     private final int minimumY;
     private final Supplier<Block> air;
 
-    public CavePatcher(WorldReader cavesWorld, Boundary boundary, int minimumY, Supplier<Block> air) {
+    public CavePatcher(WorldReader cavesWorld, WorldMask worldMask, int minimumY, Supplier<Block> air) {
         this.cavesWorld = Objects.requireNonNull(cavesWorld, "cavesWorld");
-        this.boundary = Objects.requireNonNull(boundary, "boundary");
+        this.worldMask = Objects.requireNonNull(worldMask, "worldMask");
         this.minimumY = minimumY;
         this.air = Objects.requireNonNull(air, "air");
     }
@@ -37,10 +37,11 @@ public final class CavePatcher implements ChunkPatcher {
         int chunkOriginZ = targetChunk.getChunkZ() * GenerationConstants.CHUNK_SIZE;
         for (int x = 0; x < GenerationConstants.CHUNK_SIZE; x++) {
             for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
-                int columnMaximumY = Math.min(maximumY, boundary.at(chunkOriginX + x, chunkOriginZ + z));
-                for (int y = lowestY; y <= columnMaximumY; y++) {
-                    Block caveBlock = cavesChunk.blockAt(x, y, z).orElseGet(air);
-                    targetChunk.setBlock(x, y, z, caveBlock);
+                for (int y = lowestY; y <= maximumY; y++) {
+                    if (!worldMask.contains(chunkOriginX + x, y, chunkOriginZ + z)) {
+                        Block caveBlock = cavesChunk.blockAt(x, y, z).orElseGet(air);
+                        targetChunk.setBlock(x, y, z, caveBlock);
+                    }
                 }
             }
         }

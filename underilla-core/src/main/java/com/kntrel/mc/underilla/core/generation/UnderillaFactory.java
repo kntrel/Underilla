@@ -10,6 +10,7 @@ import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cleanup.BlockCleanupPatcher;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
 import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -36,15 +37,15 @@ public final class UnderillaFactory {
     private UnderillaFactory() {}
 
     public static Builder absolute(WorldReader referenceWorld) {
-        return new Builder(Strategy.ABSOLUTE, referenceWorld);
+        return new Builder(Strategy.ABSOLUTE, referenceWorld, true);
     }
 
     public static Builder surface(WorldReader referenceWorld) {
-        return new Builder(Strategy.SURFACE, referenceWorld);
+        return new Builder(Strategy.SURFACE, referenceWorld, true);
     }
 
     public static Builder none(WorldReader referenceWorld) {
-        return new Builder(Strategy.NONE, referenceWorld);
+        return new Builder(Strategy.NONE, referenceWorld, true);
     }
 
     private enum Strategy {
@@ -80,15 +81,17 @@ public final class UnderillaFactory {
         private Consumer<Entity> cleanupEntityTransformer;
         private boolean surfaceBiomeUseTopYOnly;
         private boolean preserveGeneratedBiomesOnlyUnderSurface;
+        private boolean surfaceFill;
         private boolean carversEnabled = true;
         private boolean featuresEnabled = true;
         private boolean mobsEnabled = true;
         private boolean structuresEnabled = true;
         private NoodleCavesPolicy noodleCavesPolicy = NoodleCavesPolicy.underground();
 
-        private Builder(Strategy strategy, WorldReader referenceWorld) {
+        private Builder(Strategy strategy, WorldReader referenceWorld, boolean surfaceFill) {
             this.strategy = Objects.requireNonNull(strategy, "strategy");
             this.referenceWorld = Objects.requireNonNull(referenceWorld, "referenceWorld");
+            this.surfaceFill = surfaceFill;
         }
 
         public Builder underground(WorldReader undergroundWorld) {
@@ -171,6 +174,12 @@ public final class UnderillaFactory {
             return this;
         }
 
+        /** Copies reference blocks above the generated surface even when they are outside the world mask. */
+        public Builder surfaceFill(boolean enabled) {
+            surfaceFill = enabled;
+            return this;
+        }
+
         /** Configures block support and replacement cleanup after vanilla features are generated. */
         public Builder blockCleanup(
                 Function<ID, Optional<ID>> supportReplacement,
@@ -231,10 +240,8 @@ public final class UnderillaFactory {
             int configuredMaximumCaveY = maximumCaveY == null ? configuredMaximumY : maximumCaveY;
             BlockFactory configuredBlocks = Objects.requireNonNull(blocks, "blocks");
             Supplier<Block> configuredAir = configuredBlocks::air;
-            Boundary boundary = boundary(configuredMinimumY, configuredMaximumY, configuredMaximumCaveY,
+            WorldMask worldMask = worldMask(configuredMinimumY, configuredMaximumY, configuredMaximumCaveY,
                     configuredAir.get());
-            ChunkPatcher surfacePatcher = new SurfacePatcher(referenceWorld, boundary, configuredMinimumY,
-                    configuredAir, keptSurfaceBlock, surfaceBlockTransformer);
             WorldGenerationPlanBuilder plan = WorldGenerationPlan.build();
             if (instrumenter != null) {
                 plan.instrumenter(instrumenter);
@@ -252,7 +259,7 @@ public final class UnderillaFactory {
             plan.coverage(this::coversChunk)
                     .biomePatch(new SurfaceBiomePatcher(
                             referenceWorld,
-                            boundary,
+                            worldMask,
                             generationArea,
                             configuredMaximumY,
                             surfaceBiomeUseTopYOnly,
@@ -267,16 +274,22 @@ public final class UnderillaFactory {
             plan.altimeter(new SurfaceAltimeter(referenceWorld, configuredAir));
 
             if (noodleCavesPolicy instanceof NoodleCavesPolicy.Underground) {
-                List<ChunkPatcher> patchers = terrainPatchersBeforeSurface(
-                        boundary, configuredMinimumY, configuredAir);
-                patchers.add(surfacePatcher);
-                plan.afterCarvers(patchers.toArray(ChunkPatcher[]::new));
+                plan.afterCarvers(terrainPatcher(
+                        worldMask,
+                        configuredMinimumY,
+                        configuredAir
+                ));
             } else if (noodleCavesPolicy instanceof NoodleCavesPolicy.Surface surfacePolicy) {
-                DeferredPatcher deferredSurface = new DeferredPatcher(surfacePatcher,
+                ChunkPatcher referenceWorldPatcher = referenceWorldPatcher(
+                        worldMask,
+                        configuredMinimumY,
+                        configuredAir
+                );
+                DeferredPatcher deferredSurface = new DeferredPatcher(referenceWorldPatcher,
                         deferredWritePredicate(surfacePolicy, surfaceBiomeUseTopYOnly, configuredMaximumY),
                         chunkCacheSize);
                 List<ChunkPatcher> patchers = terrainPatchersBeforeSurface(
-                        boundary, configuredMinimumY, configuredAir);
+                        worldMask, configuredMinimumY, configuredAir);
                 patchers.add(deferredSurface);
                 plan.afterSurface(patchers.toArray(ChunkPatcher[]::new));
                 plan.afterCarvers(deferredSurface.applier());
@@ -292,11 +305,11 @@ public final class UnderillaFactory {
             return plan.done();
         }
 
-        private Boundary boundary(int minimumY, int maximumY, int maximumCaveY, Block air) {
+        private WorldMask worldMask(int minimumY, int maximumY, int maximumCaveY, Block air) {
             return switch (strategy) {
-                case ABSOLUTE -> new AbsoluteBoundary(maximumCaveY, minimumY, maximumY);
-                case SURFACE -> new CachedBoundary(
-                        new HeightBoundary(
+                case ABSOLUTE -> new AbsoluteWorldMask(maximumCaveY, minimumY, maximumY);
+                case SURFACE -> new CachedWorldMask(
+                        new SurfaceWorldMask(
                                 referenceWorld,
                                 air,
                                 minimumY,
@@ -310,20 +323,71 @@ public final class UnderillaFactory {
                         ),
                         chunkCacheSize
                     );
-                case NONE -> new AbsoluteBoundary(minimumY);
+                case NONE -> new AbsoluteWorldMask(minimumY);
             };
         }
 
         private List<ChunkPatcher> terrainPatchersBeforeSurface(
-                Boundary boundary,
+                WorldMask worldMask,
                 int minimumY,
                 Supplier<Block> air
         ) {
             List<ChunkPatcher> patchers = new ArrayList<>();
             if (undergroundWorld != null) {
-                patchers.add(new CavePatcher(undergroundWorld, boundary, minimumY, air));
+                patchers.add(new CavePatcher(undergroundWorld, worldMask, minimumY, air));
             }
             return patchers;
+        }
+
+        private ChunkPatcher terrainPatcher(
+                WorldMask worldMask,
+                int minimumY,
+                Supplier<Block> air
+        ) {
+            if (!surfaceFill) {
+                List<ChunkPatcher> patchers = terrainPatchersBeforeSurface(worldMask, minimumY, air);
+                patchers.add(referenceWorldPatcher(worldMask, minimumY, air));
+                return new ChunkPatcherPipeline(patchers);
+            }
+            return new WorldHeightPatcher(minimumY, heightMask -> {
+                List<ChunkPatcher> patchers = terrainPatchersBeforeSurface(worldMask, minimumY, air);
+                patchers.add(maskedReferenceWorldPatcher(
+                        new UnionWorldMask(heightMask, worldMask),
+                        minimumY,
+                        air
+                ));
+                return new ChunkPatcherPipeline(patchers);
+            });
+        }
+
+        private ChunkPatcher referenceWorldPatcher(
+                WorldMask worldMask,
+                int minimumY,
+                Supplier<Block> air
+        ) {
+            if (surfaceFill) {
+                return new WorldHeightPatcher(minimumY, heightMask -> maskedReferenceWorldPatcher(
+                        new UnionWorldMask(heightMask, worldMask),
+                        minimumY,
+                        air
+                ));
+            }
+            return maskedReferenceWorldPatcher(worldMask, minimumY, air);
+        }
+
+        private ChunkPatcher maskedReferenceWorldPatcher(
+                WorldMask worldMask,
+                int minimumY,
+                Supplier<Block> air
+        ) {
+            return new ReferenceWorldPatcher(
+                    referenceWorld,
+                    worldMask,
+                    minimumY,
+                    air,
+                    keptSurfaceBlock,
+                    surfaceBlockTransformer
+            );
         }
 
         private BiPredicate<Vector<Integer>, ChunkData> deferredWritePredicate(

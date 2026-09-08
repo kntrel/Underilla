@@ -8,8 +8,8 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-/** Calculates a per-column boundary from the reference world's terrain height. */
-public final class HeightBoundary implements Boundary {
+/** Selects a shell beneath the reference world's terrain surface. */
+public final class SurfaceWorldMask implements WorldMask {
 
     private final WorldReader surfaceWorld;
     private final Block air;
@@ -22,7 +22,7 @@ public final class HeightBoundary implements Boundary {
     private final Predicate<ID> surfaceWorldOnlyBiome;
     private final Predicate<ID> ignoredSurfaceBlock;
 
-    public HeightBoundary(
+    public SurfaceWorldMask(
             WorldReader surfaceWorld,
             Block air,
             int minimumY,
@@ -47,7 +47,11 @@ public final class HeightBoundary implements Boundary {
     }
 
     @Override
-    public int at(int globalX, int globalZ) {
+    public boolean contains(int globalX, int y, int globalZ) {
+        return y > boundaryAt(globalX, globalZ);
+    }
+
+    private int boundaryAt(int globalX, int globalZ) {
         int clampedHardSurfaceBoundary = Math.max(minimumY, Math.min(hardSurfaceBoundary, maximumY));
         if (clampedHardSurfaceBoundary <= minimumY) {
             return minimumY;

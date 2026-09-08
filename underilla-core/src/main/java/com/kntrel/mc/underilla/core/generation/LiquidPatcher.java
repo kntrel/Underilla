@@ -12,16 +12,16 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Restores reference-world liquids above the terrain boundary after carvers run. */
+/** Restores reference-world liquids inside the world mask after carvers run. */
 public final class LiquidPatcher implements ChunkPatcher {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LiquidPatcher.class);
     private final WorldReader surfaceWorld;
-    private final Boundary boundary;
+    private final WorldMask worldMask;
 
-    public LiquidPatcher(WorldReader surfaceWorld, Boundary boundary) {
+    public LiquidPatcher(WorldReader surfaceWorld, WorldMask worldMask) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
-        this.boundary = Objects.requireNonNull(boundary, "boundary");
+        this.worldMask = Objects.requireNonNull(worldMask, "worldMask");
     }
 
     @Override
@@ -34,7 +34,7 @@ public final class LiquidPatcher implements ChunkPatcher {
         }
 
         List<LocatedBlock> locations = surfaceChunk.locationsOf(Block::isLiquid).stream()
-                .filter(location -> boundary.isAbove(
+                .filter(location -> worldMask.contains(
                         targetChunk.getChunkX() * GenerationConstants.CHUNK_SIZE + location.x(),
                         location.y(),
                         targetChunk.getChunkZ() * GenerationConstants.CHUNK_SIZE + location.z()))

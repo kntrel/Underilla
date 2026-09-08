@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import org.junit.jupiter.api.Test;
 
 class PatcherStrategyTest {
@@ -36,19 +37,16 @@ class PatcherStrategyTest {
     private static final TestBlock REFERENCE = new TestBlock("minecraft:reference", true, false, false);
     private static final TestBlock GENERATED = new TestBlock("minecraft:generated", true, false, false);
     @Test
-    void boundaryPredicatesHaveExplicitEqualitySemantics() {
-        Boundary boundary = new AbsoluteBoundary(10);
+    void absoluteWorldMaskExcludesItsBoundary() {
+        WorldMask worldMask = new AbsoluteWorldMask(10);
 
-        assertTrue(boundary.isAbove(0, 11, 0));
-        assertFalse(boundary.isAbove(0, 10, 0));
-        assertTrue(boundary.isAboveEquals(0, 10, 0));
-        assertTrue(boundary.isBelow(0, 9, 0));
-        assertFalse(boundary.isBelow(0, 10, 0));
-        assertTrue(boundary.isBelowEquals(0, 10, 0));
+        assertTrue(worldMask.contains(0, 11, 0));
+        assertFalse(worldMask.contains(0, 10, 0));
+        assertFalse(worldMask.contains(0, 9, 0));
     }
 
     @Test
-    void absolutePatcherUsesOneFixedBoundary() {
+    void absolutePatcherUsesOneFixedWorldMask() {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 8;
@@ -57,8 +55,8 @@ class PatcherStrategyTest {
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 5, REFERENCE);
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
-        Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
-        ChunkPatcher patcher = surfacePatcher(referenceWorld, boundary, context);
+        WorldMask worldMask = new AbsoluteWorldMask(config.maximumCaveY, config.minimumY, config.maximumY);
+        ChunkPatcher patcher = referenceWorldPatcher(referenceWorld, worldMask, context);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
         patcher.patch(destination);
@@ -67,12 +65,12 @@ class PatcherStrategyTest {
         assertSame(REFERENCE, destination.getBlock(0, 3, 0));
         assertSame(REFERENCE, destination.getBlock(0, 4, 0));
         assertSame(AIR, destination.getBlock(0, 5, 0));
-        assertTrue(boundary.isBelowEquals(100, 2, -100));
-        assertFalse(boundary.isBelowEquals(100, 3, -100));
+        assertFalse(worldMask.contains(100, 2, -100));
+        assertTrue(worldMask.contains(100, 3, -100));
     }
 
     @Test
-    void surfaceBoundaryCalculatesAndOwnsThePerColumnBoundary() {
+    void surfaceWorldMaskCalculatesAndOwnsThePerColumnWorldMask() {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 8;
@@ -85,14 +83,14 @@ class PatcherStrategyTest {
         world.putBlock(0, 5, 0, LEAVES);
         world.putBiome(0, config.maximumY, 0, "minecraft:plains");
 
-        Boundary boundary = heightBoundary(world, config);
+        WorldMask worldMask = surfaceWorldMask(world, config);
 
-        assertTrue(boundary.isBelowEquals(0, 2, 0));
-        assertFalse(boundary.isBelowEquals(0, 3, 0));
+        assertFalse(worldMask.contains(0, 2, 0));
+        assertTrue(worldMask.contains(0, 3, 0));
     }
 
     @Test
-    void surfaceBoundaryPreservesTheWholeReferenceColumnForConfiguredBiomes() {
+    void surfaceWorldMaskPreservesTheWholeReferenceColumnForConfiguredBiomes() {
         TestConfig config = new TestConfig();
         config.minimumY = -64;
         config.maximumY = 320;
@@ -101,10 +99,122 @@ class PatcherStrategyTest {
         FakeWorldReader world = new FakeWorldReader();
         world.putBiome(12, config.maximumY, -4, "example:preserved");
 
-        Boundary boundary = heightBoundary(world, config);
+        WorldMask worldMask = surfaceWorldMask(world, config);
 
-        assertTrue(boundary.isBelowEquals(12, -64, -4));
-        assertFalse(boundary.isBelowEquals(12, -63, -4));
+        assertFalse(worldMask.contains(12, -64, -4));
+        assertTrue(worldMask.contains(12, -63, -4));
+    }
+
+    @Test
+    void referenceWorldPatcherFillsFromAReferenceSurfaceDownToALowerVanillaSurface() {
+        TestConfig config = new TestConfig();
+        config.minimumY = 0;
+        config.maximumY = 12;
+        config.maximumCaveY = 10;
+        config.depth = 2;
+        GenerationContext context = context(config);
+        FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 11, REFERENCE);
+        FakeWorldReader referenceWorld = new FakeWorldReader();
+        referenceWorld.putChunk(referenceChunk);
+        for (int y = 0; y <= 10; y++) {
+            referenceWorld.putBlock(0, y, 0, REFERENCE);
+        }
+        referenceWorld.fillChunkBiome(config.maximumY, "minecraft:plains");
+        FakeChunkData destination = new FakeChunkData(0, 12, 0, 0, AIR);
+        for (int y = 0; y <= 5; y++) {
+            destination.setBlock(0, y, 0, GENERATED);
+        }
+
+        referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), context).patch(destination);
+
+        assertSame(GENERATED, destination.getBlock(0, 5, 0));
+        assertSame(REFERENCE, destination.getBlock(0, 6, 0));
+        assertSame(REFERENCE, destination.getBlock(0, 10, 0));
+    }
+
+    @Test
+    void referenceWorldPatcherCanDisableSurfaceFilling() {
+        TestConfig config = new TestConfig();
+        config.minimumY = 0;
+        config.maximumY = 8;
+        GenerationContext context = context(config);
+        FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 7, REFERENCE);
+        FakeWorldReader referenceWorld = new FakeWorldReader();
+        referenceWorld.putChunk(referenceChunk);
+        FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, AIR);
+        for (int y = 0; y <= 4; y++) {
+            destination.setBlock(0, y, 0, GENERATED);
+        }
+        WorldMask emptyMask = (_, _, _) -> false;
+        BlockFactory blocks = context.blocks();
+        ChunkPatcher patcher = new ReferenceWorldPatcher(
+                referenceWorld,
+                emptyMask,
+                config.generationAreaMinY(),
+                blocks::air,
+                _ -> false,
+                UnaryOperator.identity()
+        );
+
+        patcher.patch(destination);
+
+        assertSame(AIR, destination.getBlock(0, 5, 0));
+    }
+
+    @Test
+    void referenceWorldPatcherSupportsNonHeightBasedMasks() {
+        TestConfig config = new TestConfig();
+        config.minimumY = 0;
+        config.maximumY = 4;
+        GenerationContext context = context(config);
+        FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 4, REFERENCE);
+        FakeWorldReader referenceWorld = new FakeWorldReader();
+        referenceWorld.putChunk(referenceChunk);
+        FakeChunkData destination = new FakeChunkData(0, 4, 0, 0, GENERATED);
+        WorldMask singleBlockMask = (x, y, z) -> x == 0 && y == 1 && z == 0;
+        BlockFactory blocks = context.blocks();
+        ChunkPatcher patcher = new ReferenceWorldPatcher(
+                referenceWorld,
+                singleBlockMask,
+                config.generationAreaMinY(),
+                blocks::air,
+                _ -> false,
+                UnaryOperator.identity()
+        );
+
+        patcher.patch(destination);
+
+        assertSame(GENERATED, destination.getBlock(0, 0, 0));
+        assertSame(REFERENCE, destination.getBlock(0, 1, 0));
+        assertSame(GENERATED, destination.getBlock(0, 2, 0));
+    }
+
+    @Test
+    void referenceWorldPatcherStillCutsAtALowerReferenceSurface() {
+        TestConfig config = new TestConfig();
+        config.minimumY = 0;
+        config.maximumY = 12;
+        config.maximumCaveY = 10;
+        config.depth = 2;
+        GenerationContext context = context(config);
+        FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 7, REFERENCE);
+        FakeWorldReader referenceWorld = new FakeWorldReader();
+        referenceWorld.putChunk(referenceChunk);
+        for (int y = 0; y <= 6; y++) {
+            referenceWorld.putBlock(0, y, 0, REFERENCE);
+        }
+        referenceWorld.fillChunkBiome(config.maximumY, "minecraft:plains");
+        FakeChunkData destination = new FakeChunkData(0, 12, 0, 0, AIR);
+        for (int y = 0; y <= 10; y++) {
+            destination.setBlock(0, y, 0, GENERATED);
+        }
+
+        referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), context).patch(destination);
+
+        assertSame(GENERATED, destination.getBlock(0, 4, 0));
+        assertSame(REFERENCE, destination.getBlock(0, 5, 0));
+        assertSame(REFERENCE, destination.getBlock(0, 6, 0));
+        assertSame(AIR, destination.getBlock(0, 7, 0));
     }
 
     @Test
@@ -112,38 +222,38 @@ class PatcherStrategyTest {
         TestConfig config = new TestConfig();
         config.minimumY = -64;
         GenerationContext context = context(config);
-        Boundary boundary = new AbsoluteBoundary(config.minimumY);
+        WorldMask worldMask = new AbsoluteWorldMask(config.minimumY);
         FakeWorldReader referenceWorld = new FakeWorldReader();
-        ChunkPatcher terrainPatcher = surfacePatcher(referenceWorld, boundary, context);
-        PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, boundary, false);
+        ChunkPatcher terrainPatcher = referenceWorldPatcher(referenceWorld, worldMask, context);
+        PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, worldMask, false);
 
         assertFalse(plan.generateNoise());
-        assertTrue(boundary.isBelowEquals(0, -64, 0));
-        assertFalse(boundary.isBelowEquals(0, -63, 0));
+        assertFalse(worldMask.contains(0, -64, 0));
+        assertTrue(worldMask.contains(0, -63, 0));
     }
 
     @Test
-    void liquidPatcherOnlyRestoresLiquidsAboveTheBoundary() {
+    void liquidPatcherOnlyRestoresLiquidsAboveTheWorldMask() {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 8;
         config.maximumCaveY = 2;
         GenerationContext context = context(config);
-        Boundary boundary = new AbsoluteBoundary(config.maximumCaveY, config.minimumY, config.maximumY);
+        WorldMask worldMask = new AbsoluteWorldMask(config.maximumCaveY, config.minimumY, config.maximumY);
         FakeChunkReader surfaceChunk = FakeChunkReader.filled(0, 0, 5, REFERENCE);
         surfaceChunk.putBlock(0, 2, 0, WATER);
         surfaceChunk.putBlock(0, 3, 0, WATER);
         FakeWorldReader surfaceWorld = new FakeWorldReader();
         surfaceWorld.putChunk(surfaceChunk);
-        TestBlock boundaryBlock = new TestBlock("minecraft:boundary_target", true, false, false);
+        TestBlock worldMaskBlock = new TestBlock("minecraft:world_mask_target", true, false, false);
         TestBlock aboveBlock = new TestBlock("minecraft:above_target", true, false, false);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
-        destination.setBlock(0, 2, 0, boundaryBlock);
+        destination.setBlock(0, 2, 0, worldMaskBlock);
         destination.setBlock(0, 3, 0, aboveBlock);
 
-        new LiquidPatcher(surfaceWorld, boundary).patch(destination);
+        new LiquidPatcher(surfaceWorld, worldMask).patch(destination);
 
-        assertFalse(boundaryBlock.isWaterlogged());
+        assertFalse(worldMaskBlock.isWaterlogged());
         assertTrue(aboveBlock.isWaterlogged());
     }
 
@@ -158,24 +268,27 @@ class PatcherStrategyTest {
         return new GenerationContext(config, blockFactory);
     }
 
-    private static ChunkPatcher surfacePatcher(
+    private static ChunkPatcher referenceWorldPatcher(
             WorldReader surfaceWorld,
-            Boundary boundary,
+            WorldMask worldMask,
             GenerationContext context
     ) {
         GenerationConfig config = context.config();
         BlockFactory blocks = context.blocks();
-        return new SurfacePatcher(
-                surfaceWorld,
-                boundary,
-                config.generationAreaMinY(),
-                blocks::air,
-                block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
-                block -> config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block));
+        return new WorldHeightPatcher(config.generationAreaMinY(), heightMask ->
+                new ReferenceWorldPatcher(
+                        surfaceWorld,
+                        new UnionWorldMask(heightMask, worldMask),
+                        config.generationAreaMinY(),
+                        blocks::air,
+                        block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
+                        block -> config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block)
+                )
+        );
     }
 
-    private static Boundary heightBoundary(WorldReader surfaceWorld, TestConfig config) {
-        return new HeightBoundary(surfaceWorld, AIR,
+    private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, TestConfig config) {
+        return new SurfaceWorldMask(surfaceWorld, AIR,
                 config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                 config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
                 config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation);
@@ -369,6 +482,14 @@ class PatcherStrategyTest {
         void putBlock(int x, int y, int z, Block block) { blocks.put(new Position(x, y, z), block); }
 
         void putBiome(int x, int y, int z, String name) { biomes.put(new Position(x, y, z), () -> ID.of(name)); }
+
+        void fillChunkBiome(int y, String name) {
+            for (int x = 0; x < GenerationConstants.CHUNK_SIZE; x++) {
+                for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
+                    putBiome(x, y, z, name);
+                }
+            }
+        }
 
         void putChunk(ChunkReader chunk) { chunks.put(new Position(chunk.getX(), 0, chunk.getZ()), chunk); }
 

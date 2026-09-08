@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 /** Composed patchers and generation policies for one configured strategy. */
-public record PatchingPlan(List<ChunkPatcher> terrainPatchers, ChunkPatcher liquidPatcher, Boundary boundary,
+public record PatchingPlan(List<ChunkPatcher> terrainPatchers, ChunkPatcher liquidPatcher, WorldMask worldMask,
         boolean generateNoise) {
 
     public PatchingPlan {
@@ -14,12 +14,12 @@ public record PatchingPlan(List<ChunkPatcher> terrainPatchers, ChunkPatcher liqu
             throw new IllegalArgumentException("terrainPatchers must not be empty");
         }
         Objects.requireNonNull(liquidPatcher, "liquidPatcher");
-        Objects.requireNonNull(boundary, "boundary");
+        Objects.requireNonNull(worldMask, "worldMask");
     }
 
-    public PatchingPlan(ChunkPatcher terrainPatcher, ChunkPatcher liquidPatcher, Boundary boundary,
+    public PatchingPlan(ChunkPatcher terrainPatcher, ChunkPatcher liquidPatcher, WorldMask worldMask,
             boolean generateNoise) {
         this(List.of(Objects.requireNonNull(terrainPatcher, "terrainPatcher")),
-                liquidPatcher, boundary, generateNoise);
+                liquidPatcher, worldMask, generateNoise);
     }
 }

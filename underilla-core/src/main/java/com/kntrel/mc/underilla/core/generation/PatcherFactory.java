@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.generation;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -14,49 +15,58 @@ public final class PatcherFactory {
 
     public static PatchingPlan surface(WorldReader surfaceWorld,
             WorldReader cavesWorld, GenerationContext context) {
-        return plan(surfaceWorld, cavesWorld, context, heightBoundary(surfaceWorld, context), true);
+        return plan(surfaceWorld, cavesWorld, context, surfaceWorldMask(surfaceWorld, context), true);
     }
 
     public static PatchingPlan absolute(WorldReader surfaceWorld,
             WorldReader cavesWorld, GenerationContext context) {
         GenerationConfig config = context.config();
-        Boundary boundary = new AbsoluteBoundary(config.maxHeightOfCaves(),
+        WorldMask worldMask = new AbsoluteWorldMask(config.maxHeightOfCaves(),
                 config.generationAreaMinY(), config.generationAreaMaxY());
-        return plan(surfaceWorld, cavesWorld, context, boundary, true);
+        return plan(surfaceWorld, cavesWorld, context, worldMask, true);
     }
 
     public static PatchingPlan none(WorldReader surfaceWorld,
             WorldReader cavesWorld, GenerationContext context) {
-        Boundary boundary = new AbsoluteBoundary(context.config().generationAreaMinY());
-        return plan(surfaceWorld, cavesWorld, context, boundary, false);
+        WorldMask worldMask = new AbsoluteWorldMask(context.config().generationAreaMinY());
+        return plan(surfaceWorld, cavesWorld, context, worldMask, false);
     }
 
     private static PatchingPlan plan(WorldReader surfaceWorld, WorldReader cavesWorld,
-            GenerationContext context, Boundary boundary, boolean generateNoise) {
+            GenerationContext context, WorldMask worldMask, boolean generateNoise) {
         GenerationConfig config = context.config();
         var blocks = context.blocks();
-        ChunkPatcher surfacePatcher = new SurfacePatcher(
-                surfaceWorld,
-                boundary,
-                config.generationAreaMinY(),
-                blocks::air,
-                block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
-                surfaceBlockTransformer(config, blocks));
-        List<ChunkPatcher> terrainPatchers = cavesWorld == null
-                ? List.of(surfacePatcher)
-                : List.of(new CavePatcher(cavesWorld, boundary, config.generationAreaMinY(), blocks::air),
-                        surfacePatcher);
-        ChunkPatcher liquidPatcher = new LiquidPatcher(surfaceWorld, boundary);
-        return new PatchingPlan(terrainPatchers, liquidPatcher, boundary, generateNoise);
+        ChunkPatcher terrainPatcher = new WorldHeightPatcher(config.generationAreaMinY(), heightMask -> {
+            ChunkPatcher referenceWorldPatcher = new ReferenceWorldPatcher(
+                    surfaceWorld,
+                    new UnionWorldMask(heightMask, worldMask),
+                    config.generationAreaMinY(),
+                    blocks::air,
+                    block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
+                    surfaceBlockTransformer(config, blocks)
+            );
+            return cavesWorld == null
+                    ? referenceWorldPatcher
+                    : new ChunkPatcherPipeline(
+                            new CavePatcher(cavesWorld, worldMask, config.generationAreaMinY(), blocks::air),
+                            referenceWorldPatcher
+                    );
+        });
+        List<ChunkPatcher> terrainPatchers = List.of(terrainPatcher);
+        ChunkPatcher liquidPatcher = new LiquidPatcher(surfaceWorld, worldMask);
+        return new PatchingPlan(terrainPatchers, liquidPatcher, worldMask, generateNoise);
     }
 
-    private static Boundary heightBoundary(WorldReader surfaceWorld, GenerationContext context) {
+    private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, GenerationContext context) {
         GenerationConfig config = context.config();
-        Boundary heightBoundary = new HeightBoundary(surfaceWorld, context.blocks().air(),
-                config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
-                config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
-                config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation);
-        return new CachedBoundary(heightBoundary, config.cacheSize());
+        return new CachedWorldMask(
+                new SurfaceWorldMask(surfaceWorld, context.blocks().air(),
+                        config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
+                        config.mergeDepth(), config.adaptiveMaxMergeDepth(),
+                        config.adaptiveMinHiddenBlocksMergeDepth(), config::isSurfaceWorldOnlyBiome,
+                        config::isIgnoredForSurfaceCalculation),
+                config.cacheSize()
+        );
     }
 
     private static UnaryOperator<Block> surfaceBlockTransformer(

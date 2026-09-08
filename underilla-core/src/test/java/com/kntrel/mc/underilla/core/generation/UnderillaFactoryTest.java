@@ -71,6 +71,56 @@ class UnderillaFactoryTest {
     }
 
     @Test
+    void surfaceFillIsEnabledByDefaultAndCanBeDisabled() {
+        TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
+        referenceChunk.setBlock(0, 3, 0, REFERENCE);
+        TestWorld referenceWorld = new TestWorld().addChunk(referenceChunk);
+        WorldGenerationPlan enabled = UnderillaFactory.absolute(referenceWorld)
+                .verticalRange(0, 5)
+                .maximumCaveY(3)
+                .blocks(BLOCKS)
+                .build();
+        WorldGenerationPlan disabled = UnderillaFactory.absolute(referenceWorld)
+                .verticalRange(0, 5)
+                .maximumCaveY(3)
+                .blocks(BLOCKS)
+                .surfaceFill(false)
+                .build();
+        TestChunkGrid enabledTarget = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
+        TestChunkGrid disabledTarget = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
+        enabledTarget.setBlock(0, 1, 0, GENERATED);
+        disabledTarget.setBlock(0, 1, 0, GENERATED);
+
+        enabled.afterCarvers().patch(enabledTarget);
+        disabled.afterCarvers().patch(disabledTarget);
+
+        assertSame(REFERENCE, enabledTarget.getBlock(0, 3, 0));
+        assertSame(AIR, disabledTarget.getBlock(0, 3, 0));
+    }
+
+    @Test
+    void surfaceFillCapturesVanillaHeightBeforeTheUndergroundWorldIsPatched() {
+        TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
+        referenceChunk.setBlock(0, 2, 0, REFERENCE);
+        TestWorld referenceWorld = new TestWorld().addChunk(referenceChunk);
+        TestWorld undergroundWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, 0, 5, GENERATED, PLAINS)
+        );
+        WorldGenerationPlan plan = UnderillaFactory.absolute(referenceWorld)
+                .underground(undergroundWorld)
+                .verticalRange(0, 5)
+                .maximumCaveY(3)
+                .blocks(BLOCKS)
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
+        target.setBlock(0, 1, 0, GENERATED);
+
+        plan.afterCarvers().patch(target);
+
+        assertSame(REFERENCE, target.getBlock(0, 2, 0));
+    }
+
+    @Test
     void noodleCavesPoliciesHaveTheRequestedPublicShape() {
         assertSame(NoodleCavesPolicy.underground(), NoodleCavesPolicy.underground());
 

@@ -13,7 +13,7 @@ import java.util.function.Predicate;
 public final class SurfaceBiomePatcher implements BiomePatcher {
 
     private final WorldReader surfaceWorld;
-    private final Boundary boundary;
+    private final WorldMask worldMask;
     private final GenerationArea generationArea;
     private final int topY;
     private final boolean useTopYOnly;
@@ -23,7 +23,7 @@ public final class SurfaceBiomePatcher implements BiomePatcher {
 
     public SurfaceBiomePatcher(
             WorldReader surfaceWorld,
-            Boundary boundary,
+            WorldMask worldMask,
             GenerationArea generationArea,
             int topY,
             boolean useTopYOnly,
@@ -32,7 +32,7 @@ public final class SurfaceBiomePatcher implements BiomePatcher {
             boolean preserveGeneratedBiomesOnlyUnderSurface
     ) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
-        this.boundary = Objects.requireNonNull(boundary, "boundary");
+        this.worldMask = Objects.requireNonNull(worldMask, "worldMask");
         this.generationArea = Objects.requireNonNull(generationArea, "generationArea");
         this.topY = topY;
         this.useTopYOnly = useTopYOnly;
@@ -77,7 +77,7 @@ public final class SurfaceBiomePatcher implements BiomePatcher {
         int cellZ = biomeData.getBiomeZ() * cellSize;
         for (int x = cellX; x < cellX + cellSize; x++) {
             for (int z = cellZ; z < cellZ + cellSize; z++) {
-                if (!boundary.isBelowEquals(x, biomeData.getY(), z)) {
+                if (worldMask.contains(x, biomeData.getY(), z)) {
                     return false;
                 }
             }
