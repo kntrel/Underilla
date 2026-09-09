@@ -17,6 +17,10 @@ import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import com.kntrel.mc.underilla.core.reference.*;
+import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import com.kntrel.mc.underilla.core.vector.Vector;
 import java.util.ArrayList;
 import java.util.List;
@@ -371,7 +375,7 @@ public final class UnderillaFactory {
                     patchers.add(referenceWorldPatcher(worldMask, minimumY, air));
                     return new ChunkPatcherPipeline(patchers);
                 }
-                return new WorldHeightPatcher(minimumY, heightMask -> {
+                return new WorldHeightMaskPatcher(minimumY, heightMask -> {
                     List<ChunkPatcher> patchers = terrainPatchersBeforeSurface(worldMask, minimumY, air);
                     patchers.add(maskedReferenceWorldPatcher(
                             new UnionWorldMask(heightMask, worldMask),
@@ -388,7 +392,7 @@ public final class UnderillaFactory {
                     Supplier<Block> air
             ) {
                 if (surfaceFill) {
-                    return new WorldHeightPatcher(minimumY, heightMask -> maskedReferenceWorldPatcher(
+                    return new WorldHeightMaskPatcher(minimumY, heightMask -> maskedReferenceWorldPatcher(
                             new UnionWorldMask(heightMask, worldMask),
                             minimumY,
                             air

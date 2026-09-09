@@ -8,9 +8,12 @@ import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import java.util.concurrent.atomic.AtomicReference;
+
+import com.kntrel.mc.underilla.core.reference.WorldHeightMaskPatcher;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import org.junit.jupiter.api.Test;
 
-class WorldHeightPatcherTest {
+class WorldHeightMaskPatcherTest {
 
     private static final TestBlock AIR = TestBlock.air("minecraft:air");
     private static final TestBlock STONE = TestBlock.solid("minecraft:stone");
@@ -19,7 +22,7 @@ class WorldHeightPatcherTest {
     @Test
     void exposesTheChunkHeightMaskOnlyWhileTheDelegateRuns() {
         AtomicReference<WorldMask> capturedMask = new AtomicReference<>();
-        WorldHeightPatcher patcher = new WorldHeightPatcher(0, mask -> {
+        WorldHeightMaskPatcher patcher = new WorldHeightMaskPatcher(0, mask -> {
             capturedMask.set(mask);
             return _ -> {
                 assertFalse(mask.contains(0, 2, 0));
@@ -36,7 +39,7 @@ class WorldHeightPatcherTest {
     @Test
     void clearsTheChunkHeightMaskWhenTheDelegateFails() {
         AtomicReference<WorldMask> capturedMask = new AtomicReference<>();
-        WorldHeightPatcher patcher = new WorldHeightPatcher(0, mask -> {
+        WorldHeightMaskPatcher patcher = new WorldHeightMaskPatcher(0, mask -> {
             capturedMask.set(mask);
             return _ -> {
                 throw new IllegalStateException("failure");

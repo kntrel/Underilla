@@ -11,6 +11,8 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.reference.SurfaceBiomePatcher;
+import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import org.junit.jupiter.api.Test;
 
 class SurfaceBiomePatcherTest {

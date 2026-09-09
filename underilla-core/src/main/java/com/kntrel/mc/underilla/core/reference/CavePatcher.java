@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.core.generation;
+package com.kntrel.mc.underilla.core.reference;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
@@ -6,6 +6,8 @@ import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
+
 import java.util.Objects;
 import java.util.function.Supplier;
 

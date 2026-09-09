@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.core.generation;
+package com.kntrel.mc.underilla.core.reference.mask;
 
 /** Selects every position above one fixed Y value. */
 public final class AbsoluteWorldMask implements WorldMask {

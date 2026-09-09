@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.core.generation;
+package com.kntrel.mc.underilla.core.reference.mask;
 
 import java.util.List;
 

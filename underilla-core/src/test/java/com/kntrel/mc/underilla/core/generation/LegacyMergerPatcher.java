@@ -7,8 +7,11 @@ import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import com.kntrel.mc.underilla.core.reference.ReferenceHeightWorldMask;
+import com.kntrel.mc.underilla.core.reference.CavePatcher;
+import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
 import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
+import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 
 import java.util.Objects;
 

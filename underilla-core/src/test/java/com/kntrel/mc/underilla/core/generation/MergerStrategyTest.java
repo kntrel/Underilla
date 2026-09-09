@@ -18,8 +18,12 @@ import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import com.kntrel.mc.underilla.core.reference.ReferenceHeightWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
 import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
+import com.kntrel.mc.underilla.core.reference.WorldHeightMaskPatcher;
+import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -230,7 +234,7 @@ class PatcherStrategyTest {
             TestConfig config
     ) {
         BlockFactory blocks = blockFactory();
-        return new WorldHeightPatcher(config.generationAreaMinY(), heightMask ->
+        return new WorldHeightMaskPatcher(config.generationAreaMinY(), heightMask ->
                 new ReferenceWorldPatcher(
                         surfaceWorld,
                         new UnionWorldMask(heightMask, worldMask),
