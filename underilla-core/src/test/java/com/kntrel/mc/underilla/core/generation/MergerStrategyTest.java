@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Test;
 class PatcherStrategyTest {
 
     private static final TestBlock AIR = new TestBlock("minecraft:air", false, false, true);
-    private static final TestBlock WATER = new TestBlock("minecraft:water", false, true, false);
     private static final TestBlock STONE = new TestBlock("minecraft:stone", true, false, false);
     private static final TestBlock LEAVES = new TestBlock("minecraft:oak_leaves", true, false, false);
     private static final TestBlock REFERENCE = new TestBlock("minecraft:reference", true, false, false);
@@ -54,12 +53,11 @@ class PatcherStrategyTest {
         config.minimumY = 0;
         config.maximumY = 8;
         config.maximumCaveY = 2;
-        GenerationContext context = context(config);
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 5, REFERENCE);
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
         WorldMask worldMask = new AbsoluteWorldMask(config.maximumCaveY, config.minimumY, config.maximumY);
-        ChunkPatcher patcher = referenceWorldPatcher(referenceWorld, worldMask, context);
+        ChunkPatcher patcher = referenceWorldPatcher(referenceWorld, worldMask, config);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
         patcher.patch(destination);
@@ -115,7 +113,6 @@ class PatcherStrategyTest {
         config.maximumY = 12;
         config.maximumCaveY = 10;
         config.depth = 2;
-        GenerationContext context = context(config);
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 11, REFERENCE);
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
@@ -128,7 +125,7 @@ class PatcherStrategyTest {
             destination.setBlock(0, y, 0, GENERATED);
         }
 
-        referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), context).patch(destination);
+        referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), config).patch(destination);
 
         assertSame(GENERATED, destination.getBlock(0, 5, 0));
         assertSame(REFERENCE, destination.getBlock(0, 6, 0));
@@ -140,7 +137,6 @@ class PatcherStrategyTest {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 8;
-        GenerationContext context = context(config);
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 7, REFERENCE);
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
@@ -149,7 +145,7 @@ class PatcherStrategyTest {
             destination.setBlock(0, y, 0, GENERATED);
         }
         WorldMask emptyMask = (_, _, _) -> false;
-        BlockFactory blocks = context.blocks();
+        BlockFactory blocks = blockFactory();
         ChunkPatcher patcher = new ReferenceWorldPatcher(
                 referenceWorld,
                 emptyMask,
@@ -169,13 +165,12 @@ class PatcherStrategyTest {
         TestConfig config = new TestConfig();
         config.minimumY = 0;
         config.maximumY = 4;
-        GenerationContext context = context(config);
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 4, REFERENCE);
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
         FakeChunkData destination = new FakeChunkData(0, 4, 0, 0, GENERATED);
         WorldMask singleBlockMask = (x, y, z) -> x == 0 && y == 1 && z == 0;
-        BlockFactory blocks = context.blocks();
+        BlockFactory blocks = blockFactory();
         ChunkPatcher patcher = new ReferenceWorldPatcher(
                 referenceWorld,
                 singleBlockMask,
@@ -199,7 +194,6 @@ class PatcherStrategyTest {
         config.maximumY = 12;
         config.maximumCaveY = 10;
         config.depth = 2;
-        GenerationContext context = context(config);
         FakeChunkReader referenceChunk = FakeChunkReader.filled(0, 0, 7, REFERENCE);
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
@@ -212,7 +206,7 @@ class PatcherStrategyTest {
             destination.setBlock(0, y, 0, GENERATED);
         }
 
-        referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), context).patch(destination);
+        referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), config).patch(destination);
 
         assertSame(GENERATED, destination.getBlock(0, 4, 0));
         assertSame(REFERENCE, destination.getBlock(0, 5, 0));
@@ -220,64 +214,22 @@ class PatcherStrategyTest {
         assertSame(AIR, destination.getBlock(0, 7, 0));
     }
 
-    @Test
-    void referenceOnlyPlanDisablesGeneratedNoise() {
-        TestConfig config = new TestConfig();
-        config.minimumY = -64;
-        GenerationContext context = context(config);
-        WorldMask worldMask = new AbsoluteWorldMask(config.minimumY);
-        FakeWorldReader referenceWorld = new FakeWorldReader();
-        ChunkPatcher terrainPatcher = referenceWorldPatcher(referenceWorld, worldMask, context);
-        PatchingPlan plan = new PatchingPlan(terrainPatcher, chunk -> {}, worldMask, false);
-
-        assertFalse(plan.generateNoise());
-        assertFalse(worldMask.contains(0, -64, 0));
-        assertTrue(worldMask.contains(0, -63, 0));
-    }
-
-    @Test
-    void liquidPatcherOnlyRestoresLiquidsAboveTheWorldMask() {
-        TestConfig config = new TestConfig();
-        config.minimumY = 0;
-        config.maximumY = 8;
-        config.maximumCaveY = 2;
-        GenerationContext context = context(config);
-        WorldMask worldMask = new AbsoluteWorldMask(config.maximumCaveY, config.minimumY, config.maximumY);
-        FakeChunkReader surfaceChunk = FakeChunkReader.filled(0, 0, 5, REFERENCE);
-        surfaceChunk.putBlock(0, 2, 0, WATER);
-        surfaceChunk.putBlock(0, 3, 0, WATER);
-        FakeWorldReader surfaceWorld = new FakeWorldReader();
-        surfaceWorld.putChunk(surfaceChunk);
-        TestBlock worldMaskBlock = new TestBlock("minecraft:world_mask_target", true, false, false);
-        TestBlock aboveBlock = new TestBlock("minecraft:above_target", true, false, false);
-        FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
-        destination.setBlock(0, 2, 0, worldMaskBlock);
-        destination.setBlock(0, 3, 0, aboveBlock);
-
-        new LiquidPatcher(surfaceWorld, worldMask).patch(destination);
-
-        assertFalse(worldMaskBlock.isWaterlogged());
-        assertTrue(aboveBlock.isWaterlogged());
-    }
-
-    private static GenerationContext context(TestConfig config) {
-        BlockFactory blockFactory = new BlockFactory() {
+    private static BlockFactory blockFactory() {
+        return new BlockFactory() {
             @Override
             public Block air() { return AIR; }
 
             @Override
             public Block create(ID id) { return new TestBlock(id.toString(), true, false, false); }
         };
-        return new GenerationContext(config, blockFactory);
     }
 
     private static ChunkPatcher referenceWorldPatcher(
             WorldReader surfaceWorld,
             WorldMask worldMask,
-            GenerationContext context
+            TestConfig config
     ) {
-        GenerationConfig config = context.config();
-        BlockFactory blocks = context.blocks();
+        BlockFactory blocks = blockFactory();
         return new WorldHeightPatcher(config.generationAreaMinY(), heightMask ->
                 new ReferenceWorldPatcher(
                         surfaceWorld,
@@ -297,7 +249,7 @@ class PatcherStrategyTest {
                 config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation, new ChunkCache(2));
     }
 
-    private static final class TestConfig implements GenerationConfig {
+    private static final class TestConfig {
         private int minimumY = -64;
         private int maximumY = 320;
         private int maximumCaveY = 320;
@@ -307,67 +259,24 @@ class PatcherStrategyTest {
         private Set<ID> preservedBiomes = Set.of();
         private Set<ID> ignoredSurfaceBlocks = Set.of();
 
-        @Override
-        public int cacheSize() { return 1; }
-
-        @Override
-        public int generationAreaMinX() { return Integer.MIN_VALUE; }
-
-        @Override
         public int generationAreaMinY() { return minimumY; }
 
-        @Override
-        public int generationAreaMinZ() { return Integer.MIN_VALUE; }
-
-        @Override
-        public int generationAreaMaxX() { return Integer.MAX_VALUE; }
-
-        @Override
         public int generationAreaMaxY() { return maximumY; }
 
-        @Override
-        public int generationAreaMaxZ() { return Integer.MAX_VALUE; }
-
-        @Override
         public int maxHeightOfCaves() { return maximumCaveY; }
 
-        @Override
         public int mergeDepth() { return depth; }
 
-        @Override
         public int adaptiveMaxMergeDepth() { return adaptiveMaximumDepth; }
 
-        @Override
         public int adaptiveMinHiddenBlocksMergeDepth() { return adaptiveMinimumHiddenDepth; }
 
-        @Override
-        public boolean carversEnabled() { return true; }
-
-        @Override
-        public boolean vanillaPopulationEnabled() { return true; }
-
-        @Override
-        public boolean structuresEnabled() { return true; }
-
-        @Override
-        public boolean surfaceBiomeUseTopYOnly() { return false; }
-
-        @Override
-        public boolean shouldPreserveBiome(ID biome) { return false; }
-
-        @Override
-        public boolean preserveBiomesOnlyUnderSurface() { return false; }
-
-        @Override
         public boolean isSurfaceWorldOnlyBiome(ID biome) { return preservedBiomes.contains(biome); }
 
-        @Override
         public boolean isIgnoredForSurfaceCalculation(ID block) { return ignoredSurfaceBlocks.contains(block); }
 
-        @Override
         public boolean shouldKeepSurfaceBlockInCaves(ID block) { return false; }
 
-        @Override
         public Optional<ID> surfaceBlockReplacement(ID block) { return Optional.empty(); }
     }
 
@@ -376,8 +285,6 @@ class PatcherStrategyTest {
         private final boolean solid;
         private final boolean liquid;
         private final boolean air;
-        private boolean waterlogged;
-
         private TestBlock(String name, boolean solid, boolean liquid, boolean air) {
             this.id = ID.of(name);
             this.solid = solid;
@@ -387,9 +294,7 @@ class PatcherStrategyTest {
 
         @Override
         public TestBlock clone() {
-            TestBlock block = new TestBlock(id.toString(), solid, liquid, air);
-            block.waterlogged = waterlogged;
-            return block;
+            return new TestBlock(id.toString(), solid, liquid, air);
         }
 
         @Override
@@ -405,9 +310,7 @@ class PatcherStrategyTest {
         public boolean isWaterloggable() { return true; }
 
         @Override
-        public void waterlog() { waterlogged = true; }
-
-        boolean isWaterlogged() { return waterlogged; }
+        public void waterlog() {}
 
         @Override
         public ID id() { return id; }

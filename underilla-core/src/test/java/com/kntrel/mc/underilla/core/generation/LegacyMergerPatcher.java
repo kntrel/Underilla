@@ -12,53 +12,67 @@ import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
 
 import java.util.Objects;
 
-/**
- * Keeps the characterization fixture's original construction API while running
- * the production patcher pipeline.
- */
+/** Builds the production patcher pipeline used by the merger characterization fixture. */
 final class LegacyMergerPatcher {
 
     private final ChunkPatcher patcher;
 
-    LegacyMergerPatcher(AbsoluteMerger merger, WorldReader surfaceWorld, WorldReader cavesWorld) {
-        Objects.requireNonNull(merger, "merger");
-        Objects.requireNonNull(surfaceWorld, "surfaceWorld");
-        GenerationConfig config = merger.context().config();
-        var blocks = merger.context().blocks();
-        WorldMask worldMask = new AbsoluteWorldMask(config.maxHeightOfCaves(),
-                config.generationAreaMinY(), config.generationAreaMaxY());
-        this.patcher = pipeline(cavesWorld, worldMask, merger.context(),
-                referenceWorldPatcher(surfaceWorld, worldMask, config, blocks));
+    private LegacyMergerPatcher(ChunkPatcher patcher) {
+        this.patcher = patcher;
     }
 
-    LegacyMergerPatcher(SurfaceMerger merger, WorldReader surfaceWorld, WorldReader cavesWorld) {
-        Objects.requireNonNull(merger, "merger");
+    static LegacyMergerPatcher absolute(
+            WorldReader surfaceWorld,
+            WorldReader cavesWorld,
+            TestGenerationConfig config,
+            BlockFactory blocks
+    ) {
         Objects.requireNonNull(surfaceWorld, "surfaceWorld");
-        GenerationConfig config = merger.context().config();
-        var blocks = merger.context().blocks();
-        WorldMask worldMask = surfaceWorldMask(surfaceWorld, merger.context());
-        this.patcher = pipeline(cavesWorld, worldMask, merger.context(),
-                referenceWorldPatcher(surfaceWorld, worldMask, config, blocks));
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(blocks, "blocks");
+        WorldMask worldMask = new AbsoluteWorldMask(config.maxHeightOfCaves(),
+                config.generationAreaMinY(), config.generationAreaMaxY());
+        return new LegacyMergerPatcher(pipeline(cavesWorld, worldMask, config, blocks,
+                referenceWorldPatcher(surfaceWorld, worldMask, config, blocks)));
+    }
+
+    static LegacyMergerPatcher surface(
+            WorldReader surfaceWorld,
+            WorldReader cavesWorld,
+            TestGenerationConfig config,
+            BlockFactory blocks
+    ) {
+        Objects.requireNonNull(surfaceWorld, "surfaceWorld");
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(blocks, "blocks");
+        WorldMask worldMask = surfaceWorldMask(surfaceWorld, config, blocks);
+        return new LegacyMergerPatcher(pipeline(cavesWorld, worldMask, config, blocks,
+                referenceWorldPatcher(surfaceWorld, worldMask, config, blocks)));
     }
 
     void patch(ChunkData chunk) {
         patcher.patch(chunk);
     }
 
-    private static ChunkPatcher pipeline(WorldReader cavesWorld, WorldMask worldMask, GenerationContext context,
-            ChunkPatcher strategyPatcher) {
+    private static ChunkPatcher pipeline(
+            WorldReader cavesWorld,
+            WorldMask worldMask,
+            TestGenerationConfig config,
+            BlockFactory blocks,
+            ChunkPatcher strategyPatcher
+    ) {
         if (cavesWorld == null) {
             return strategyPatcher;
         }
         return new ChunkPatcherPipeline(
-                new CavePatcher(cavesWorld, worldMask, context.config().generationAreaMinY(), context.blocks()::air),
+                new CavePatcher(cavesWorld, worldMask, config.generationAreaMinY(), blocks::air),
                 strategyPatcher);
     }
 
     private static ChunkPatcher referenceWorldPatcher(
             WorldReader surfaceWorld,
             WorldMask worldMask,
-            GenerationConfig config,
+            TestGenerationConfig config,
             BlockFactory blocks
     ) {
         return new ReferenceWorldPatcher(
@@ -72,9 +86,12 @@ final class LegacyMergerPatcher {
                 });
     }
 
-    private static WorldMask surfaceWorldMask(WorldReader surfaceWorld, GenerationContext context) {
-        GenerationConfig config = context.config();
-        return new ReferenceHeightWorldMask(surfaceWorld, context.blocks().air(),
+    private static WorldMask surfaceWorldMask(
+            WorldReader surfaceWorld,
+            TestGenerationConfig config,
+            BlockFactory blocks
+    ) {
+        return new ReferenceHeightWorldMask(surfaceWorld, blocks.air(),
                         config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                         config.mergeDepth(), config.adaptiveMaxMergeDepth(),
                         config.adaptiveMinHiddenBlocksMergeDepth(), config::isSurfaceWorldOnlyBiome,

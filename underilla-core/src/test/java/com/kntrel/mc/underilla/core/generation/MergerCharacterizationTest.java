@@ -79,8 +79,7 @@ class MergerCharacterizationTest {
 
         TestGenerationConfig absoluteConfig = new TestGenerationConfig(MINIMUM_Y, MAXIMUM_Y)
                 .maximumCaveY(ABSOLUTE_MERGE_BOUNDARY_Y);
-        GenerationContext absoluteContext = new GenerationContext(absoluteConfig, blocks);
-        absolutePatcher = new LegacyMergerPatcher(new AbsoluteMerger(absoluteContext), surfaceWorld, cavesWorld);
+        absolutePatcher = LegacyMergerPatcher.absolute(surfaceWorld, cavesWorld, absoluteConfig, blocks);
 
         surfaceConfig = new TestGenerationConfig(MINIMUM_Y, MAXIMUM_Y)
                 .maximumCaveY(MAXIMUM_Y)
@@ -88,11 +87,8 @@ class MergerCharacterizationTest {
                 .adaptiveMaximumDepth(ADAPTIVE_MAXIMUM_DEPTH)
                 .adaptiveMinimumHiddenDepth(ADAPTIVE_MINIMUM_HIDDEN_DEPTH);
         IGNORED_SURFACE_BLOCKS.forEach(surfaceConfig::ignoreSurfaceBlock);
-        GenerationContext surfaceContext = new GenerationContext(surfaceConfig, blocks);
-        surfacePatcher = new LegacyMergerPatcher(new SurfaceMerger(surfaceWorld, surfaceContext),
-                surfaceWorld, cavesWorld);
-        surfacePatcherWithoutCaves = new LegacyMergerPatcher(new SurfaceMerger(surfaceWorld, surfaceContext),
-                surfaceWorld, null);
+        surfacePatcher = LegacyMergerPatcher.surface(surfaceWorld, cavesWorld, surfaceConfig, blocks);
+        surfacePatcherWithoutCaves = LegacyMergerPatcher.surface(surfaceWorld, null, surfaceConfig, blocks);
     }
 
     @Test
