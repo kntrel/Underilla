@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.api.WorldInfo;
@@ -16,9 +17,12 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.patch.ChunkBlock;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +51,69 @@ class UnderillaFactoryTest {
             return Optional.empty();
         }
     };
+
+    @Test
+    void alternativeReferenceWorldPatcherGatesDirectWritesByHeightAndMask() {
+        TestWorld referenceWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, 0, 2, REFERENCE, PLAINS));
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 2, GENERATED, PLAINS);
+        WorldMask firstColumn = (x, _, _) -> x == 0;
+        Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
+                referenceWorld,
+                firstColumn,
+                1,
+                () -> AIR,
+                null,
+                java.util.List.of()
+        );
+
+        patcher.patch(target);
+
+        assertSame(GENERATED, target.getBlock(0, 0, 0));
+        assertSame(REFERENCE, target.getBlock(0, 1, 0));
+        assertSame(GENERATED, target.getBlock(1, 1, 0));
+    }
+
+    @Test
+    void alternativeReferenceWorldPatcherTestsTransformedCandidatesForSurvival() {
+        TestWorld referenceWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, 0, 1, REFERENCE, PLAINS));
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
+        target.setBlock(1, 0, 0, AIR);
+        Patcher<ChunkBlock> transformReference = candidate -> candidate.replace(WATER);
+        Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
+                referenceWorld,
+                (_, _, _) -> false,
+                0,
+                () -> AIR,
+                block -> block == WATER,
+                java.util.List.of(transformReference)
+        );
+
+        patcher.patch(target);
+
+        assertSame(WATER, target.getBlock(0, 0, 0));
+        assertSame(AIR, target.getBlock(1, 0, 0));
+    }
+
+    @Test
+    void alternativeReferenceWorldPatcherReadsTransformedCandidatesAtGlobalCoordinates() {
+        TestWorld referenceWorld = new TestWorld().addChunk(
+                new TestChunkGrid(2, -1, 0, 1, REFERENCE, PLAINS));
+        TestChunkGrid target = new TestChunkGrid(2, -1, 0, 1, GENERATED, PLAINS);
+        Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
+                referenceWorld,
+                (x, _, z) -> x == 32 && z == -16,
+                0,
+                () -> AIR,
+                null,
+                java.util.List.of(_ -> {})
+        );
+
+        patcher.patch(target);
+
+        assertSame(REFERENCE, target.getBlock(0, 0, 0));
+    }
 
     @Test
     void strategyEntryPointsBuildAnAdapterSafeBaselinePlan() {
