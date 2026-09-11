@@ -61,6 +61,7 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
                 referenceWorld,
                 firstColumn,
+                false,
                 1,
                 () -> AIR,
                 null,
@@ -84,6 +85,7 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
                 referenceWorld,
                 (_, _, _) -> false,
+                false,
                 0,
                 () -> AIR,
                 block -> block == WATER,
@@ -104,6 +106,7 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
                 referenceWorld,
                 (x, _, z) -> x == 32 && z == -16,
+                false,
                 0,
                 () -> AIR,
                 null,

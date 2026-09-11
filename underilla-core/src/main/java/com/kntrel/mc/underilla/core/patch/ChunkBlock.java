@@ -95,7 +95,7 @@ public class ChunkBlock {
         replace(Objects.requireNonNull(attempt, "attempt").candidate());
     }
 
-    /** Reads the block currently present in the target chunk. */
+    /** Returns the block this operation would replace, including accepted upstream changes. */
     public Block destinationBlock() {
         return targetChunk.getBlock(x, y, z);
     }
@@ -177,7 +177,7 @@ public class ChunkBlock {
         public Block candidate() { return candidate; }
 
         @Override
-        public Block destinationBlock() { return parent.destinationBlock(); }
+        public Block destinationBlock() { return parent.candidate(); }
 
         private final class AttemptTrackingBlock implements Block {
 

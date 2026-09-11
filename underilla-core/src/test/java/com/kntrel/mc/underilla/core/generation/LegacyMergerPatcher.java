@@ -7,7 +7,6 @@ import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import com.kntrel.mc.underilla.core.reference.CavePatcher;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
 import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
 import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
@@ -68,7 +67,15 @@ final class LegacyMergerPatcher {
             return strategyPatcher;
         }
         return new PatcherPipeline<>(
-                new CavePatcher(cavesWorld, worldMask, config.generationAreaMinY(), blocks::air),
+                UnderillaFactory.referenceWorldPatcher(
+                        cavesWorld,
+                        (x, y, z) -> !worldMask.contains(x, y, z),
+                        false,
+                        config.generationAreaMinY(),
+                        blocks::air,
+                        null,
+                        java.util.List.of()
+                ),
                 strategyPatcher);
     }
 
