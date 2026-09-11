@@ -14,7 +14,7 @@ import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -61,7 +61,7 @@ class PatcherStrategyTest {
         FakeWorldReader referenceWorld = new FakeWorldReader();
         referenceWorld.putChunk(referenceChunk);
         WorldMask worldMask = new AbsoluteWorldMask(config.maximumCaveY, config.minimumY, config.maximumY);
-        ChunkPatcher patcher = referenceWorldPatcher(referenceWorld, worldMask, config);
+        Patcher<ChunkData> patcher = referenceWorldPatcher(referenceWorld, worldMask, config);
         FakeChunkData destination = new FakeChunkData(0, 8, 0, 0, GENERATED);
 
         patcher.patch(destination);
@@ -150,7 +150,7 @@ class PatcherStrategyTest {
         }
         WorldMask emptyMask = (_, _, _) -> false;
         BlockFactory blocks = blockFactory();
-        ChunkPatcher patcher = new ReferenceWorldPatcher(
+        Patcher<ChunkData> patcher = new ReferenceWorldPatcher(
                 referenceWorld,
                 emptyMask,
                 config.generationAreaMinY(),
@@ -175,7 +175,7 @@ class PatcherStrategyTest {
         FakeChunkData destination = new FakeChunkData(0, 4, 0, 0, GENERATED);
         WorldMask singleBlockMask = (x, y, z) -> x == 0 && y == 1 && z == 0;
         BlockFactory blocks = blockFactory();
-        ChunkPatcher patcher = new ReferenceWorldPatcher(
+        Patcher<ChunkData> patcher = new ReferenceWorldPatcher(
                 referenceWorld,
                 singleBlockMask,
                 config.generationAreaMinY(),
@@ -228,7 +228,7 @@ class PatcherStrategyTest {
         };
     }
 
-    private static ChunkPatcher referenceWorldPatcher(
+    private static Patcher<ChunkData> referenceWorldPatcher(
             WorldReader surfaceWorld,
             WorldMask worldMask,
             TestConfig config

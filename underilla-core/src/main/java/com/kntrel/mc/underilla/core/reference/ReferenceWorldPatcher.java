@@ -4,7 +4,7 @@ import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.Vector;
@@ -15,7 +15,7 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /** Copies reference-world blocks selected by a world mask. */
-public final class ReferenceWorldPatcher implements ChunkPatcher {
+public final class ReferenceWorldPatcher implements Patcher<ChunkData> {
 
     private final WorldReader referenceWorld;
     private final WorldMask worldMask;

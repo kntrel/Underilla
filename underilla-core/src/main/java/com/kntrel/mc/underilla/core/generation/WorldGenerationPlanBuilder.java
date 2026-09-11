@@ -3,8 +3,9 @@ package com.kntrel.mc.underilla.core.generation;
 import com.kntrel.mc.underilla.core.patch.BiomePatcher;
 import com.kntrel.mc.underilla.core.patch.BiomeProfiledPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkProfiledPatcher;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
+import com.kntrel.mc.underilla.core.patch.Patcher;
+import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 
 import java.util.Arrays;
@@ -17,17 +18,17 @@ import java.util.Objects;
 public final class WorldGenerationPlanBuilder {
 
     private static final Instrumenter NO_OP_INSTRUMENTER = new Instrumenter(_ -> {});
-    private static final ChunkPatcher NO_OP_CHUNK_PATCHER = _ -> {};
+    private static final Patcher<ChunkData> NO_OP_CHUNK_PATCHER = _ -> {};
     private static final BiomePatcher NO_OP_BIOME_PATCHER = _ -> false;
     private static final Altimeter NO_OP_ALTIMETER = (worldInfo, x, z, heightMap) -> 0;
     private static final ChunkCoverage ALL_CHUNKS = (chunkX, chunkZ) -> true;
 
     private ChunkCoverage coverage = ALL_CHUNKS;
-    private List<ChunkPatcher> afterNoise = List.of();
-    private List<ChunkPatcher> afterSurface = List.of();
-    private List<ChunkPatcher> afterCarvers = List.of();
-    private List<ChunkPatcher> afterFeatures = List.of();
-    private List<ChunkPatcher> afterLoad = List.of();
+    private List<Patcher<ChunkData>> afterNoise = List.of();
+    private List<Patcher<ChunkData>> afterSurface = List.of();
+    private List<Patcher<ChunkData>> afterCarvers = List.of();
+    private List<Patcher<ChunkData>> afterFeatures = List.of();
+    private List<Patcher<ChunkData>> afterLoad = List.of();
     private BiomePatcher biomePatch = NO_OP_BIOME_PATCHER;
     private Instrumenter instrumenter = NO_OP_INSTRUMENTER;
     private boolean noise = true;
@@ -47,7 +48,8 @@ public final class WorldGenerationPlanBuilder {
     /**
      * Sets the ordered patch pipeline that runs after vanilla noise generation.
      */
-    public WorldGenerationPlanBuilder afterNoise(ChunkPatcher... patchers) {
+    @SafeVarargs
+    public final WorldGenerationPlanBuilder afterNoise(Patcher<ChunkData>... patchers) {
         afterNoise = listPatcher("afterNoise", patchers);
         return this;
     }
@@ -55,7 +57,13 @@ public final class WorldGenerationPlanBuilder {
     /**
      * Sets the ordered patch pipeline that runs after vanilla surface rules.
      */
-    public WorldGenerationPlanBuilder afterSurface(ChunkPatcher... patchers) {
+    @SafeVarargs
+    public final WorldGenerationPlanBuilder afterSurface(Patcher<ChunkData>... patchers) {
+        afterSurface = listPatcher("afterSurface", patchers);
+        return this;
+    }
+
+    public WorldGenerationPlanBuilder afterSurface(List<? extends Patcher<ChunkData>> patchers) {
         afterSurface = listPatcher("afterSurface", patchers);
         return this;
     }
@@ -63,7 +71,8 @@ public final class WorldGenerationPlanBuilder {
     /**
      * Sets the ordered patch pipeline that runs after vanilla carvers.
      */
-    public WorldGenerationPlanBuilder afterCarvers(ChunkPatcher... patchers) {
+    @SafeVarargs
+    public final WorldGenerationPlanBuilder afterCarvers(Patcher<ChunkData>... patchers) {
         afterCarvers = listPatcher("afterCarvers", patchers);
         return this;
     }
@@ -71,7 +80,13 @@ public final class WorldGenerationPlanBuilder {
     /**
      * Sets the ordered patch pipeline that runs after vanilla features and structure pieces.
      */
-    public WorldGenerationPlanBuilder afterFeatures(ChunkPatcher... patchers) {
+    @SafeVarargs
+    public final WorldGenerationPlanBuilder afterFeatures(Patcher<ChunkData>... patchers) {
+        afterFeatures = listPatcher("afterFeatures", patchers);
+        return this;
+    }
+
+    public WorldGenerationPlanBuilder afterFeatures(List<? extends Patcher<ChunkData>> patchers) {
         afterFeatures = listPatcher("afterFeatures", patchers);
         return this;
     }
@@ -79,7 +94,8 @@ public final class WorldGenerationPlanBuilder {
     /**
      * Sets the ordered patch pipeline that runs after the generated chunk becomes live in its world.
      */
-    public WorldGenerationPlanBuilder afterLoad(ChunkPatcher... patchers) {
+    @SafeVarargs
+    public final WorldGenerationPlanBuilder afterLoad(Patcher<ChunkData>... patchers) {
         afterLoad = listPatcher("afterLoad", patchers);
         return this;
     }
@@ -163,23 +179,33 @@ public final class WorldGenerationPlanBuilder {
         );
     }
 
-    private static List<ChunkPatcher> listPatcher(String phase, ChunkPatcher... patchers) {
+    @SafeVarargs
+    private static List<Patcher<ChunkData>> listPatcher(String phase, Patcher<ChunkData>... patchers) {
         Objects.requireNonNull(patchers, phase + " patchers");
         Arrays.stream(patchers).forEach(patcher -> Objects.requireNonNull(patcher, phase + " patcher"));
         return List.of(patchers);
     }
 
-    private ChunkPatcher profiledPipeline(List<ChunkPatcher> patchers) {
+    private static List<Patcher<ChunkData>> listPatcher(
+            String phase,
+            List<? extends Patcher<ChunkData>> patchers
+    ) {
+        Objects.requireNonNull(patchers, phase + " patchers");
+        patchers.forEach(patcher -> Objects.requireNonNull(patcher, phase + " patcher"));
+        return List.copyOf(patchers);
+    }
+
+    private Patcher<ChunkData> profiledPipeline(List<Patcher<ChunkData>> patchers) {
         if (patchers.isEmpty()) {
             return NO_OP_CHUNK_PATCHER;
         }
         if (instrumenter == NO_OP_INSTRUMENTER) {
-            return new ChunkPatcherPipeline(patchers);
+            return new PatcherPipeline<>(patchers);
         }
-        List<ChunkPatcher> profiledPatchers = patchers.stream()
-                .map(p -> (ChunkPatcher) new ChunkProfiledPatcher(p, instrumenter))
+        List<Patcher<ChunkData>> profiledPatchers = patchers.stream()
+                .map(p -> (Patcher<ChunkData>) new ChunkProfiledPatcher(p, instrumenter))
                 .toList();
-        return new ChunkPatcherPipeline(profiledPatchers);
+        return new PatcherPipeline<>(profiledPatchers);
     }
 
     private BiomePatcher profiledBiomePatcher() {

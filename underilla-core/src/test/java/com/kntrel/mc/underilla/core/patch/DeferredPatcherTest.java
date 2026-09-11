@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.patch;
 
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -22,13 +23,13 @@ class DeferredPatcherTest {
     @Test
     void usesTheCachedBatchThenRecomputesOnlySelectedWritesOnAMiss() {
         TestChunkGrid chunk = new TestChunkGrid(4, -2, 0, 4, GENERATED, PLAINS);
-        ChunkPatcher writesReferenceTerrain = target -> {
+        Patcher<ChunkData> writesReferenceTerrain = target -> {
             target.setRegion(0, 1, 0, 2, 2, 1, REFERENCE);
             target.setBlock(2, 1, 0, OTHER_REFERENCE);
         };
         DeferredPatcher deferred = new DeferredPatcher(writesReferenceTerrain,
                 (position, ignored) -> position.x() == 0, new ChunkCache(2));
-        ChunkPatcher restore = deferred.applier();
+        Patcher<ChunkData> restore = deferred.applier();
 
         deferred.patch(chunk);
 
@@ -75,7 +76,7 @@ class DeferredPatcherTest {
         TestChunkGrid third = new TestChunkGrid(3, 0, 0, 4, GENERATED, PLAINS);
         AtomicInteger firstRuns = new AtomicInteger();
         AtomicInteger secondRuns = new AtomicInteger();
-        ChunkPatcher delegate = target -> {
+        Patcher<ChunkData> delegate = target -> {
             if (target.getChunkX() == 1) {
                 target.setBlock(0, 1, 0,
                         firstRuns.incrementAndGet() == 1 ? REFERENCE : OTHER_REFERENCE);

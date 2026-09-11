@@ -3,7 +3,7 @@ package com.kntrel.mc.underilla.core.reference;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
@@ -12,7 +12,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 
 /** Copies underground blocks from a caves world into the target chunk. */
-public final class CavePatcher implements ChunkPatcher {
+public final class CavePatcher implements Patcher<ChunkData> {
 
     private final WorldReader cavesWorld;
     private final WorldMask worldMask;

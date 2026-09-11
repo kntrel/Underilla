@@ -2,7 +2,7 @@ package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.patch.BiomePatcher;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 
 import java.util.Objects;
 
@@ -14,11 +14,11 @@ import java.util.Objects;
  */
 public record WorldGenerationPlan(
         ChunkCoverage coverage,
-        ChunkPatcher afterNoise,
-        ChunkPatcher afterSurface,
-        ChunkPatcher afterCarvers,
-        ChunkPatcher afterFeatures,
-        ChunkPatcher afterLoad,
+        Patcher<ChunkData> afterNoise,
+        Patcher<ChunkData> afterSurface,
+        Patcher<ChunkData> afterCarvers,
+        Patcher<ChunkData> afterFeatures,
+        Patcher<ChunkData> afterLoad,
         BiomePatcher biomePatch,
         GenerationFlags flags,
         Altimeter altimeter
@@ -83,7 +83,7 @@ public record WorldGenerationPlan(
         return tryPatch(afterLoad, targetChunk);
     }
 
-    private boolean tryPatch(ChunkPatcher patcher, ChunkData targetChunk) {
+    private boolean tryPatch(Patcher<ChunkData> patcher, ChunkData targetChunk) {
         Objects.requireNonNull(targetChunk, "targetChunk");
         if (!coverage.covers(targetChunk.getChunkX(), targetChunk.getChunkZ())) {
             return false;

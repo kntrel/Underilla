@@ -4,8 +4,8 @@ import com.kntrel.mc.underilla.core.cache.ChunkCache;
 
 import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcherPipeline;
+import com.kntrel.mc.underilla.core.patch.Patcher;
+import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.CavePatcher;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
@@ -18,9 +18,9 @@ import java.util.Objects;
 /** Builds the production patcher pipeline used by the merger characterization fixture. */
 final class LegacyMergerPatcher {
 
-    private final ChunkPatcher patcher;
+    private final Patcher<ChunkData> patcher;
 
-    private LegacyMergerPatcher(ChunkPatcher patcher) {
+    private LegacyMergerPatcher(Patcher<ChunkData> patcher) {
         this.patcher = patcher;
     }
 
@@ -57,22 +57,22 @@ final class LegacyMergerPatcher {
         patcher.patch(chunk);
     }
 
-    private static ChunkPatcher pipeline(
+    private static Patcher<ChunkData> pipeline(
             WorldReader cavesWorld,
             WorldMask worldMask,
             TestGenerationConfig config,
             BlockFactory blocks,
-            ChunkPatcher strategyPatcher
+            Patcher<ChunkData> strategyPatcher
     ) {
         if (cavesWorld == null) {
             return strategyPatcher;
         }
-        return new ChunkPatcherPipeline(
+        return new PatcherPipeline<>(
                 new CavePatcher(cavesWorld, worldMask, config.generationAreaMinY(), blocks::air),
                 strategyPatcher);
     }
 
-    private static ChunkPatcher referenceWorldPatcher(
+    private static Patcher<ChunkData> referenceWorldPatcher(
             WorldReader surfaceWorld,
             WorldMask worldMask,
             TestGenerationConfig config,

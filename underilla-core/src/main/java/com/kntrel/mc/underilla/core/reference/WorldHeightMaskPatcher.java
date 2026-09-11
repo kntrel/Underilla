@@ -3,7 +3,7 @@ package com.kntrel.mc.underilla.core.reference;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,13 +12,13 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
 /** Runs a patcher with a temporary mask selecting positions above the target chunk's surface. */
-public final class WorldHeightMaskPatcher implements ChunkPatcher {
+public final class WorldHeightMaskPatcher implements Patcher<ChunkData> {
 
     private final int minimumY;
     private final TempChunkHeightMask mask;
-    private final ChunkPatcher delegate;
+    private final Patcher<ChunkData> delegate;
 
-    public WorldHeightMaskPatcher(int minimumY, Function<WorldMask, ChunkPatcher> delegateFactory) {
+    public WorldHeightMaskPatcher(int minimumY, Function<WorldMask, Patcher<ChunkData>> delegateFactory) {
         this.minimumY = minimumY;
         this.mask = new TempChunkHeightMask();
         this.delegate = Objects.requireNonNull(delegateFactory, "delegateFactory").apply(mask);

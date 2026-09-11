@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,7 +9,7 @@ import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.patch.BiomePatcher;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.profiling.Measurement;
 import java.util.ArrayList;
@@ -21,12 +22,12 @@ class WorldGenerationPlanTest {
     void builderComposesPatchersAtEachPhaseInDeclaredOrder() {
         List<String> calls = new ArrayList<>();
         List<Measurement> measurements = new ArrayList<>();
-        ChunkPatcher noiseFirst = ignored -> calls.add("noise-first");
-        ChunkPatcher noiseSecond = ignored -> calls.add("noise-second");
-        ChunkPatcher surface = ignored -> calls.add("surface");
-        ChunkPatcher carvers = ignored -> calls.add("carvers");
-        ChunkPatcher features = ignored -> calls.add("features");
-        ChunkPatcher load = ignored -> calls.add("load");
+        Patcher<ChunkData> noiseFirst = ignored -> calls.add("noise-first");
+        Patcher<ChunkData> noiseSecond = ignored -> calls.add("noise-second");
+        Patcher<ChunkData> surface = ignored -> calls.add("surface");
+        Patcher<ChunkData> carvers = ignored -> calls.add("carvers");
+        Patcher<ChunkData> features = ignored -> calls.add("features");
+        Patcher<ChunkData> load = ignored -> calls.add("load");
 
         WorldGenerationPlan plan = WorldGenerationPlan.build()
                 .instrumenter(new Instrumenter(measurements::add))

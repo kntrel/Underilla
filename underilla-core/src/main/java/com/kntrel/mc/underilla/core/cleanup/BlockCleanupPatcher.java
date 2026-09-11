@@ -5,13 +5,13 @@ import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
-import com.kntrel.mc.underilla.core.patch.ChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
 /** Applies configured support and replacement rules to every block in a chunk. */
-public final class BlockCleanupPatcher implements ChunkPatcher {
+public final class BlockCleanupPatcher implements Patcher<ChunkData> {
 
     private final BlockFactory blocks;
     private final Function<ID, Optional<ID>> supportReplacement;

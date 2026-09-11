@@ -20,10 +20,10 @@ import java.util.function.BiPredicate;
  * by the applier through a view that applies only writes selected by {@code shouldDefer}.
  * Use one deferred patcher per cache instance: its topic identifies one batch per chunk.</p>
  */
-public final class DeferredPatcher implements ChunkPatcher {
+public final class DeferredPatcher implements Patcher<ChunkData> {
 
     //FIELDS
-    private final ChunkPatcher delegate;
+    private final Patcher<ChunkData> delegate;
     private final TopicChunkCache<DeferredBlockWrites> deferredWrites;
     private final BiPredicate<Vector<Integer>, ChunkData> shouldDefer;
     private final Applier applier;
@@ -31,7 +31,7 @@ public final class DeferredPatcher implements ChunkPatcher {
 
     //CONSTRUCTORS
     public DeferredPatcher(
-            ChunkPatcher delegate,
+            Patcher<ChunkData> delegate,
             BiPredicate<Vector<Integer>, ChunkData> shouldDefer,
             ChunkCache cache
     ) {
@@ -43,7 +43,7 @@ public final class DeferredPatcher implements ChunkPatcher {
 
 
     //API
-    public ChunkPatcher applier() {
+    public Patcher<ChunkData> applier() {
         return this.applier;
     }
 
@@ -145,10 +145,10 @@ public final class DeferredPatcher implements ChunkPatcher {
     }
 
     private record Applier(
-            ChunkPatcher delegate,
+            Patcher<ChunkData> delegate,
             TopicChunkCache<DeferredBlockWrites> deferredWrites,
             BiPredicate<Vector<Integer>, ChunkData> shouldDefer
-    ) implements ChunkPatcher {
+    ) implements Patcher<ChunkData> {
 
         private Applier {
             Objects.requireNonNull(delegate, "delegate");
