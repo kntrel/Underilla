@@ -1,7 +1,9 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.patch.CandidatePatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
@@ -12,6 +14,7 @@ import com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -19,6 +22,26 @@ import java.util.function.Supplier;
 class Patchers {
 
     private Patchers() {}
+
+    /** Applies configured support and replacement rules to every block in a chunk. */
+    static Patcher<ChunkData> blockCleanupPatcher(
+            BlockFactory blocks,
+            Function<ID, Optional<ID>> supportReplacement,
+            Function<ID, Optional<ID>> blockReplacement
+    ) {
+        Objects.requireNonNull(blocks, "blocks");
+        Objects.requireNonNull(supportReplacement, "supportReplacement");
+        Objects.requireNonNull(blockReplacement, "blockReplacement");
+
+        Patcher<ChunkBlock> unsupportedBlock =
+                Patcher.<ChunkBlock>iff(block ->    block.y() > block.targetChunk().getMinHeight()
+                                                            && !block.initialBlock().isAir()
+                                                            && !block.targetChunk().getBlock(block.x(), block.y() - 1, block.z()).isSolid())
+                                    .then(block -> supportReplacement.apply(block.initialBlock().id()).ifPresent(id -> block.replace(blocks.create(id))))
+                                    .end();
+        Patcher<ChunkBlock> replacement = block -> blockReplacement.apply(block.initialBlock().id()).ifPresent(id -> block.replace(blocks.create(id)));
+        return new PerBlockChunkPatcher(unsupportedBlock, replacement);
+    }
 
     /** Builds the one-pass reference-world block pipeline without installing it in a plan. */
     static Patcher<ChunkData> referenceWorldPatcher(
@@ -61,7 +84,7 @@ class Patchers {
                 .end();
     }
 
-    private static Patcher<ChunkBlock> referenceWorldBlockPatcher(
+    static Patcher<ChunkBlock> referenceWorldBlockPatcher(
             WorldReader referenceWorld,
             WorldMask worldMask,
             Supplier<Block> air,

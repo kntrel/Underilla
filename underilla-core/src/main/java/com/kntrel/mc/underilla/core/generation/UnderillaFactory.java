@@ -8,7 +8,6 @@ import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
-import com.kntrel.mc.underilla.core.cleanup.BlockCleanupPatcher;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
@@ -260,7 +259,7 @@ public final class UnderillaFactory {
 
             List<Patcher<ChunkData>> afterFeatures = new ArrayList<>();
             if (cleanupSupportReplacement != null) {
-                afterFeatures.add(new BlockCleanupPatcher(
+                afterFeatures.add(Patchers.blockCleanupPatcher(
                         configuredBlocks,
                         cleanupSupportReplacement,
                         cleanupBlockReplacement));

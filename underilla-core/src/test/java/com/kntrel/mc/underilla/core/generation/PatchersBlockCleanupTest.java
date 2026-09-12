@@ -1,16 +1,18 @@
-package com.kntrel.mc.underilla.core.cleanup;
+package com.kntrel.mc.underilla.core.generation;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
 
-import com.kntrel.mc.underilla.core.impl.TestBiome;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
+import com.kntrel.mc.underilla.core.patch.Patcher;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
-class BlockCleanupPatcherTest {
+class PatchersBlockCleanupTest {
 
     private static final TestBlock AIR = TestBlock.air("minecraft:air");
     private static final TestBlock STONE = TestBlock.solid("minecraft:stone");
@@ -72,8 +74,8 @@ class BlockCleanupPatcherTest {
         assertSame(SANDSTONE, chunk.getBlock(0, 1, 0));
     }
 
-    private static BlockCleanupPatcher patcher(Map<String, String> support, Map<String, String> replacements) {
-        return new BlockCleanupPatcher(
+    private static Patcher<ChunkData> patcher(Map<String, String> support, Map<String, String> replacements) {
+        return Patchers.blockCleanupPatcher(
                 BLOCKS,
                 id -> java.util.Optional.ofNullable(support.get(id.toString())).map(ID::of),
                 id -> java.util.Optional.ofNullable(replacements.get(id.toString())).map(ID::of));
