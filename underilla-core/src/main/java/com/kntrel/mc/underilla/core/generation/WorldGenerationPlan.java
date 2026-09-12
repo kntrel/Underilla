@@ -1,7 +1,7 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.ChunkData;
-import com.kntrel.mc.underilla.core.patch.BiomePatcher;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 
 import java.util.Objects;
@@ -19,7 +19,7 @@ public record WorldGenerationPlan(
         Patcher<ChunkData> afterCarvers,
         Patcher<ChunkData> afterFeatures,
         Patcher<ChunkData> afterLoad,
-        BiomePatcher biomePatch,
+        Patcher<BiomeData> biomePatch,
         GenerationFlags flags,
         Altimeter altimeter
 ) {

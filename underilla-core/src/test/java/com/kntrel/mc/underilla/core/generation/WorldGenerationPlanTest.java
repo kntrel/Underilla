@@ -1,14 +1,14 @@
 package com.kntrel.mc.underilla.core.generation;
 
-import com.kntrel.mc.underilla.core.api.ChunkData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
-import com.kntrel.mc.underilla.core.patch.BiomePatcher;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.profiling.Measurement;
@@ -28,6 +28,7 @@ class WorldGenerationPlanTest {
         Patcher<ChunkData> carvers = ignored -> calls.add("carvers");
         Patcher<ChunkData> features = ignored -> calls.add("features");
         Patcher<ChunkData> load = ignored -> calls.add("load");
+        Patcher<BiomeData> biome = ignored -> calls.add("biome");
 
         WorldGenerationPlan plan = WorldGenerationPlan.build()
                 .instrumenter(new Instrumenter(measurements::add))
@@ -36,6 +37,7 @@ class WorldGenerationPlanTest {
                 .afterCarvers(carvers)
                 .afterFeatures(features)
                 .afterLoad(load)
+                .biomePatch(biome)
                 .noise(false)
                 .carvers(false)
                 .done();
@@ -45,13 +47,14 @@ class WorldGenerationPlanTest {
         plan.afterCarvers().patch(null);
         plan.afterFeatures().patch(null);
         plan.afterLoad().patch(null);
+        plan.biomePatch().patch(null);
 
-        assertEquals(List.of("noise-first", "noise-second", "surface", "carvers", "features", "load"), calls);
+        assertEquals(List.of("noise-first", "noise-second", "surface", "carvers", "features", "load", "biome"), calls);
         assertFalse(plan.flags().noise());
         assertFalse(plan.flags().carvers());
         assertTrue(plan.flags().surface());
         assertTrue(plan.flags().features());
-        assertEquals(6, measurements.size());
+        assertEquals(7, measurements.size());
         assertTrue(measurements.stream().allMatch(measurement -> measurement.event().equals("patch")));
     }
 
@@ -65,8 +68,8 @@ class WorldGenerationPlanTest {
         plan.afterCarvers().patch(null);
         plan.afterFeatures().patch(null);
         plan.afterLoad().patch(null);
+        plan.biomePatch().patch(null);
 
-        assertFalse(plan.biomePatch().patch(null));
         assertEquals(0, plan.altimeter().heightAt(null, 0, 0, null));
         assertEquals(new GenerationFlags(true, true, true, true, true, true), plan.flags());
     }
@@ -114,7 +117,7 @@ class WorldGenerationPlanTest {
     @Test
     void instrumenterProfilesBiomeAndHeightQueries() {
         List<Measurement> measurements = new ArrayList<>();
-        BiomePatcher biomePatcher = ignored -> true;
+        Patcher<BiomeData> biomePatcher = ignored -> {};
         Altimeter altimeter = (worldInfo, x, z, heightMap) -> 42;
         WorldGenerationPlan plan = WorldGenerationPlan.build()
                 .instrumenter(new Instrumenter(measurements::add))
@@ -122,7 +125,7 @@ class WorldGenerationPlanTest {
                 .altimeter(altimeter)
                 .done();
 
-        assertTrue(plan.biomePatch().patch(null));
+        plan.biomePatch().patch(null);
         assertEquals(42, plan.altimeter().heightAt(null, 0, 0, null));
 
         assertEquals(2, measurements.size());

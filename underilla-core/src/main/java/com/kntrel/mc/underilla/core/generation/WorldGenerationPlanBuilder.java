@@ -1,12 +1,12 @@
 package com.kntrel.mc.underilla.core.generation;
 
-import com.kntrel.mc.underilla.core.patch.BiomePatcher;
-import com.kntrel.mc.underilla.core.patch.BiomeProfiledPatcher;
+import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.patch.ChunkProfiledPatcher;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
-import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
+import com.kntrel.mc.underilla.core.profiling.Tracker;
 
 import java.util.Arrays;
 import java.util.List;
@@ -19,7 +19,7 @@ public final class WorldGenerationPlanBuilder {
 
     private static final Instrumenter NO_OP_INSTRUMENTER = new Instrumenter(_ -> {});
     private static final Patcher<ChunkData> NO_OP_CHUNK_PATCHER = _ -> {};
-    private static final BiomePatcher NO_OP_BIOME_PATCHER = _ -> false;
+    private static final Patcher<BiomeData> NO_OP_BIOME_PATCHER = _ -> {};
     private static final Altimeter NO_OP_ALTIMETER = (worldInfo, x, z, heightMap) -> 0;
     private static final ChunkCoverage ALL_CHUNKS = (chunkX, chunkZ) -> true;
 
@@ -29,7 +29,7 @@ public final class WorldGenerationPlanBuilder {
     private List<Patcher<ChunkData>> afterCarvers = List.of();
     private List<Patcher<ChunkData>> afterFeatures = List.of();
     private List<Patcher<ChunkData>> afterLoad = List.of();
-    private BiomePatcher biomePatch = NO_OP_BIOME_PATCHER;
+    private Patcher<BiomeData> biomePatch = NO_OP_BIOME_PATCHER;
     private Instrumenter instrumenter = NO_OP_INSTRUMENTER;
     private boolean noise = true;
     private boolean surface = true;
@@ -77,6 +77,11 @@ public final class WorldGenerationPlanBuilder {
         return this;
     }
 
+    public WorldGenerationPlanBuilder afterCarvers(List<? extends Patcher<ChunkData>> patchers) {
+        afterCarvers = listPatcher("afterCarvers", patchers);
+        return this;
+    }
+
     /**
      * Sets the ordered patch pipeline that runs after vanilla features and structure pieces.
      */
@@ -100,7 +105,12 @@ public final class WorldGenerationPlanBuilder {
         return this;
     }
 
-    public WorldGenerationPlanBuilder biomePatch(BiomePatcher biomePatch) {
+    public WorldGenerationPlanBuilder afterLoad(List<? extends Patcher<ChunkData>> patchers) {
+        afterLoad = listPatcher("afterLoad", patchers);
+        return this;
+    }
+
+    public WorldGenerationPlanBuilder biomePatch(Patcher<BiomeData> biomePatch) {
         this.biomePatch = Objects.requireNonNull(biomePatch, "biomePatch");
         return this;
     }
@@ -208,11 +218,17 @@ public final class WorldGenerationPlanBuilder {
         return new PatcherPipeline<>(profiledPatchers);
     }
 
-    private BiomePatcher profiledBiomePatcher() {
+    private Patcher<BiomeData> profiledBiomePatcher() {
         if (instrumenter == NO_OP_INSTRUMENTER || biomePatch == NO_OP_BIOME_PATCHER) {
             return biomePatch;
         }
-        return new BiomeProfiledPatcher(biomePatch, instrumenter);
+        Patcher<BiomeData> patcher = biomePatch;
+        Tracker tracker = instrumenter.tracker(patcher.getClass());
+        return biome -> {
+            try (var _ = tracker.stopwatch("patch")) {
+                patcher.patch(biome);
+            }
+        };
     }
 
     private Altimeter profiledAltimeter() {

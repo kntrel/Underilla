@@ -1,35 +1,40 @@
 package com.kntrel.mc.underilla.core.generation;
 
-import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
+import com.kntrel.mc.underilla.core.api.Biome;
+import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
-import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
+import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
 import com.kntrel.mc.underilla.core.patch.Patcher;
-import com.kntrel.mc.underilla.core.patch.PerBlockChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.TransformationBlockPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
-import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
-import com.kntrel.mc.underilla.core.reference.*;
+import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reference.SurfaceAltimeter;
+import com.kntrel.mc.underilla.core.reference.WorldHeightMaskPatcher;
 import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import com.kntrel.mc.underilla.core.vector.Vector;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 
 /**
@@ -58,6 +63,16 @@ public final class UnderillaFactory {
         ABSOLUTE,
         SURFACE,
         NONE
+    }
+
+    private record TerrainPhases(
+            List<Patcher<ChunkData>> afterSurface,
+            List<Patcher<ChunkData>> afterCarvers
+    ) {
+        private TerrainPhases {
+            afterSurface = List.copyOf(afterSurface);
+            afterCarvers = List.copyOf(afterCarvers);
+        }
     }
 
     /** Mutable input collector for one strategy-specific plan. */
@@ -250,83 +265,332 @@ public final class UnderillaFactory {
             int configuredMaximumCaveY = maximumCaveY == null ? configuredMaximumY : maximumCaveY;
             BlockFactory configuredBlocks = Objects.requireNonNull(blocks, "blocks");
             Supplier<Block> configuredAir = configuredBlocks::air;
+            boolean configuredSurfaceFill = surfaceFill && undergroundWorld == null;
             WorldMask worldMask = worldMask(configuredMinimumY, configuredMaximumY, configuredMaximumCaveY,
                     configuredAir.get(), chunkCache);
+
+            Patcher<BiomeData> biomePatcher = biomePatcher(worldMask, configuredMaximumY);
+            TerrainPhases terrain = terrain(
+                    noodleCavesPolicy,
+                    referenceWorld,
+                    undergroundWorld,
+                    worldMask,
+                    configuredSurfaceFill,
+                    configuredMinimumY,
+                    configuredAir,
+                    keptSurfaceBlock,
+                    surfaceBlockTransformer,
+                    surfaceBiomeUseTopYOnly,
+                    configuredMaximumY,
+                    chunkCache
+            );
+            List<Patcher<ChunkData>> featurePatchers = new ArrayList<>();
+            if (cleanupSupportReplacement != null) {
+                featurePatchers.add(Patchers.blockCleanupPatcher(
+                        configuredBlocks,
+                        cleanupSupportReplacement,
+                        cleanupBlockReplacement
+                ));
+            }
+            featurePatchers.add(Patchers.referenceWorldEntityPatcher(referenceWorld));
+
+            List<Patcher<ChunkData>> loadPatchers = cleanupEntityRemoval == null
+                    ? List.of()
+                    : List.of(new EntityCleanupPatcher(cleanupEntityRemoval, cleanupEntityTransformer));
+            GenerationFlags flags = new GenerationFlags(
+                    strategy != Strategy.NONE,
+                    true,
+                    carversEnabled,
+                    featuresEnabled,
+                    mobsEnabled,
+                    structuresEnabled
+            );
+            ChunkCoverage coverage = this::coversChunk;
+            Altimeter altimeter = new SurfaceAltimeter(referenceWorld, configuredAir);
+
             WorldGenerationPlanBuilder plan = WorldGenerationPlan.build();
             if (instrumenter != null) {
                 plan.instrumenter(instrumenter);
             }
+            return plan
+                    .coverage(coverage)
+                    .biomePatch(biomePatcher)
+                    .afterSurface(terrain.afterSurface())
+                    .afterCarvers(terrain.afterCarvers())
+                    .afterFeatures(featurePatchers)
+                    .afterLoad(loadPatchers)
+                    .flags(flags)
+                    .altimeter(altimeter)
+                    .done();
+        }
 
-            List<Patcher<ChunkData>> afterFeatures = new ArrayList<>();
-            if (cleanupSupportReplacement != null) {
-                afterFeatures.add(Patchers.blockCleanupPatcher(
-                        configuredBlocks,
-                        cleanupSupportReplacement,
-                        cleanupBlockReplacement));
+        private Patcher<BiomeData> biomePatcher(WorldMask worldMask, int maximumY) {
+            Predicate<BiomeData> included = biome -> generationArea.contains(biome.getX(), biome.getZ());
+            ToIntFunction<BiomeData> referenceY = surfaceBiomeUseTopYOnly
+                    ? _ -> maximumY
+                    : BiomeData::getY;
+            BiPredicate<BiomeData, Biome> shouldReplace = (biome, referenceBiome) ->
+                    surfaceOnlyBiome.test(referenceBiome.id())
+                    || !preservedGeneratedBiome.test(biome.get().id())
+                    || preserveGeneratedBiomesOnlyUnderSurface && biomeCellIntersectsMask(biome, worldMask);
+            return Patchers.referenceWorldBiomePatcher(referenceWorld, included, referenceY, shouldReplace);
+        }
+
+        private static boolean biomeCellIntersectsMask(BiomeData biome, WorldMask worldMask) {
+            int cellSize = GenerationConstants.BIOME_CELL_SIZE;
+            int cellX = biome.getBiomeX() * cellSize;
+            int cellZ = biome.getBiomeZ() * cellSize;
+            for (int x = cellX; x < cellX + cellSize; x++) {
+                for (int z = cellZ; z < cellZ + cellSize; z++) {
+                    if (worldMask.contains(x, biome.getY(), z)) {
+                        return true;
+                    }
+                }
             }
-            afterFeatures.add(new ReferenceWorldEntityPatcher(referenceWorld));
+            return false;
+        }
 
-            plan    .coverage(this::coversChunk)
-                    .biomePatch(new SurfaceBiomePatcher(
-                            referenceWorld,
-                            worldMask,
-                            generationArea,
-                            configuredMaximumY,
-                            surfaceBiomeUseTopYOnly,
-                            surfaceOnlyBiome,
-                            preservedGeneratedBiome,
-                            preserveGeneratedBiomesOnlyUnderSurface
-                    ))
-                    .afterFeatures(afterFeatures);
-            if (cleanupEntityRemoval != null) {
-                plan.afterLoad(new EntityCleanupPatcher(cleanupEntityRemoval, cleanupEntityTransformer));
-            }
-            plan.altimeter(new SurfaceAltimeter(referenceWorld, configuredAir));
-
-            if (noodleCavesPolicy instanceof NoodleCavesPolicy.Underground) {
-                plan.afterCarvers(terrainPatcher(
-                        worldMask,
-                        configuredMinimumY,
-                        configuredAir
-                ));
-            } else if (noodleCavesPolicy instanceof NoodleCavesPolicy.Surface surfacePolicy) {
-                Patcher<ChunkData> referenceWorldPatcher = Patchers.referenceWorldPatcher(
+        private static TerrainPhases terrain(
+                NoodleCavesPolicy policy,
+                WorldReader referenceWorld,
+                WorldReader undergroundWorld,
+                WorldMask worldMask,
+                boolean surfaceFill,
+                int minimumY,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                UnaryOperator<Block> blockTransformer,
+                boolean useTopYOnly,
+                int topY,
+                ChunkCache chunkCache
+        ) {
+            return switch (policy) {
+                case NoodleCavesPolicy.Underground _ -> immediateTerrain(
                         referenceWorld,
+                        undergroundWorld,
                         worldMask,
                         surfaceFill,
-                        configuredMinimumY,
-                        configuredAir,
-                        keptSurfaceBlock,
-                        surfaceBlockTransformations()
+                        minimumY,
+                        air,
+                        survivingBlock,
+                        blockTransformer
                 );
-                DeferredPatcher deferredSurface = new DeferredPatcher(referenceWorldPatcher,
-                        deferredWritePredicate(surfacePolicy, surfaceBiomeUseTopYOnly, configuredMaximumY),
-                        chunkCache);
-                List<Patcher<ChunkData>> patchers = new ArrayList<>();
-                if (undergroundWorld != null) {
-                    patchers.add(Patchers.referenceWorldPatcher(
-                            undergroundWorld,
-                            worldMask.inverted(),
-                            false,
-                            minimumY,
-                            blocks::air,
-                            null,
-                            List.of()
-                    ));
-                }
-                patchers.add(deferredSurface);
-                plan.afterSurface(patchers);
-                plan.afterCarvers(deferredSurface.applier());
+                case NoodleCavesPolicy.Surface surface -> deferredTerrain(
+                        referenceWorld,
+                        undergroundWorld,
+                        worldMask,
+                        surfaceFill,
+                        minimumY,
+                        air,
+                        survivingBlock,
+                        blockTransformer,
+                        deferredWritePredicate(referenceWorld, surface, useTopYOnly, topY),
+                        chunkCache
+                );
+            };
+        }
+
+        private static TerrainPhases immediateTerrain(
+                WorldReader referenceWorld,
+                WorldReader undergroundWorld,
+                WorldMask worldMask,
+                boolean surfaceFill,
+                int minimumY,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                UnaryOperator<Block> blockTransformer
+        ) {
+            Patcher<ChunkData> terrain = terrainPatcher(
+                    referenceWorld,
+                    undergroundWorld,
+                    worldMask,
+                    surfaceFill,
+                    minimumY,
+                    air,
+                    survivingBlock,
+                    transformations(blockTransformer)
+            );
+            return new TerrainPhases(List.of(), List.of(terrain));
+        }
+
+        private static TerrainPhases deferredTerrain(
+                WorldReader referenceWorld,
+                WorldReader undergroundWorld,
+                WorldMask worldMask,
+                boolean surfaceFill,
+                int minimumY,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                UnaryOperator<Block> blockTransformer,
+                BiPredicate<Vector<Integer>, ChunkData> deferredWritePredicate,
+                ChunkCache chunkCache
+        ) {
+            Patcher<ChunkData> surface = referenceWorldPatcher(
+                    referenceWorld,
+                    worldMask,
+                    surfaceFill,
+                    minimumY,
+                    air,
+                    survivingBlock,
+                    transformations(blockTransformer)
+            );
+            DeferredPatcher deferredSurface = new DeferredPatcher(surface, deferredWritePredicate, chunkCache);
+            List<Patcher<ChunkData>> afterSurface = new ArrayList<>();
+            if (undergroundWorld != null) {
+                afterSurface.add(referenceWorldPatcher(
+                        undergroundWorld,
+                        worldMask.inverted(),
+                        false,
+                        minimumY,
+                        air,
+                        null,
+                        null
+                ));
+            }
+            afterSurface.add(deferredSurface);
+            return new TerrainPhases(afterSurface, List.of(deferredSurface.applier()));
+        }
+
+        private static Patcher<ChunkData> terrainPatcher(
+                WorldReader referenceWorld,
+                WorldReader undergroundWorld,
+                WorldMask worldMask,
+                boolean surfaceFill,
+                int minimumY,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                List<Patcher<ChunkBlock>> transformations
+        ) {
+            if (!surfaceFill) {
+                return combinedTerrainPatcher(
+                        referenceWorld,
+                        undergroundWorld,
+                        worldMask,
+                        minimumY,
+                        air,
+                        survivingBlock,
+                        transformations
+                );
+            }
+            return new WorldHeightMaskPatcher(minimumY, heightMask -> combinedTerrainPatcher(
+                    referenceWorld,
+                    undergroundWorld,
+                    new UnionWorldMask(heightMask, worldMask),
+                    minimumY,
+                    air,
+                    survivingBlock,
+                    transformations
+            ));
+        }
+
+        private static Patcher<ChunkData> combinedTerrainPatcher(
+                WorldReader referenceWorld,
+                WorldReader undergroundWorld,
+                WorldMask worldMask,
+                int minimumY,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                List<Patcher<ChunkBlock>> transformations
+        ) {
+            if (undergroundWorld == null) {
+                return Patchers.referenceWorldPatcher(
+                        referenceWorld,
+                        worldMask,
+                        minimumY,
+                        air,
+                        survivingBlock,
+                        transformations
+                );
             }
 
-            plan.noise(strategy != Strategy.NONE)
-                    // Noodle-cave policies decide how carvers affect copied terrain, never whether
-                    // vanilla carvers run at all.
-                    .carvers(carversEnabled)
-                    .features(featuresEnabled)
-                    .mobs(mobsEnabled)
-                    .structures(structuresEnabled);
-            return plan.done();
+            return Patchers.dualReferenceWorldPatcher(
+                    referenceWorld,
+                    undergroundWorld,
+                    worldMask,
+                    minimumY,
+                    air,
+                    survivingBlock,
+                    transformations
+            );
+        }
+
+        private static Patcher<ChunkData> referenceWorldPatcher(
+                WorldReader referenceWorld,
+                WorldMask worldMask,
+                boolean surfaceFill,
+                int minimumY,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                List<Patcher<ChunkBlock>> transformations
+        ) {
+            if (!surfaceFill) {
+                return Patchers.referenceWorldPatcher(
+                        referenceWorld, worldMask, minimumY, air, survivingBlock, transformations);
+            }
+            return new WorldHeightMaskPatcher(minimumY, heightMask -> Patchers.referenceWorldPatcher(
+                    referenceWorld,
+                    new UnionWorldMask(heightMask, worldMask),
+                    minimumY,
+                    air,
+                    survivingBlock,
+                    transformations
+            ));
+        }
+
+        private static List<Patcher<ChunkBlock>> transformations(UnaryOperator<Block> transformer) {
+            return transformer == null
+                    ? List.of()
+                    : List.of(TransformationBlockPatcher.fromBlocks(transformer));
+        }
+
+        private static BiPredicate<Vector<Integer>, ChunkData> deferredWritePredicate(
+                WorldReader referenceWorld,
+                NoodleCavesPolicy.Surface policy,
+                boolean useTopYOnly,
+                int topY
+        ) {
+            BiPredicate<Vector<Integer>, ChunkData> mayWriteBeforeCarvers = matchingReferenceBiome(
+                    referenceWorld, policy.predicate(), useTopYOnly, topY);
+            if (policy.restoreLiquids()) {
+                mayWriteBeforeCarvers = mayWriteBeforeCarvers.and(referenceBlockIsNotLiquid(referenceWorld));
+            }
+            return mayWriteBeforeCarvers.negate();
+        }
+
+        private static BiPredicate<Vector<Integer>, ChunkData> matchingReferenceBiome(
+                WorldReader referenceWorld,
+                Predicate<Biome> predicate,
+                boolean useTopYOnly,
+                int topY
+        ) {
+            if (useTopYOnly) {
+                return (position, targetChunk) -> referenceWorld
+                        .biomeAt(globalX(position, targetChunk), topY, globalZ(position, targetChunk))
+                        .filter(predicate)
+                        .isPresent();
+            }
+            return (position, targetChunk) -> referenceWorld
+                    .biomeAt(globalX(position, targetChunk), position.y(), globalZ(position, targetChunk))
+                    .filter(predicate)
+                    .isPresent();
+        }
+
+        private static BiPredicate<Vector<Integer>, ChunkData> referenceBlockIsNotLiquid(
+                WorldReader referenceWorld
+        ) {
+            return (position, targetChunk) -> referenceWorld
+                    .blockAt(globalX(position, targetChunk), position.y(), globalZ(position, targetChunk))
+                    .map(Block::isLiquid)
+                    .map(isLiquid -> !isLiquid)
+                    .orElse(true);
+        }
+
+        private static int globalX(Vector<Integer> position, ChunkData targetChunk) {
+            return targetChunk.getChunkX() * GenerationConstants.CHUNK_SIZE + position.x();
+        }
+
+        private static int globalZ(Vector<Integer> position, ChunkData targetChunk) {
+            return targetChunk.getChunkZ() * GenerationConstants.CHUNK_SIZE + position.z();
         }
 
         private static WorldReader bindReader(WorldReader reader, ChunkCache cache) {
@@ -353,130 +617,6 @@ public final class UnderillaFactory {
             };
         }
 
-        private Patcher<ChunkData> terrainPatcher(
-                WorldMask worldMask,
-                int minimumY,
-                Supplier<Block> air
-        ) {
-            if (!surfaceFill) {
-                return combinedTerrainPatcher(worldMask, worldMask, minimumY, air);
-            }
-            return new WorldHeightMaskPatcher(minimumY, heightMask -> combinedTerrainPatcher(
-                    worldMask,
-                    new UnionWorldMask(heightMask, worldMask),
-                    minimumY,
-                    air
-            ));
-        }
-
-        private Patcher<ChunkData> combinedTerrainPatcher(
-                WorldMask undergroundMask,
-                WorldMask surfaceMask,
-                int minimumY,
-                Supplier<Block> air
-        ) {
-            Patcher<ChunkBlock> surface = Patchers.referenceWorldBlockPatcher(
-                    referenceWorld,
-                    surfaceMask,
-                    air,
-                    keptSurfaceBlock,
-                    surfaceBlockTransformations()
-            );
-            if (undergroundWorld == null) {
-                return available(referenceWorld, perBlock(minimumY, surface));
-            }
-
-            Patcher<ChunkBlock> underground = Patchers.referenceWorldBlockPatcher(
-                    undergroundWorld,
-                    undergroundMask.inverted(),
-                    air,
-                    null,
-                    List.of()
-            );
-            Patcher<ChunkData> surfaceOnly = perBlock(minimumY, surface);
-            Patcher<ChunkData> undergroundOnly = perBlock(minimumY, underground);
-            Patcher<ChunkData> both = perBlock(minimumY, underground, surface);
-
-            return Patcher.<ChunkData>iff(chunk -> chunkExists(referenceWorld, chunk))
-                    .then(Patcher.<ChunkData>iff(chunk -> chunkExists(undergroundWorld, chunk))
-                            .then(both)
-                            .otherwise(surfaceOnly)
-                            .end())
-                    .otherwise(Patcher.<ChunkData>iff(chunk -> chunkExists(undergroundWorld, chunk))
-                            .then(undergroundOnly)
-                            .end())
-                    .end();
-        }
-
-        private static Patcher<ChunkData> available(
-                WorldReader world,
-                Patcher<ChunkData> patcher
-        ) {
-            return Patcher.<ChunkData>iff(chunk -> chunkExists(world, chunk))
-                    .then(patcher)
-                    .end();
-        }
-
-        @SafeVarargs
-        private static Patcher<ChunkData> perBlock(
-                int minimumY,
-                Patcher<ChunkBlock>... patchers
-        ) {
-            Patcher<ChunkBlock> aboveMinimumY = Patcher.<ChunkBlock>iff(
-                            block -> block.y() >= minimumY)
-                    .then(Patcher.sequence(patchers))
-                    .end();
-            return new PerBlockChunkPatcher(aboveMinimumY);
-        }
-
-        private static boolean chunkExists(WorldReader world, ChunkData chunk) {
-            return world.readChunk(chunk.getChunkX(), chunk.getChunkZ()).isPresent();
-        }
-
-        private List<Patcher<ChunkBlock>> surfaceBlockTransformations() {
-            return surfaceBlockTransformer == null
-                    ? List.of()
-                    : List.of(TransformationBlockPatcher.fromBlocks(surfaceBlockTransformer));
-        }
-
-        private BiPredicate<Vector<Integer>, ChunkData> deferredWritePredicate(
-                NoodleCavesPolicy.Surface policy,
-                boolean useTopYOnly,
-                int topY
-        ) {
-            BiPredicate<Vector<Integer>, ChunkData> mayWriteBeforeCarvers = matchingReferenceBiome(
-                    policy.predicate(), useTopYOnly, topY);
-            if (policy.restoreLiquids()) {
-                mayWriteBeforeCarvers = mayWriteBeforeCarvers.and(referenceBlockIsNotLiquid());
-            }
-            return mayWriteBeforeCarvers.negate();
-        }
-
-        private BiPredicate<Vector<Integer>, ChunkData> matchingReferenceBiome(
-                Predicate<Biome> predicate,
-                boolean useTopYOnly,
-                int topY
-        ) {
-            if (useTopYOnly) {
-                return (position, targetChunk) -> referenceWorld
-                        .biomeAt(globalX(position, targetChunk), topY, globalZ(position, targetChunk))
-                        .filter(predicate)
-                        .isPresent();
-            }
-            return (position, targetChunk) -> referenceWorld
-                    .biomeAt(globalX(position, targetChunk), position.y(), globalZ(position, targetChunk))
-                    .filter(predicate)
-                    .isPresent();
-        }
-
-        private BiPredicate<Vector<Integer>, ChunkData> referenceBlockIsNotLiquid() {
-            return (position, targetChunk) -> referenceWorld
-                    .blockAt(globalX(position, targetChunk), position.y(), globalZ(position, targetChunk))
-                    .map(Block::isLiquid)
-                    .map(isLiquid -> !isLiquid)
-                    .orElse(true);
-        }
-
         private static int requiredValue(Integer value, String source) {
             if (value == null) {
                 throw new IllegalStateException(source + " must be configured");
@@ -491,12 +631,5 @@ public final class UnderillaFactory {
                     && referenceWorld.readChunk(chunkX, chunkZ).isPresent();
         }
 
-        private static int globalX(Vector<Integer> position, ChunkData targetChunk) {
-            return targetChunk.getChunkX() * GenerationConstants.CHUNK_SIZE + position.x();
-        }
-
-        private static int globalZ(Vector<Integer> position, ChunkData targetChunk) {
-            return targetChunk.getChunkZ() * GenerationConstants.CHUNK_SIZE + position.z();
-        }
     }
 }

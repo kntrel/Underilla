@@ -49,13 +49,17 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
     }
 
     private @NotNull Biome getBiomeForPosition(@NotNull WorldInfo worldInfo, int x, int y, int z) {
-        Biome vanillaBiome = getVanillaBiomeProvider(worldInfo).getBiome(worldInfo, x, y, z);
-        BukkitBiomeData biomeData = new BukkitBiomeData(vanillaBiome, x, y, z);
-        if (!generationPlan.biomePatch().patch(biomeData) && outOfBoundsProvider != null) {
+        int chunkX = Math.floorDiv(x, Underilla.CHUNK_SIZE);
+        int chunkZ = Math.floorDiv(z, Underilla.CHUNK_SIZE);
+        if (!generationPlan.coverage().covers(chunkX, chunkZ) && outOfBoundsProvider != null) {
             Biome fallbackBiome = outOfBoundsProvider.getBiome(worldInfo, x, y, z);
             countBiome(fallbackBiome.getKey().asString());
             return fallbackBiome;
         }
+
+        Biome vanillaBiome = getVanillaBiomeProvider(worldInfo).getBiome(worldInfo, x, y, z);
+        BukkitBiomeData biomeData = new BukkitBiomeData(vanillaBiome, x, y, z);
+        generationPlan.biomePatch().patch(biomeData);
 
         Biome selectedBiome = biomeData.getBukkitBiome();
         if (selectedBiome != null) {

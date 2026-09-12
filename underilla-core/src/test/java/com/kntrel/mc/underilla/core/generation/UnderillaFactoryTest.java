@@ -61,7 +61,6 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 firstColumn,
-                false,
                 1,
                 () -> AIR,
                 null,
@@ -85,7 +84,6 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 (_, _, _) -> false,
-                false,
                 0,
                 () -> AIR,
                 block -> block == WATER,
@@ -106,7 +104,6 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 (x, _, z) -> x == 32 && z == -16,
-                false,
                 0,
                 () -> AIR,
                 null,
@@ -169,7 +166,7 @@ class UnderillaFactoryTest {
     }
 
     @Test
-    void surfaceFillCapturesVanillaHeightBeforeTheUndergroundWorldIsPatched() {
+    void configuringASecondReferenceWorldDisablesSurfaceFill() {
         TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
         referenceChunk.setBlock(0, 2, 0, REFERENCE);
         TestWorld referenceWorld = new TestWorld().addChunk(referenceChunk);
@@ -187,7 +184,7 @@ class UnderillaFactoryTest {
 
         plan.afterCarvers().patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 2, 0));
+        assertSame(GENERATED, target.getBlock(0, 2, 0));
     }
 
     @Test
@@ -258,7 +255,7 @@ class UnderillaFactoryTest {
     }
 
     @Test
-    void finalPlanUsesTheConfiguredSurfaceBiomePatcher() {
+    void finalPlanUsesTheConfiguredBiomeComposition() {
         TestBiome reference = new TestBiome("example:reference");
         TestChunkGrid referenceChunk = new TestChunkGrid(0, 0, 0, 5, AIR, PLAINS);
         referenceChunk.fillBiomeLayer(4, reference);
@@ -270,9 +267,10 @@ class UnderillaFactoryTest {
         MutableBiomeData inside = new MutableBiomeData(PLAINS, 0, 1, 0);
         MutableBiomeData outside = new MutableBiomeData(PLAINS, 8, 1, 0);
 
-        assertTrue(plan.biomePatch().patch(inside));
+        plan.biomePatch().patch(inside);
+        plan.biomePatch().patch(outside);
+
         assertSame(reference, inside.get());
-        assertFalse(plan.biomePatch().patch(outside));
         assertSame(PLAINS, outside.get());
     }
 

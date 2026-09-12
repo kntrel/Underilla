@@ -70,7 +70,6 @@ final class LegacyMergerPatcher {
                 Patchers.referenceWorldPatcher(
                         cavesWorld,
                         (x, y, z) -> !worldMask.contains(x, y, z),
-                        false,
                         config.generationAreaMinY(),
                         blocks::air,
                         null,
