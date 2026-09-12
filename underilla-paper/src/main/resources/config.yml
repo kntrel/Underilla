@@ -17,8 +17,6 @@ steps:
   # Remove world folder if it already exists
   # Need a restart before running this step
   underillaGeneration: "todo"
-  cleaningBlocks: "skip"
-  cleaingEntities: "skip"
 
 
 # The world to merge the terrain into
@@ -198,9 +196,6 @@ biomesMerging:
 clean:
   blocks:
     enabled: true
-    # If removeUnstableBlocks is true, the blocks that are not stable, as flowers over an air block, will be removed.
-    removeUnstableBlocks: true
-
     # List of blocks to support by another block. It will replace the lower block of a column by the block defined here.
     # This is useful to avoid having floating sand or gravel.
     # Keys and values are block identifiers.

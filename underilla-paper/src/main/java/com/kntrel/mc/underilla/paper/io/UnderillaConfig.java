@@ -547,7 +547,6 @@ public class UnderillaConfig {
         BIOME_MERGING_FROM_CAVES_GENERATION_ENABLED("biomesMerging.fromCavesGeneration.enabled", true),
         BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_UNDER_SURFACE("biomesMerging.fromCavesGeneration.onlyUnderSurface", true),
         CLEAN_BLOCKS_ENABLED("clean.blocks.enabled", true),
-        CLEAN_BLOCKS_REMOVE_UNSTABLE_BLOCKS("clean.blocks.removeUnstableBlocks", true),
         CLEAN_ENTITIES_ENABLED("clean.entities.enabled", true);
         // @formatter:on
 
@@ -594,8 +593,6 @@ public class UnderillaConfig {
         STEP_DOWNLOAD_DEPENDENCY_PLUGINS("steps.downloadDependencyPlugins", "skip"),
         STEP_SET_UNDERILLA_AS_WORLD_GENERATOR("steps.setUnderillaAsWorldGenerator", "skip"),
         STEP_UNDERILLA_GENERATION("steps.underillaGeneration", "skip"),
-        STEP_CLEANING_BLOCKS("steps.cleaningBlocks", "skip"),
-        STEP_CLEANING_ENTITIES("steps.cleaingEntities", "skip"),
         FINAL_WORLD_NAME("finalWorld.name", "world"),
         OUT_OF_THE_SURFACE_WORLD_GENERATOR("outOfTheSurfaceWorldGenerator", "VoidWorldGenerator"),
         STRATEGY("strategy", "SURFACE");

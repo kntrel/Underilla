@@ -3,9 +3,6 @@ package com.kntrel.mc.underilla.paper;
 import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import com.kntrel.mc.underilla.paper.cleaning.CleanBlocksTask;
-import com.kntrel.mc.underilla.paper.cleaning.CleanEntitiesTask;
-import com.kntrel.mc.underilla.paper.cleaning.FollowableProgressTask;
 import com.kntrel.mc.underilla.paper.generation.GeneratorAccessor;
 import com.kntrel.mc.underilla.paper.generation.UnderillaChunkGenerator;
 import com.kntrel.mc.underilla.paper.generation.PaperGenerationPlanFactory;
@@ -20,9 +17,9 @@ import com.kntrel.mc.underilla.paper.listener.WorldListener;
 import com.kntrel.mc.underilla.paper.preparing.ServerSetup;
 import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import com.kntrel.mc.underilla.paper.profiling.JsonStatsRecorder;
-import com.kntrel.mc.underilla.paper.selector.Selector;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,7 +28,6 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
-import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -55,8 +51,6 @@ public final class Underilla extends JavaPlugin {
     private static final String DOING = "doing";
     private static final String DONE = "done";
     private static final String FAILED = "failed";
-    private CleanBlocksTask cleanBlocksTask;
-    private CleanEntitiesTask cleanEntitiesTask;
     private StructureEventListener structureEventListener;
     private JsonStatsRecorder profilingRecorder;
     private Instrumenter instrumenter;
@@ -64,14 +58,13 @@ public final class Underilla extends JavaPlugin {
     private final Map<String, UnderillaChunkGenerator> worldGenerators = new ConcurrentHashMap<>();
 
     private Function<org.bukkit.block.Biome, org.bukkit.block.Biome> endBiomeTransformer;
-    private Consumer<Block> endBlockTransformer;
     private Consumer<Entity> endEntityTransformer;
     private Map<StringKeys, Runnable> endTaskActions = new EnumMap<>(StringKeys.class);
 
     @Override
     public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
         if (allStepsDone()) {
-            LOGGER.info("Use the out of the surface world generator instead of Underilla because we have done all generation & cleaning steps.");
+            LOGGER.info("Use the out of the surface world generator instead of Underilla because generation is complete.");
             return GeneratorAccessor.getOutOfTheSurfaceWorldGenerator(worldName, id);
         }
         if (this.worldSurfaceReader == null) {
@@ -164,7 +157,6 @@ public final class Underilla extends JavaPlugin {
     @Override
     public void onDisable() {
         try {
-            stopTasks();
             for (Map.Entry<String, UnderillaChunkGenerator> worldGenerator : worldGenerators.entrySet()) {
                 Map<String, Long> biomesPlaced = worldGenerator.getValue().getBiomesPlaced();
                 LOGGER.info("Map of biomes placed in world '{}': {}", worldGenerator.getKey(), biomesPlaced.entrySet().stream()
@@ -172,7 +164,7 @@ public final class Underilla extends JavaPlugin {
                         .map(entry -> entry.getKey() + ": " + entry.getValue()).reduce((a, b) -> a + ", " + b).orElse(""));
             }
         } catch (Exception e) {
-            LOGGER.error("Failed to stop tasks or print biomes placed", e);
+            LOGGER.error("Failed to print biomes placed", e);
         } finally {
             closeProfilingRecorder();
         }
@@ -233,20 +225,10 @@ public final class Underilla extends JavaPlugin {
             runChunky();
         } else if (getUnderillaConfig().getString(StringKeys.STEP_UNDERILLA_GENERATION).equals(DOING)) {
             restartChunky();
-        } else if (getUnderillaConfig().getString(StringKeys.STEP_CLEANING_BLOCKS).equals(TODO)) {
-            runCleanBlocks();
-        } else if (getUnderillaConfig().getString(StringKeys.STEP_CLEANING_BLOCKS).equals(DOING)) {
-            restartCleanBlocks();
-        } else if (getUnderillaConfig().getString(StringKeys.STEP_CLEANING_ENTITIES).equals(TODO)) {
-            runCleanEntities();
-        } else if (getUnderillaConfig().getString(StringKeys.STEP_CLEANING_ENTITIES).equals(DOING)) {
-            restartCleanEntities();
         }
     }
     public boolean allStepsDone() {
-        return getUnderillaConfig().getString(StringKeys.STEP_UNDERILLA_GENERATION).equals(DONE)
-                && getUnderillaConfig().getString(StringKeys.STEP_CLEANING_BLOCKS).equals(DONE)
-                && getUnderillaConfig().getString(StringKeys.STEP_CLEANING_ENTITIES).equals(DONE);
+        return getUnderillaConfig().getString(StringKeys.STEP_UNDERILLA_GENERATION).equals(DONE);
     }
     public void validateTask(StringKeys taskKey, boolean done) {
         getUnderillaConfig().saveNewValue(taskKey, done ? DONE : FAILED);
@@ -269,9 +251,6 @@ public final class Underilla extends JavaPlugin {
         this.endBiomeTransformer = endBiomeTransformer;
     }
     public boolean hasEndBiomeTransformer() { return endBiomeTransformer != null; }
-    public Consumer<Block> getEndBlockTransformer() { return endBlockTransformer; }
-    public void setEndBlockTransformer(Consumer<Block> endBlockTransformer) { this.endBlockTransformer = endBlockTransformer; }
-    public boolean hasEndBlockTransformer() { return endBlockTransformer != null; }
     public Consumer<Entity> getEndEntityTransformer() { return endEntityTransformer; }
     public void setEndEntityTransformer(Consumer<Entity> endEntityTransformer) { this.endEntityTransformer = endEntityTransformer; }
     public boolean hasEndEntityTransformer() { return endEntityTransformer != null; }
@@ -301,7 +280,7 @@ public final class Underilla extends JavaPlugin {
             public void accept(GenerationProgressEvent generationProgressEvent) {
                 if (printTime + printTimeEachXMs < System.currentTimeMillis()) {
                     printTime = System.currentTimeMillis();
-                    FollowableProgressTask.printProgress(generationProgressEvent.chunks(), startTime,
+                    printProgress(generationProgressEvent.chunks(), startTime,
                             generationProgressEvent.progress() / 100, 1, 1, "Rate: " + (int) (generationProgressEvent.rate())
                                     + ", Current: " + generationProgressEvent.x() + " " + generationProgressEvent.z());
                 }
@@ -331,54 +310,24 @@ public final class Underilla extends JavaPlugin {
         }
     }
     private void runChunky() { runChunky(false); }
-    private void runCleanBlocks(Selector selector) {
-        setToDoingTask(StringKeys.STEP_CLEANING_BLOCKS);
-        LOGGER.info("Starting clean blocks task");
-        cleanBlocksTask = new CleanBlocksTask(2, 3, selector);
-        cleanBlocksTask.run();
-    }
-    private void runCleanBlocks() { runCleanBlocks(getUnderillaConfig().getSelector()); }
-    private void runCleanEntities(Selector selector) {
-        setToDoingTask(StringKeys.STEP_CLEANING_ENTITIES);
-        LOGGER.info("Starting clean entities task");
-        cleanEntitiesTask = new CleanEntitiesTask(3, 3);
-        cleanEntitiesTask.run();
-    }
-    private void runCleanEntities() { runCleanEntities(getUnderillaConfig().getSelector()); }
-
-    // stop tasks -----------------------------------------------------------------------------------------------------
-    private void stopTasks() {
-        if (cleanBlocksTask != null && getUnderillaConfig().getString(StringKeys.STEP_CLEANING_BLOCKS).equals(DOING)) {
-            Selector selector = cleanBlocksTask.stop();
-            selector.saveIn("cleanBlocksTask");
-        }
-        if (cleanEntitiesTask != null && getUnderillaConfig().getString(StringKeys.STEP_CLEANING_ENTITIES).equals(DOING)) {
-            Selector selector = cleanEntitiesTask.stop();
-            selector.saveIn("cleanEntitiesTask");
-        }
-    }
-
-    // restart tasks --------------------------------------------------------------------------------------------------
     private void restartChunky() {
         LOGGER.info("Restarting Chunky task");
         runChunky(true);
     }
-    private void restartCleanBlocks() {
-        LOGGER.info("Restarting clean blocks task");
-        try {
-            runCleanBlocks(Selector.loadFrom("cleanBlocksTask"));
-        } catch (Exception e) {
-            LOGGER.warn("Tasks can't be restarted from last state. Restarting from the beginning.", e);
-            runCleanBlocks();
-        }
-    }
-    private void restartCleanEntities() {
-        LOGGER.info("Restarting clean entities task");
-        try {
-            runCleanEntities(Selector.loadFrom("cleanEntitiesTask"));
-        } catch (Exception e) {
-            LOGGER.warn("Tasks can't be restarted from last state. Restarting from the beginning.", e);
-            runCleanEntities();
-        }
+
+    private static void printProgress(
+            long processed,
+            long startTime,
+            double progress,
+            int taskID,
+            int tasksCount,
+            String extra
+    ) {
+        long elapsed = System.currentTimeMillis() - startTime;
+        long estimatedDuration = (long) (elapsed / progress);
+        String taskCount = tasksCount > 1 ? " (" + taskID + "/" + tasksCount + ")" : "";
+        String extraMessage = extra == null ? "" : " " + extra;
+        LOGGER.info("Task{} Progress: {}   {} ETA: {}{}", taskCount, processed,
+                String.format("%.4f", progress * 100) + "%", Duration.ofMillis(estimatedDuration - elapsed), extraMessage);
     }
 }
