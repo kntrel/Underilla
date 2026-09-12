@@ -58,7 +58,7 @@ class UnderillaFactoryTest {
                 new TestChunkGrid(0, 0, 0, 2, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 2, GENERATED, PLAINS);
         WorldMask firstColumn = (x, _, _) -> x == 0;
-        Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
+        Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 firstColumn,
                 false,
@@ -82,7 +82,7 @@ class UnderillaFactoryTest {
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
         target.setBlock(1, 0, 0, AIR);
         Patcher<ChunkBlock> transformReference = candidate -> candidate.replace(WATER);
-        Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
+        Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 (_, _, _) -> false,
                 false,
@@ -103,7 +103,7 @@ class UnderillaFactoryTest {
         TestWorld referenceWorld = new TestWorld().addChunk(
                 new TestChunkGrid(2, -1, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(2, -1, 0, 1, GENERATED, PLAINS);
-        Patcher<ChunkData> patcher = UnderillaFactory.referenceWorldPatcher(
+        Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 (x, _, z) -> x == 32 && z == -16,
                 false,

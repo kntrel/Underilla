@@ -11,10 +11,8 @@ import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.BlockCleanupPatcher;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
-import com.kntrel.mc.underilla.core.patch.CandidatePatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
-import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
 import com.kntrel.mc.underilla.core.patch.PerBlockChunkPatcher;
 import com.kntrel.mc.underilla.core.patch.TransformationBlockPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
@@ -55,71 +53,6 @@ public final class UnderillaFactory {
 
     public static Builder none(WorldReader referenceWorld) {
         return new Builder(Strategy.NONE, referenceWorld, true);
-    }
-
-    /** Builds the one-pass reference-world block pipeline without installing it in a plan. */
-    static Patcher<ChunkData> referenceWorldPatcher(
-            WorldReader referenceWorld,
-            WorldMask worldMask,
-            boolean surfaceFill,
-            int minimumY,
-            Supplier<Block> air,
-            Predicate<Block> survivingBlock,
-            Collection<Patcher<ChunkBlock>> transformations
-    ) {
-        Objects.requireNonNull(referenceWorld, "referenceWorld");
-        Objects.requireNonNull(worldMask, "worldMask");
-        Objects.requireNonNull(air, "air");
-
-        if (surfaceFill) {
-            return new WorldHeightMaskPatcher(minimumY, heightMask -> referenceWorldPatcher(
-                    referenceWorld,
-                    new UnionWorldMask(heightMask, worldMask),
-                    false,
-                    minimumY,
-                    air,
-                    survivingBlock,
-                    transformations
-            ));
-        }
-
-        Patcher<ChunkBlock> blockPatch = Patcher.<ChunkBlock>iff(block -> block.y() >= minimumY)
-                .then(referenceWorldBlockPatcher(
-                        referenceWorld,
-                        worldMask,
-                        air,
-                        survivingBlock,
-                        transformations
-                ))
-                .end();
-        Patcher<ChunkData> chunkPatch = new PerBlockChunkPatcher(blockPatch);
-        return Patcher.<ChunkData>iff(targetChunk -> referenceWorld.readChunk(targetChunk.getChunkX(), targetChunk.getChunkZ()).isPresent())
-                .then(chunkPatch)
-                .end();
-    }
-
-    private static Patcher<ChunkBlock> referenceWorldBlockPatcher(
-            WorldReader referenceWorld,
-            WorldMask worldMask,
-            Supplier<Block> air,
-            Predicate<Block> survivingBlock,
-            Collection<Patcher<ChunkBlock>> transformations
-    ) {
-        Function<ChunkBlock, Block> referenceBlock = target -> referenceWorld.blockAt(target.globalX(), target.y(), target.globalZ()).orElseGet(air);
-        Predicate<ChunkBlock> shouldWrite = candidate -> worldMask.contains(candidate.globalX(), candidate.y(), candidate.globalZ());
-        if (survivingBlock != null) {
-            shouldWrite = shouldWrite.or(candidate -> survivingBlock.test(candidate.candidate()) && candidate.destinationBlock().isSolid());
-        }
-
-        CandidatePatcher.Builder<ChunkBlock> candidate = Patcher.take(original -> original.attempt(referenceBlock.apply(original)));
-        if (transformations != null && !transformations.isEmpty()) {
-            candidate.patch(transformations);
-        }
-        Predicate<ChunkBlock> finalShouldWrite = shouldWrite;
-        return candidate
-                .iff((_, proposed) -> finalShouldWrite.test(proposed))
-                .then((original, proposed) -> original.replace(proposed.candidate()))
-                .end();
     }
 
     private enum Strategy {
@@ -358,7 +291,7 @@ public final class UnderillaFactory {
                         configuredAir
                 ));
             } else if (noodleCavesPolicy instanceof NoodleCavesPolicy.Surface surfacePolicy) {
-                Patcher<ChunkData> referenceWorldPatcher = UnderillaFactory.referenceWorldPatcher(
+                Patcher<ChunkData> referenceWorldPatcher = Patchers.referenceWorldPatcher(
                         referenceWorld,
                         worldMask,
                         surfaceFill,
@@ -372,7 +305,7 @@ public final class UnderillaFactory {
                         chunkCache);
                 List<Patcher<ChunkData>> patchers = new ArrayList<>();
                 if (undergroundWorld != null) {
-                    patchers.add(UnderillaFactory.referenceWorldPatcher(
+                    patchers.add(Patchers.referenceWorldPatcher(
                             undergroundWorld,
                             worldMask.inverted(),
                             false,
@@ -443,7 +376,7 @@ public final class UnderillaFactory {
                 int minimumY,
                 Supplier<Block> air
         ) {
-            Patcher<ChunkBlock> surface = UnderillaFactory.referenceWorldBlockPatcher(
+            Patcher<ChunkBlock> surface = Patchers.referenceWorldBlockPatcher(
                     referenceWorld,
                     surfaceMask,
                     air,
@@ -454,7 +387,7 @@ public final class UnderillaFactory {
                 return available(referenceWorld, perBlock(minimumY, surface));
             }
 
-            Patcher<ChunkBlock> underground = UnderillaFactory.referenceWorldBlockPatcher(
+            Patcher<ChunkBlock> underground = Patchers.referenceWorldBlockPatcher(
                     undergroundWorld,
                     undergroundMask.inverted(),
                     air,

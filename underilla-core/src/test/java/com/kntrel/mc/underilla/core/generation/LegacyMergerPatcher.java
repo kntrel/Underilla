@@ -67,7 +67,7 @@ final class LegacyMergerPatcher {
             return strategyPatcher;
         }
         return new PatcherPipeline<>(
-                UnderillaFactory.referenceWorldPatcher(
+                Patchers.referenceWorldPatcher(
                         cavesWorld,
                         (x, y, z) -> !worldMask.contains(x, y, z),
                         false,
