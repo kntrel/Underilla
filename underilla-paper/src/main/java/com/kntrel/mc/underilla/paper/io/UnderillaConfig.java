@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.paper.io;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.paper.impl.BukkitBiome;
+import com.kntrel.mc.underilla.paper.impl.BukkitIDs;
 import com.kntrel.mc.underilla.paper.selector.Selector;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
@@ -117,7 +118,11 @@ public class UnderillaConfig {
     public boolean surfaceBiomeUseTopYOnly() { return getBoolean(BooleanKeys.SURFACE_WORLD_BIOME_USE_TOP_Y_VALUE_ONLY); }
 
     public boolean shouldPreserveBiome(ID biome) {
-        return isBiomeInSet(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES, biome);
+        return getBoolean(BooleanKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ENABLED)
+                && matchesBiomeSelection(
+                        SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES,
+                        SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_EXCEPT_ON_BIOMES,
+                        biome);
     }
 
     public boolean preserveBiomesOnlyUnderSurface() {
@@ -380,7 +385,6 @@ public class UnderillaConfig {
     }
 
     private void initSetBiomeStringMap(FileConfiguration fileConfiguration) {
-        Collection<ID> allBiomes = BukkitBiome.getAllBiomeIDs();
         listBiomeStringMap.clear();
         for (SetBiomeStringKeys key : SetBiomeStringKeys.values()) {
             List<String> biomesOrTags = new ArrayList<>();
@@ -405,7 +409,7 @@ public class UnderillaConfig {
                         LOGGER.warn("Invalid biome identifier {}.", biomeOrTag);
                         continue;
                     }
-                    if (allBiomes.contains(biome)) {
+                    if (BukkitBiome.getBiomeRegistryAccess().get(BukkitIDs.toKey(biome)) != null) {
                         existingBiomes.add(biome);
                     } else {
                         LOGGER.warn("Biome or tag {} not found in the biome registry.", biomeOrTag);
@@ -415,32 +419,23 @@ public class UnderillaConfig {
             listBiomeStringMap.put(key, existingBiomes);
         }
 
-        // Special rules for ...OnlyOn & ...ExceptOn
+        // Validate ...OnlyOn / ...ExceptOn pairs without expanding an empty pair to every registered biome.
         if (getBoolean(BooleanKeys.CARVERS_ENABLED)) {
-            mergeOnlyOnAndExceptOn(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, SetBiomeStringKeys.APPLY_CARVERS_EXCEPT_ON_BIOMES,
-                    allBiomes);
-            // Do not apply carvers on the biomes that should have surface world only.
-            listBiomeStringMap.get(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES)
-                    .removeAll(listBiomeStringMap.get(SetBiomeStringKeys.SURFACE_WORLD_ONLY_ON_THIS_BIOMES));
-        } else {
-            listBiomeStringMap.put(SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES, Set.of());
-            listBiomeStringMap.remove(SetBiomeStringKeys.APPLY_CARVERS_EXCEPT_ON_BIOMES);
+            warnConflictingBiomeSelectors(
+                    SetBiomeStringKeys.APPLY_CARVERS_ONLY_ON_BIOMES,
+                    SetBiomeStringKeys.APPLY_CARVERS_EXCEPT_ON_BIOMES);
         }
 
         if (getBoolean(BooleanKeys.CARVERS_ENABLED) && getBoolean(BooleanKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS)) {
-            mergeOnlyOnAndExceptOn(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES,
-                    SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_EXCEPT_ON_BIOMES, allBiomes);
-        } else {
-            listBiomeStringMap.put(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES, Set.of());
-            listBiomeStringMap.remove(SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_EXCEPT_ON_BIOMES);
+            warnConflictingBiomeSelectors(
+                    SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_ONLY_ON_BIOMES,
+                    SetBiomeStringKeys.PRESERVE_SURFACE_WORLD_FROM_CAVERS_EXCEPT_ON_BIOMES);
         }
 
         if (getBoolean(BooleanKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ENABLED)) {
-            mergeOnlyOnAndExceptOn(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES,
-                    SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_EXCEPT_ON_BIOMES, allBiomes);
-        } else {
-            listBiomeStringMap.put(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES, Set.of());
-            listBiomeStringMap.remove(SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_EXCEPT_ON_BIOMES);
+            warnConflictingBiomeSelectors(
+                    SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_ON_BIOMES,
+                    SetBiomeStringKeys.BIOME_MERGING_FROM_CAVES_GENERATION_EXCEPT_ON_BIOMES);
         }
     }
 
@@ -506,21 +501,20 @@ public class UnderillaConfig {
 
     // private --------------------------------------------------------------------------------------------------------
 
-    private void mergeOnlyOnAndExceptOn(SetBiomeStringKeys onlyOnKey, SetBiomeStringKeys exceptOnKey, Collection<ID> allBiomes) {
+    private void warnConflictingBiomeSelectors(SetBiomeStringKeys onlyOnKey, SetBiomeStringKeys exceptOnKey) {
         Set<ID> onlyOn = listBiomeStringMap.get(onlyOnKey);
         Set<ID> exceptOn = listBiomeStringMap.get(exceptOnKey);
-        boolean onlyOnEmpty = onlyOn.isEmpty();
-        boolean exceptOnEmpty = exceptOn.isEmpty();
-
-        if (!onlyOnEmpty && !exceptOnEmpty) {
+        if (!onlyOn.isEmpty() && !exceptOn.isEmpty()) {
             LOGGER.warn("Both {} and {} are set. Ignoring {}.", onlyOnKey, exceptOnKey, exceptOnKey);
-        } else if (onlyOnEmpty && exceptOnEmpty) {
-            listBiomeStringMap.put(onlyOnKey, new HashSet<>(allBiomes));
-        } else if (onlyOnEmpty) {
-            listBiomeStringMap.put(onlyOnKey, allBiomes.stream().filter(biome -> !exceptOn.contains(biome)).collect(Collectors.toSet()));
         }
+    }
 
-        listBiomeStringMap.remove(exceptOnKey);
+    private boolean matchesBiomeSelection(SetBiomeStringKeys onlyOnKey, SetBiomeStringKeys exceptOnKey, ID biome) {
+        Set<ID> onlyOn = listBiomeStringMap.get(onlyOnKey);
+        if (!onlyOn.isEmpty()) {
+            return onlyOn.contains(biome);
+        }
+        return !listBiomeStringMap.get(exceptOnKey).contains(biome);
     }
 
     private void warnKeyMissing(Object key) { LOGGER.warn("Key {} not found in config", key); }
