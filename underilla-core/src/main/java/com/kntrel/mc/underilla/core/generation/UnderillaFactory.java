@@ -12,6 +12,7 @@ import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.DeferredPatcher;
+import com.kntrel.mc.underilla.core.patch.PatchTimeValue;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.TransformationBlockPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
@@ -425,16 +426,26 @@ public final class UnderillaFactory {
                 BiPredicate<Vector<Integer>, ChunkData> deferredWritePredicate,
                 ChunkCache chunkCache
         ) {
-            Patcher<ChunkData> surface = referenceWorldPatcher(
+            PatchTimeValue<ChunkData, WorldMask> effectiveMask = Patcher.value(targetChunk -> {
+                WorldMask mask = surfaceFill
+                        ? new UnionWorldMask(WorldHeightMaskPatcher.snapshot(targetChunk, minimumY), worldMask)
+                        : worldMask;
+                return new LastResultWorldMask(mask);
+            });
+            WorldMask scopedMask = (x, y, z) -> effectiveMask.get().contains(x, y, z);
+            Patcher<ChunkData> reference = Patchers.referenceWorldPatcher(
                     referenceWorld,
-                    worldMask,
-                    surfaceFill,
+                    scopedMask,
                     minimumY,
                     air,
                     survivingBlock,
                     transformations(blockTransformer)
             );
-            DeferredPatcher deferredSurface = new DeferredPatcher(surface, deferredWritePredicate, chunkCache);
+            Patcher<ChunkData> surface = Patcher.with(effectiveMask).sequence(reference);
+            BiPredicate<Vector<Integer>, ChunkData> deferInsideMask = (position, targetChunk) ->
+                    scopedMask.contains(globalX(position, targetChunk), position.y(), globalZ(position, targetChunk))
+                            && deferredWritePredicate.test(position, targetChunk);
+            DeferredPatcher deferredSurface = new DeferredPatcher(surface, deferInsideMask, chunkCache);
             List<Patcher<ChunkData>> afterSurface = new ArrayList<>();
             if (undergroundWorld != null) {
                 afterSurface.add(referenceWorldPatcher(
@@ -583,6 +594,33 @@ public final class UnderillaFactory {
                     .map(Block::isLiquid)
                     .map(isLiquid -> !isLiquid)
                     .orElse(true);
+        }
+
+        /** Reuses consecutive membership checks for the same block within one patch invocation. */
+        private static final class LastResultWorldMask implements WorldMask {
+
+            private final WorldMask delegate;
+            private int lastX;
+            private int lastY;
+            private int lastZ;
+            private boolean lastResult;
+            private boolean hasResult;
+
+            private LastResultWorldMask(WorldMask delegate) {
+                this.delegate = Objects.requireNonNull(delegate, "delegate");
+            }
+
+            @Override
+            public boolean contains(int globalX, int y, int globalZ) {
+                if (!hasResult || globalX != lastX || y != lastY || globalZ != lastZ) {
+                    lastX = globalX;
+                    lastY = y;
+                    lastZ = globalZ;
+                    lastResult = delegate.contains(globalX, y, globalZ);
+                    hasResult = true;
+                }
+                return lastResult;
+            }
         }
 
         private static int globalX(Vector<Integer> position, ChunkData targetChunk) {

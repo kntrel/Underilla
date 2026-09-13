@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.HeightMapType;
@@ -235,6 +236,36 @@ class UnderillaFactoryTest {
         assertSame(GENERATED, liquidsTarget.getBlock(1, 1, 0));
         restoredLiquids.afterCarvers().patch(liquidsTarget);
         assertSame(WATER, liquidsTarget.getBlock(1, 1, 0));
+    }
+
+    @Test
+    void survivingBlocksOutsideTheMaskAreWrittenBeforeCarversRegardlessOfDeferredCacheResidency() {
+        assertSame(AIR, carvedSurvivingBlock(128));
+        assertSame(AIR, carvedSurvivingBlock(1));
+    }
+
+    private static Block carvedSurvivingBlock(int cacheSize) {
+        TestBlock ore = TestBlock.solid("minecraft:diamond_ore");
+        TestChunkGrid firstReference = new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS);
+        firstReference.setBlock(0, 0, 0, ore);
+        TestWorld referenceWorld = new TestWorld()
+                .addChunk(firstReference)
+                .addChunk(new TestChunkGrid(1, 0, 0, 4, REFERENCE, PLAINS));
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
+                .surfaceFill(false)
+                .chunkCacheSize(cacheSize)
+                .keptSurfaceBlocks(block -> block == ore)
+                .noodleCaves(NoodleCavesPolicy.surface(_ -> false, false))
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
+
+        plan.afterSurface().patch(target);
+        assertSame(ore, target.getBlock(0, 0, 0));
+        plan.afterSurface().patch(new TestChunkGrid(1, 0, 0, 4, GENERATED, PLAINS));
+        target.setBlock(0, 0, 0, AIR);
+        plan.afterCarvers().patch(target);
+
+        return target.getBlock(0, 0, 0);
     }
 
     @Test

@@ -20,5 +20,14 @@ public interface Patcher<T> {
         return PatcherPipeline.sequence(patchers);
     }
 
+    @SafeVarargs
+    static <T> PatcherPipeline.Builder<T> with(PatchTimeValue<T, ?>... values) {
+        return PatcherPipeline.with(values);
+    }
+
+    static <T, V> PatchTimeValue<T, V> value(Function<? super T, ? extends V> calculation) {
+        return PatchTimeValue.from(calculation);
+    }
+
     void patch(T subject);
 }

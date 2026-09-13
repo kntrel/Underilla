@@ -28,23 +28,30 @@ public final class WorldHeightMaskPatcher implements Patcher<ChunkData> {
     @Override
     public void patch(ChunkData targetChunk) {
         Objects.requireNonNull(targetChunk, "targetChunk");
-        ChunkHeightMap heightMap = calculateHeightMap(targetChunk);
+        ChunkHeightMap heightMap = calculateHeightMap(targetChunk, minimumY);
         try (TempChunkHeightMask.Lease _ = mask.install(heightMap)) {
             delegate.patch(targetChunk);
         }
     }
 
-    private ChunkHeightMap calculateHeightMap(ChunkData chunk) {
+    /** Captures the target chunk's current solid-surface mask for use during one patch invocation. */
+    public static WorldMask snapshot(ChunkData targetChunk, int minimumY) {
+        Objects.requireNonNull(targetChunk, "targetChunk");
+        ChunkHeightMap heightMap = calculateHeightMap(targetChunk, minimumY);
+        return heightMap::contains;
+    }
+
+    private static ChunkHeightMap calculateHeightMap(ChunkData chunk, int minimumY) {
         short[][] heights = new short[GenerationConstants.CHUNK_SIZE][GenerationConstants.CHUNK_SIZE];
         for (int x = 0; x < GenerationConstants.CHUNK_SIZE; x++) {
             for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
-                heights[x][z] = (short) heightAt(chunk, x, z);
+                heights[x][z] = (short) heightAt(chunk, minimumY, x, z);
             }
         }
         return new ChunkHeightMap(chunk.getChunkX(), chunk.getChunkZ(), heights);
     }
 
-    private int heightAt(ChunkData chunk, int x, int z) {
+    private static int heightAt(ChunkData chunk, int minimumY, int x, int z) {
         for (int y = chunk.getMaxHeight() - 1; y >= Math.max(minimumY, chunk.getMinHeight()); y--) {
             Block block = chunk.getBlock(x, y, z);
             if (block != null && block.isSolid()) {
@@ -54,7 +61,18 @@ public final class WorldHeightMaskPatcher implements Patcher<ChunkData> {
         return minimumY;
     }
 
-    private record ChunkHeightMap(int x, int z, short[][] heights) {}
+    private record ChunkHeightMap(int x, int z, short[][] heights) {
+
+        private boolean contains(int globalX, int y, int globalZ) {
+            int size = GenerationConstants.CHUNK_SIZE;
+            if (Math.floorDiv(globalX, size) != x || Math.floorDiv(globalZ, size) != z) {
+                return false;
+            }
+            int localX = Math.floorMod(globalX, size);
+            int localZ = Math.floorMod(globalZ, size);
+            return y > heights[localX][localZ];
+        }
+    }
 
     private record ChunkCoordinate(int x, int z) {}
 
@@ -84,12 +102,7 @@ public final class WorldHeightMaskPatcher implements Patcher<ChunkData> {
             );
             Slot slot = slots.get(coordinate);
             ChunkHeightMap heightMap = slot == null ? null : slot.heightMap;
-            if (heightMap == null) {
-                return false;
-            }
-            int localX = Math.floorMod(globalX, GenerationConstants.CHUNK_SIZE);
-            int localZ = Math.floorMod(globalZ, GenerationConstants.CHUNK_SIZE);
-            return y > heightMap.heights[localX][localZ];
+            return heightMap != null && heightMap.contains(globalX, y, globalZ);
         }
 
         private static final class Slot {
