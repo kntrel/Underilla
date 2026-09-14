@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.core.generation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jkantrell.nbt.tag.CompoundTag;
@@ -25,6 +26,7 @@ import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 
 class UnderillaFactoryTest {
@@ -239,9 +241,76 @@ class UnderillaFactoryTest {
     }
 
     @Test
+    void surfacePolicyPatchesTheNegativeWorldBeforeDeferringProtectedReferenceBlocks() {
+        TestWorld referenceWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS));
+        TestWorld negativeWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS));
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
+                .underground(negativeWorld)
+                .noodleCaves(NoodleCavesPolicy.surface(_ -> false, false))
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS);
+
+        plan.afterSurface().patch(target);
+
+        assertSame(GENERATED, target.getBlock(0, 0, 0));
+        assertSame(AIR, target.getBlock(0, 1, 0));
+
+        plan.afterCarvers().patch(target);
+
+        assertSame(GENERATED, target.getBlock(0, 0, 0));
+        assertSame(REFERENCE, target.getBlock(0, 1, 0));
+    }
+
+    @Test
     void survivingBlocksOutsideTheMaskAreWrittenBeforeCarversRegardlessOfDeferredCacheResidency() {
         assertSame(AIR, carvedSurvivingBlock(128));
         assertSame(AIR, carvedSurvivingBlock(1));
+    }
+
+    @Test
+    void protectedBlocksAreRecomputedWhenTheDeferredBatchIsEvicted() {
+        TestWorld referenceWorld = new TestWorld()
+                .addChunk(new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS))
+                .addChunk(new TestChunkGrid(1, 0, 0, 4, REFERENCE, PLAINS));
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
+                .surfaceFill(false)
+                .chunkCacheSize(1)
+                .noodleCaves(NoodleCavesPolicy.surface(_ -> false, false))
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
+
+        plan.afterSurface().patch(target);
+        assertSame(GENERATED, target.getBlock(0, 1, 0));
+        plan.afterSurface().patch(new TestChunkGrid(1, 0, 0, 4, GENERATED, PLAINS));
+        target.setBlock(0, 1, 0, AIR);
+        plan.afterCarvers().patch(target);
+
+        assertSame(REFERENCE, target.getBlock(0, 1, 0));
+    }
+
+    @Test
+    void failedSurfaceCollectionLeavesTheCarverPhaseToRecompute() {
+        AtomicBoolean fail = new AtomicBoolean(true);
+        TestWorld referenceWorld = new TestWorld()
+                .addChunk(new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS));
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
+                .surfaceFill(false)
+                .surfaceBlockTransformer(block -> {
+                    if (fail.getAndSet(false)) {
+                        throw new IllegalStateException("generation failed");
+                    }
+                    return block;
+                })
+                .noodleCaves(NoodleCavesPolicy.surface(_ -> false, false))
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
+
+        assertThrows(IllegalStateException.class, () -> plan.afterSurface().patch(target));
+        plan.afterCarvers().patch(target);
+
+        assertSame(REFERENCE, target.getBlock(0, 1, 0));
     }
 
     private static Block carvedSurvivingBlock(int cacheSize) {

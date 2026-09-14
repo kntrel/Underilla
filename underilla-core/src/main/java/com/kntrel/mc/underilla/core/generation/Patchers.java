@@ -167,8 +167,7 @@ class Patchers {
         Predicate<ChunkBlock> shouldWrite = candidate -> worldMask.contains(
                 candidate.globalX(), candidate.y(), candidate.globalZ());
         if (survivingBlock != null) {
-            shouldWrite = shouldWrite.or(candidate ->
-                    survivingBlock.test(candidate.candidate()) && candidate.destinationBlock().isSolid());
+            shouldWrite = shouldWrite.or(candidate -> survivingBlock.test(candidate.candidate()) && candidate.destinationBlock().isSolid());
         }
 
         var candidate = Patcher.<ChunkBlock>take(original -> original.attempt(referenceBlock.apply(original)));
