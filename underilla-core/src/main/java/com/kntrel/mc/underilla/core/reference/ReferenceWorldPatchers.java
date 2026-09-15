@@ -187,8 +187,7 @@ public final class ReferenceWorldPatchers {
         if (!surfaceFill) {
             return patcher.apply(worldMask);
         }
-        return new WorldHeightMaskPatcher(heightMask ->
-                patcher.apply(new UnionWorldMask(heightMask, worldMask)));
+        return new WorldHeightMaskPatcher(heightMask -> patcher.apply(new UnionWorldMask(heightMask, worldMask)));
     }
 
     private static Patcher<ChunkData> referenceWorldPatcher(

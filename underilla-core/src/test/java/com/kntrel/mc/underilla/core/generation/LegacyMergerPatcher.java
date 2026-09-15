@@ -67,12 +67,12 @@ final class LegacyMergerPatcher {
             return strategyPatcher;
         }
         return new PatcherPipeline<>(
-                Patchers.referenceWorldPatcher(
+                new ReferenceWorldPatcher(
                         cavesWorld,
                         (x, y, z) -> !worldMask.contains(x, y, z),
                         blocks::air,
-                        null,
-                        java.util.List.of()
+                        _ -> false,
+                        block -> block
                 ),
                 strategyPatcher);
     }

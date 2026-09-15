@@ -15,6 +15,7 @@ import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.HeightMapType;
 import com.kntrel.mc.underilla.core.api.WorldInfo;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
@@ -26,9 +27,13 @@ import com.kntrel.mc.underilla.core.patch.VerticalBoundChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatchers;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 class UnderillaFactoryTest {
@@ -110,7 +115,7 @@ class UnderillaFactoryTest {
                 new TestChunkGrid(0, 0, 0, 2, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 2, GENERATED, PLAINS);
         WorldMask firstColumn = (x, _, _) -> x == 0;
-        Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
+        Patcher<ChunkData> patcher = referenceWorldPatcher(
                 referenceWorld,
                 firstColumn,
                 () -> AIR,
@@ -132,7 +137,7 @@ class UnderillaFactoryTest {
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
         target.setBlock(1, 0, 0, AIR);
         Patcher<ChunkBlock> transformReference = candidate -> candidate.replace(WATER);
-        Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
+        Patcher<ChunkData> patcher = referenceWorldPatcher(
                 referenceWorld,
                 (_, _, _) -> false,
                 () -> AIR,
@@ -151,7 +156,7 @@ class UnderillaFactoryTest {
         TestWorld referenceWorld = new TestWorld().addChunk(
                 new TestChunkGrid(2, -1, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(2, -1, 0, 1, GENERATED, PLAINS);
-        Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
+        Patcher<ChunkData> patcher = referenceWorldPatcher(
                 referenceWorld,
                 (x, _, z) -> x == 32 && z == -16,
                 () -> AIR,
@@ -502,6 +507,27 @@ class UnderillaFactoryTest {
 
     private static UnderillaFactory.Builder configured(UnderillaFactory.Builder builder) {
         return builder.verticalRange(0, 4).maximumCaveY(0).blocks(BLOCKS);
+    }
+
+    private static Patcher<ChunkData> referenceWorldPatcher(
+            WorldReader referenceWorld,
+            WorldMask worldMask,
+            Supplier<Block> air,
+            Predicate<Block> survivingBlock,
+            Collection<Patcher<ChunkBlock>> transformations
+    ) {
+        return ReferenceWorldPatchers.from(
+                referenceWorld,
+                null,
+                worldMask,
+                false,
+                air,
+                survivingBlock,
+                transformations,
+                NoodleCavesPolicy.underground(),
+                false,
+                new ChunkCache(1)
+        ).afterCarvers();
     }
 
     private static final class MutableBiomeData implements BiomeData {

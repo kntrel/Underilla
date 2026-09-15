@@ -11,14 +11,11 @@ import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PerBlockChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
-import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
-import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
 class Patchers {
@@ -73,104 +70,4 @@ class Patchers {
         return new PerBlockChunkPatcher(unsupportedBlock, replacement);
     }
 
-    /** Builds the one-pass reference-world block pipeline without installing it in a plan. */
-    static Patcher<ChunkData> referenceWorldPatcher(
-            WorldReader referenceWorld,
-            WorldMask worldMask,
-            Supplier<Block> air,
-            Predicate<Block> survivingBlock,
-            Collection<Patcher<ChunkBlock>> transformations
-    ) {
-        Objects.requireNonNull(referenceWorld, "referenceWorld");
-        Objects.requireNonNull(worldMask, "worldMask");
-        Objects.requireNonNull(air, "air");
-
-        Patcher<ChunkBlock> blockPatch = referenceWorldBlockPatcher(
-                referenceWorld,
-                worldMask,
-                air,
-                survivingBlock,
-                transformations
-        );
-        Patcher<ChunkData> chunkPatch = new PerBlockChunkPatcher(blockPatch);
-        return Patcher.<ChunkData>iff(targetChunk -> referenceWorld
-                        .readChunk(targetChunk.getChunkX(), targetChunk.getChunkZ())
-                        .isPresent())
-                .then(chunkPatch)
-                .end();
-    }
-
-    static Patcher<ChunkData> dualReferenceWorldPatcher(
-            WorldReader positiveWorld,
-            WorldReader negativeWorld,
-            WorldMask worldMask,
-            Supplier<Block> air,
-            Predicate<Block> survivingBlock,
-            Collection<Patcher<ChunkBlock>> transformations
-    ) {
-        Objects.requireNonNull(negativeWorld, "negativeWorld");
-        Patcher<ChunkBlock> surface = referenceWorldBlockPatcher(
-                positiveWorld,
-                worldMask,
-                air,
-                survivingBlock,
-                transformations
-        );
-        Patcher<ChunkBlock> underground = referenceWorldBlockPatcher(
-                negativeWorld,
-                worldMask.inverted(),
-                air,
-                null,
-                null
-        );
-        Patcher<ChunkData> surfacePatch = perBlock(surface);
-        Patcher<ChunkData> undergroundPatch = perBlock(underground);
-        Patcher<ChunkData> both = perBlock(underground, surface);
-
-        return Patcher.<ChunkData>iff(chunk -> chunkExists(positiveWorld, chunk))
-                .then(Patcher.<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
-                        .then(both)
-                        .otherwise(surfacePatch)
-                        .end())
-                .otherwise(Patcher.<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
-                        .then(undergroundPatch)
-                        .end())
-                .end();
-    }
-
-    @SafeVarargs
-    private static Patcher<ChunkData> perBlock(Patcher<ChunkBlock>... patchers) {
-        return new PerBlockChunkPatcher(Patcher.sequence(patchers));
-    }
-
-    private static boolean chunkExists(WorldReader world, ChunkData chunk) {
-        return world.readChunk(chunk.getChunkX(), chunk.getChunkZ()).isPresent();
-    }
-
-    private static Patcher<ChunkBlock> referenceWorldBlockPatcher(
-            WorldReader referenceWorld,
-            WorldMask worldMask,
-            Supplier<Block> air,
-            Predicate<Block> survivingBlock,
-            Collection<Patcher<ChunkBlock>> transformations
-    ) {
-        Function<ChunkBlock, Block> referenceBlock = target -> referenceWorld
-                .blockAt(target.globalX(), target.y(), target.globalZ())
-                .orElseGet(air);
-        Predicate<ChunkBlock> shouldWrite = candidate -> worldMask.contains(
-                candidate.globalX(), candidate.y(), candidate.globalZ());
-        if (survivingBlock != null) {
-            shouldWrite = shouldWrite.or(candidate -> survivingBlock.test(candidate.candidate()) && candidate.destinationBlock().isSolid());
-        }
-
-        var candidate = Patcher.<ChunkBlock>take(original -> original.attempt(referenceBlock.apply(original)));
-        if (transformations != null && !transformations.isEmpty()) {
-            candidate.patch(transformations);
-        }
-        Predicate<ChunkBlock> finalShouldWrite = shouldWrite;
-        return candidate
-                .iff((_, proposed) -> finalShouldWrite.test(proposed))
-                .then((original, proposed) -> original.replace(proposed.candidate()))
-                .end();
-    }
 }
