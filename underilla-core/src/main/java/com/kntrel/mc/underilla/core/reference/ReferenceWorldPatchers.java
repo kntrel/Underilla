@@ -42,7 +42,7 @@ public final class ReferenceWorldPatchers {
         return afterCarvers;
     }
 
-    public static ReferenceWorldPatchers create(
+    public static ReferenceWorldPatchers from(
             WorldReader referenceWorld,
             WorldReader negativeWorld,
             WorldMask worldMask,
@@ -99,7 +99,7 @@ public final class ReferenceWorldPatchers {
         Patcher<ChunkData> afterCarvers = withEffectiveMask(
                 worldMask,
                 surfaceFill,
-                mask -> combinedReferenceWorldPatcher(
+                mask -> referenceWorldPatcher(
                         referenceWorld,
                         negativeWorld,
                         mask,
@@ -131,7 +131,7 @@ public final class ReferenceWorldPatchers {
         Patcher<ChunkData> collect = withEffectiveMask(
                 worldMask,
                 surfaceFill,
-                mask -> combinedReferenceWorldPatcher(
+                mask -> referenceWorldPatcher(
                         referenceWorld,
                         negativeWorld,
                         mask,
@@ -158,6 +158,7 @@ public final class ReferenceWorldPatchers {
                 surfaceFill,
                 mask -> referenceWorldPatcher(
                         referenceWorld,
+                        null,
                         mask,
                         air,
                         survivingBlock,
@@ -190,7 +191,7 @@ public final class ReferenceWorldPatchers {
                 patcher.apply(new UnionWorldMask(heightMask, worldMask)));
     }
 
-    private static Patcher<ChunkData> combinedReferenceWorldPatcher(
+    private static Patcher<ChunkData> referenceWorldPatcher(
             WorldReader referenceWorld,
             WorldReader negativeWorld,
             WorldMask worldMask,
@@ -199,17 +200,6 @@ public final class ReferenceWorldPatchers {
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
-        if (negativeWorld == null) {
-            return referenceWorldPatcher(
-                    referenceWorld,
-                    worldMask,
-                    air,
-                    survivingBlock,
-                    transformations,
-                    acceptedWrite
-            );
-        }
-
         Patcher<ChunkBlock> reference = perBlock(
                 referenceWorld,
                 worldMask,
@@ -218,6 +208,14 @@ public final class ReferenceWorldPatchers {
                 transformations,
                 acceptedWrite
         );
+        Patcher<ChunkData> surfaceOnly = Patcher
+                .<ChunkData>iff(chunk -> chunkExists(referenceWorld, chunk))
+                .then(perBlock(reference))
+                .end();
+        if (negativeWorld == null) {
+            return surfaceOnly;
+        }
+
         Patcher<ChunkBlock> negative = perBlock(
                 negativeWorld,
                 worldMask.inverted(),
@@ -226,41 +224,22 @@ public final class ReferenceWorldPatchers {
                 List.of(),
                 ReferenceWorldPatchers::adopt
         );
-        Patcher<ChunkData> referenceOnly = perBlock(reference);
-        Patcher<ChunkData> negativeOnly = perBlock(negative);
         Patcher<ChunkData> both = perBlock(negative, reference);
+        Patcher<ChunkData> negativeOnly = perBlock(negative);
 
-        return Patcher.<ChunkData>iff(chunk -> chunkExists(referenceWorld, chunk))
-                .then(Patcher.<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
+        return Patcher
+                .<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
+                .then(Patcher.<ChunkData>iff(chunk -> chunkExists(referenceWorld, chunk))
                         .then(both)
-                        .otherwise(referenceOnly)
+                        .otherwise(negativeOnly)
                         .end())
-                .otherwise(Patcher.<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
-                        .then(negativeOnly)
-                        .end())
-                .end();
-    }
-
-    private static Patcher<ChunkData> referenceWorldPatcher(
-            WorldReader referenceWorld,
-            WorldMask worldMask,
-            Supplier<Block> air,
-            Predicate<Block> survivingBlock,
-            List<Patcher<ChunkBlock>> transformations,
-            AcceptedWrite acceptedWrite
-    ) {
-        Patcher<ChunkData> blocks = new PerBlockChunkPatcher(
-                perBlock(referenceWorld, worldMask, air, survivingBlock, transformations, acceptedWrite));
-        return Patcher.<ChunkData>iff(targetChunk -> referenceWorld
-                        .readChunk(targetChunk.getChunkX(), targetChunk.getChunkZ())
-                        .isPresent())
-                .then(blocks)
+                .otherwise(surfaceOnly)
                 .end();
     }
 
     @SafeVarargs
     private static Patcher<ChunkData> perBlock(Patcher<ChunkBlock>... patchers) {
-        return new PerBlockChunkPatcher(Patcher.sequence(patchers));
+        return new PerBlockChunkPatcher(patchers.length == 1 ? patchers[0] : Patcher.sequence(patchers));
     }
 
     private static boolean chunkExists(WorldReader world, ChunkData chunk) {

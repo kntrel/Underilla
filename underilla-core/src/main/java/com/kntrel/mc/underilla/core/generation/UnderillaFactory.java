@@ -389,7 +389,7 @@ public final class UnderillaFactory {
                 boolean useTopYOnly,
                 ChunkCache chunkCache
         ) {
-            ReferenceWorldPatchers reference = ReferenceWorldPatchers.create(
+            ReferenceWorldPatchers reference = ReferenceWorldPatchers.from(
                     referenceWorld,
                     negativeWorld,
                     worldMask,
