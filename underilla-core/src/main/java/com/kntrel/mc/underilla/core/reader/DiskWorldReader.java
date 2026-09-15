@@ -39,19 +39,19 @@ public abstract class DiskWorldReader implements WorldReader {
     private final DiskWorldReader source;
     private final RLUCacheTriple<Biome> biomeCache;
 
-    protected DiskWorldReader(String regionPath, int cacheSize) throws NoSuchFieldException {
-        this(new File(regionPath), null, cacheSize);
+    protected DiskWorldReader(String regionPath, int regionCacheSize) throws NoSuchFieldException {
+        this(new File(regionPath), null, regionCacheSize);
     }
 
-    protected DiskWorldReader(String regionPath, String entityRegionPath, int cacheSize) throws NoSuchFieldException {
-        this(new File(regionPath), entityRegionPath == null ? null : new File(entityRegionPath), cacheSize);
+    protected DiskWorldReader(String regionPath, String entityRegionPath, int regionCacheSize) throws NoSuchFieldException {
+        this(new File(regionPath), entityRegionPath == null ? null : new File(entityRegionPath), regionCacheSize);
     }
 
-    protected DiskWorldReader(File regionDirectory, int cacheSize) throws NoSuchFieldException {
-        this(regionDirectory, null, cacheSize);
+    protected DiskWorldReader(File regionDirectory, int regionCacheSize) throws NoSuchFieldException {
+        this(regionDirectory, null, regionCacheSize);
     }
 
-    protected DiskWorldReader(File regionDirectory, File entityDirectory, int cacheSize) throws NoSuchFieldException {
+    protected DiskWorldReader(File regionDirectory, File entityDirectory, int regionCacheSize) throws NoSuchFieldException {
         if (!(regionDirectory.exists() && regionDirectory.isDirectory())) {
             throw new NoSuchFieldException("Region directory '" + regionDirectory.getPath() + "' does not exist.");
         }
@@ -60,12 +60,12 @@ public abstract class DiskWorldReader implements WorldReader {
         }
         this.regions = regionDirectory;
         this.entitites = entityDirectory;
-        this.regionCache = new RLUCache<>(cacheSize);
-        int chunkCacheSize = cacheSize * 64;
+        this.regionCache = new RLUCache<>(regionCacheSize);
+        int biomeCacheSize = regionCacheSize * 64 * GenerationConstants.BIOME_CELL_SIZE
+                * GenerationConstants.BIOME_CELL_SIZE;
         this.chunkReaders = null;
         this.source = this;
-        this.biomeCache = new RLUCacheTriple<>(chunkCacheSize * GenerationConstants.BIOME_CELL_SIZE
-                * GenerationConstants.BIOME_CELL_SIZE);
+        this.biomeCache = new RLUCacheTriple<>(biomeCacheSize);
     }
 
     private DiskWorldReader(DiskWorldReader reader, ChunkCache cache) {

@@ -9,13 +9,12 @@ import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.PatchTimeValue;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PerBlockChunkPatcher;
+import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -199,8 +198,10 @@ public final class ReferenceWorldPatchers {
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
+
+        PatchTimeValue<ChunkData, Optional<ChunkReader>> referenceChunkReader = Patcher.value(c -> referenceWorld.readChunk(c.getChunkX(), c.getChunkZ()));
         Patcher<ChunkBlock> reference = perBlock(
-                referenceWorld,
+                referenceChunkReader,
                 worldMask,
                 air,
                 survivingBlock,
@@ -212,11 +213,12 @@ public final class ReferenceWorldPatchers {
                 .then(perBlock(reference))
                 .end();
         if (negativeWorld == null) {
-            return surfaceOnly;
+            return Patcher.with(referenceChunkReader).sequence(surfaceOnly);
         }
 
+        PatchTimeValue<ChunkData, Optional<ChunkReader>> negativeChunkReader = Patcher.value(c -> negativeWorld.readChunk(c.getChunkX(), c.getChunkZ()));
         Patcher<ChunkBlock> negative = perBlock(
-                negativeWorld,
+                negativeChunkReader,
                 worldMask.inverted(),
                 air,
                 null,
@@ -226,7 +228,7 @@ public final class ReferenceWorldPatchers {
         Patcher<ChunkData> both = perBlock(negative, reference);
         Patcher<ChunkData> negativeOnly = perBlock(negative);
 
-        return Patcher
+        Patcher<ChunkData> combined = Patcher
                 .<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
                 .then(Patcher.<ChunkData>iff(chunk -> chunkExists(referenceWorld, chunk))
                         .then(both)
@@ -234,6 +236,8 @@ public final class ReferenceWorldPatchers {
                         .end())
                 .otherwise(surfaceOnly)
                 .end();
+
+        return Patcher.with(referenceChunkReader, negativeChunkReader).sequence(combined);
     }
 
     @SafeVarargs
@@ -246,7 +250,7 @@ public final class ReferenceWorldPatchers {
     }
 
     private static Patcher<ChunkBlock> perBlock(
-            WorldReader referenceWorld,
+            PatchTimeValue<?, Optional<ChunkReader>> chunkReader,
             WorldMask worldMask,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
@@ -254,8 +258,8 @@ public final class ReferenceWorldPatchers {
             AcceptedWrite acceptedWrite
     ) {
         return original -> {
-            Block referenceBlock = referenceWorld
-                    .blockAt(original.globalX(), original.y(), original.globalZ())
+            Block referenceBlock = chunkReader.get()
+                    .flatMap(c -> c.blockAt(original.x(), original.y(), original.z()))
                     .orElseGet(air);
             ChunkBlock proposed = original.attempt(referenceBlock);
             transformations.forEach(transformation -> transformation.patch(proposed));

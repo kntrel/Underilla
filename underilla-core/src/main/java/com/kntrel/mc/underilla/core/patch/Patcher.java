@@ -11,8 +11,8 @@ public interface Patcher<T> {
         return CandidatePatcher.take(take);
     }
 
-    static <T> PredicatePatcher.Builder<T> iff(Predicate<T> predicate) {
-        return PredicatePatcher.iff(predicate);
+    static <T> ConditionalPatcher.Builder<T> iff(Predicate<T> predicate) {
+        return ConditionalPatcher.iff(predicate);
     }
 
     @SafeVarargs

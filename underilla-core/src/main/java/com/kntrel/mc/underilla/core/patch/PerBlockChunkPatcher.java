@@ -23,9 +23,9 @@ public final class PerBlockChunkPatcher implements Patcher<ChunkData> {
     @Override
     public void patch(ChunkData targetChunk) {
         Objects.requireNonNull(targetChunk, "targetChunk");
-        for (int y = targetChunk.getMinHeight(); y < targetChunk.getMaxHeight(); y++) {
-            for (int x = 0; x < GenerationConstants.CHUNK_SIZE; x++) {
-                for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
+        for (int x = 0; x < GenerationConstants.CHUNK_SIZE; x++) {
+            for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
+                for (int y = targetChunk.getMinHeight(); y < targetChunk.getMaxHeight(); y++) {
                     Block currentBlock = targetChunk.getBlock(x, y, z);
                     ChunkBlock block = new ChunkBlock(targetChunk, x, y, z, currentBlock);
                     for (Patcher<ChunkBlock> blockPatcher : blockPatchers) {

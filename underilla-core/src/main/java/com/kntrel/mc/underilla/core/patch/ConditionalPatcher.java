@@ -4,7 +4,7 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 /** Routes a subject to one of two patchers according to a predicate. */
-public final class PredicatePatcher<T> implements Patcher<T> {
+public final class ConditionalPatcher<T> implements Patcher<T> {
 
     private static final Patcher<?> NOOP = _ -> {};
 
@@ -12,7 +12,7 @@ public final class PredicatePatcher<T> implements Patcher<T> {
     private final Patcher<T> then;
     private final Patcher<T> otherwise;
 
-    private PredicatePatcher(
+    private ConditionalPatcher(
             Predicate<T> predicate,
             Patcher<T> then,
             Patcher<T> otherwise
@@ -52,8 +52,8 @@ public final class PredicatePatcher<T> implements Patcher<T> {
             return this;
         }
 
-        public PredicatePatcher<T> end() {
-            return new PredicatePatcher<>(predicate, then, otherwise);
+        public ConditionalPatcher<T> end() {
+            return new ConditionalPatcher<>(predicate, then, otherwise);
         }
     }
 

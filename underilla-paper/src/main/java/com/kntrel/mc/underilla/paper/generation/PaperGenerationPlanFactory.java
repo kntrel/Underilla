@@ -65,7 +65,7 @@ public final class PaperGenerationPlanFactory {
                         config.mergeDepth(),
                         config.adaptiveMaxMergeDepth(),
                         config.adaptiveMinHiddenBlocksMergeDepth())
-                .chunkCacheSize(config.cacheSize())
+                .chunkCacheSize(config.chunkCacheSize())
                 .blocks(blocks)
                 .generationArea(
                         config.generationAreaMinX(),

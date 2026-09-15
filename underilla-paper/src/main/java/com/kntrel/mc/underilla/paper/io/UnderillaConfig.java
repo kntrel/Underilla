@@ -85,7 +85,9 @@ public class UnderillaConfig {
         Underilla.getInstance().saveConfig();
     }
 
-    public int cacheSize() { return getInt(IntegerKeys.CACHE_SIZE); }
+    public int regionFileCacheSize() { return getInt(IntegerKeys.REGION_FILE_CACHE_SIZE); }
+
+    public int chunkCacheSize() { return getInt(IntegerKeys.CHUNK_CACHE_SIZE); }
 
     public int generationAreaMinX() { return getInt(IntegerKeys.GENERATION_AREA_MIN_X); }
 
@@ -165,6 +167,9 @@ public class UnderillaConfig {
 
 
     public void reload(FileConfiguration fileConfiguration) {
+        if (fileConfiguration.contains("cache.size")) {
+            LOGGER.warn("Configuration key 'cache.size' is obsolete; use 'cache.regionFiles' and 'cache.chunks' instead");
+        }
         booleanMap.clear();
         for (BooleanKeys key : BooleanKeys.values()) {
             if (!fileConfiguration.contains(key.path)) {
@@ -211,6 +216,10 @@ public class UnderillaConfig {
                 value = key.min;
             }
             integerMap.put(key, value);
+        }
+        if (chunkCacheSize() < 32) {
+            LOGGER.warn("Chunk cache size {} is below the recommended minimum of 32; Underilla may need to repeatedly "
+                    + "read and recalculate nearby chunks, drastically slowing world generation", chunkCacheSize());
         }
         swapAeraValueIfNeeded();
 
@@ -565,7 +574,8 @@ public class UnderillaConfig {
         ADAPTATIVE_MAX_MERGE_DEPTH("surface.adaptativeDepth.maxDepth", 50),
         ADAPTATIVE_MIN_HIDDEN_BLOCKS_MERGE_DEPTH("surface.adaptativeDepth.minHiddenBlocksDepth", 2),
         MAX_HEIGHT_OF_CAVES("surfaceAndAbsolute.limit", Integer.MAX_VALUE),
-        CACHE_SIZE("cache.size", 16, 1, Integer.MAX_VALUE);
+        REGION_FILE_CACHE_SIZE("cache.regionFiles", 16, 1, Integer.MAX_VALUE),
+        CHUNK_CACHE_SIZE("cache.chunks", 64, 1, Integer.MAX_VALUE);
         // @formatter:on
 
         private final String path;

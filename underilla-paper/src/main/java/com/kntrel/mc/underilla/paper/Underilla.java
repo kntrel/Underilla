@@ -128,7 +128,7 @@ public final class Underilla extends JavaPlugin {
         }
         try {
             this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, surfaceEntitiesDirectory,
-                    getUnderillaConfig().cacheSize());
+                    getUnderillaConfig().regionFileCacheSize());
             LOGGER.info("Surface region directory '{}' found.", surfaceRegionDirectory);
         } catch (NoSuchFieldException e) {
             LOGGER.warn("No surface region directory at '{}' found", surfaceRegionDirectory, e);
@@ -139,7 +139,8 @@ public final class Underilla extends JavaPlugin {
             try {
                 LOGGER.info("Loading caves world");
                 File cavesRegionDirectory = getUnderillaConfig().getCavesRegionPath().toFile();
-                this.worldCavesReader = new BukkitWorldReader(cavesRegionDirectory, getUnderillaConfig().cacheSize());
+                this.worldCavesReader = new BukkitWorldReader(
+                        cavesRegionDirectory, getUnderillaConfig().regionFileCacheSize());
             } catch (NoSuchFieldException e) {
                 LOGGER.warn("No caves region directory at '{}' found", getUnderillaConfig().getCavesRegionPath(), e);
             }

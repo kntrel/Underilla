@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-class PredicatePatcherTest {
+class ConditionalPatcherTest {
 
     @Test
     void patchesThenWhenThePredicateMatches() {
         Value value = new Value(1);
-        PredicatePatcher<Value> patcher = PredicatePatcher.<Value>iff(subject -> subject.number > 0)
+        ConditionalPatcher<Value> patcher = ConditionalPatcher.<Value>iff(subject -> subject.number > 0)
                 .then(subject -> subject.number = 2)
                 .otherwise(subject -> subject.number = 3)
                 .end();
@@ -22,7 +22,7 @@ class PredicatePatcherTest {
     @Test
     void patchesOtherwiseWhenThePredicateDoesNotMatch() {
         Value value = new Value(-1);
-        PredicatePatcher<Value> patcher = PredicatePatcher.<Value>iff(subject -> subject.number > 0)
+        ConditionalPatcher<Value> patcher = ConditionalPatcher.<Value>iff(subject -> subject.number > 0)
                 .then(subject -> subject.number = 2)
                 .otherwise(subject -> subject.number = 3)
                 .end();

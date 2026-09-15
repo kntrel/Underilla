@@ -5,9 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.generation.NoodleCavesPolicy;
-import com.kntrel.mc.underilla.core.impl.TestBiome;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -15,6 +15,8 @@ class PaperGenerationPlanFactoryTest {
 
     private static final ID PLAINS = ID.of("minecraft:plains");
     private static final ID DESERT = ID.of("minecraft:desert");
+    private static final Biome PLAINS_BIOME = () -> PLAINS;
+    private static final Biome DESERT_BIOME = () -> DESERT;
 
     @Test
     void placesTheCombinedReferenceTerrainAfterCarversWhenEveryCarvedBiomeIsProtected() {
@@ -45,8 +47,8 @@ class PaperGenerationPlanFactoryTest {
                         Set.of(),
                         true));
 
-        assertTrue(policy.predicate().test(new TestBiome(PLAINS)));
-        assertFalse(policy.predicate().test(new TestBiome(DESERT)));
+        assertTrue(policy.predicate().test(PLAINS_BIOME));
+        assertFalse(policy.predicate().test(DESERT_BIOME));
         assertTrue(policy.restoreLiquids());
     }
 
@@ -79,8 +81,8 @@ class PaperGenerationPlanFactoryTest {
                         Set.of(),
                         false));
 
-        assertTrue(policy.predicate().test(new TestBiome(PLAINS)));
-        assertTrue(policy.predicate().test(new TestBiome(DESERT)));
+        assertTrue(policy.predicate().test(PLAINS_BIOME));
+        assertTrue(policy.predicate().test(DESERT_BIOME));
     }
 
     @Test
@@ -97,7 +99,7 @@ class PaperGenerationPlanFactoryTest {
                         Set.of(),
                         false));
 
-        assertTrue(policy.predicate().test(new TestBiome(PLAINS)));
-        assertFalse(policy.predicate().test(new TestBiome(DESERT)));
+        assertTrue(policy.predicate().test(PLAINS_BIOME));
+        assertFalse(policy.predicate().test(DESERT_BIOME));
     }
 }

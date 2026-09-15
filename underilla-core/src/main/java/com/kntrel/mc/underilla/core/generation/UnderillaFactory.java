@@ -88,7 +88,7 @@ public final class UnderillaFactory {
         private int mergeDepth;
         private int adaptiveMaximumDepth;
         private int adaptiveMinimumHiddenDepth;
-        private int chunkCacheSize = 128;
+        private int chunkCacheSize = 64;
         private BlockFactory blocks;
         private GenerationArea generationArea = GenerationArea.everywhere();
         private Predicate<ID> surfaceOnlyBiome = _ -> false;
