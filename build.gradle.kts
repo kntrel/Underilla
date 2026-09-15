@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.kntrel.mc.underilla"
-version = "2.3.4"
+version = "3.0.0"
 description = "Generate vanilla caves in custom worlds."
 
 extra["mainMinecraftVersion"] = "26.2"
