@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.core.generation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -21,6 +22,7 @@ import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
+import com.kntrel.mc.underilla.core.patch.VerticalBoundChunkPatcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -56,7 +58,54 @@ class UnderillaFactoryTest {
     };
 
     @Test
-    void alternativeReferenceWorldPatcherGatesDirectWritesByHeightAndMask() {
+    void configuredVerticalRangeBoundsEveryChunkPhase() {
+        TestWorld referenceWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, -2, 5, REFERENCE, PLAINS));
+        WorldGenerationPlan plan = UnderillaFactory.absolute(referenceWorld)
+                .verticalRange(0, 3)
+                .maximumCaveY(0)
+                .blocks(BLOCKS)
+                .keptSurfaceBlocks(_ -> true)
+                .surfaceFill(false)
+                .build();
+        TestChunkGrid target = new TestChunkGrid(0, 0, -2, 5, GENERATED, PLAINS);
+
+        assertInstanceOf(VerticalBoundChunkPatcher.class, plan.afterNoise());
+        assertInstanceOf(VerticalBoundChunkPatcher.class, plan.afterSurface());
+        assertInstanceOf(VerticalBoundChunkPatcher.class, plan.afterCarvers());
+        assertInstanceOf(VerticalBoundChunkPatcher.class, plan.afterFeatures());
+        assertInstanceOf(VerticalBoundChunkPatcher.class, plan.afterLoad());
+
+        plan.afterCarvers().patch(target);
+
+        assertSame(GENERATED, target.getBlock(0, -2, 0));
+        assertSame(GENERATED, target.getBlock(0, -1, 0));
+        assertSame(REFERENCE, target.getBlock(0, 0, 0));
+        assertSame(REFERENCE, target.getBlock(0, 2, 0));
+        assertSame(GENERATED, target.getBlock(0, 3, 0));
+        assertSame(GENERATED, target.getBlock(0, 4, 0));
+    }
+
+    @Test
+    void defaultVerticalRangeLeavesChunkPhasesUnwrapped() {
+        TestWorld referenceWorld = new TestWorld().addChunk(
+                new TestChunkGrid(0, 0, -64, 320, REFERENCE, PLAINS));
+
+        WorldGenerationPlan plan = UnderillaFactory.absolute(referenceWorld)
+                .verticalRange(-64, 320)
+                .maximumCaveY(0)
+                .blocks(BLOCKS)
+                .build();
+
+        assertFalse(plan.afterNoise() instanceof VerticalBoundChunkPatcher);
+        assertFalse(plan.afterSurface() instanceof VerticalBoundChunkPatcher);
+        assertFalse(plan.afterCarvers() instanceof VerticalBoundChunkPatcher);
+        assertFalse(plan.afterFeatures() instanceof VerticalBoundChunkPatcher);
+        assertFalse(plan.afterLoad() instanceof VerticalBoundChunkPatcher);
+    }
+
+    @Test
+    void alternativeReferenceWorldPatcherGatesDirectWritesByMask() {
         TestWorld referenceWorld = new TestWorld().addChunk(
                 new TestChunkGrid(0, 0, 0, 2, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 2, GENERATED, PLAINS);
@@ -64,7 +113,6 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 firstColumn,
-                1,
                 () -> AIR,
                 null,
                 java.util.List.of()
@@ -72,7 +120,7 @@ class UnderillaFactoryTest {
 
         patcher.patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, 0, 0));
+        assertSame(REFERENCE, target.getBlock(0, 0, 0));
         assertSame(REFERENCE, target.getBlock(0, 1, 0));
         assertSame(GENERATED, target.getBlock(1, 1, 0));
     }
@@ -87,7 +135,6 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 (_, _, _) -> false,
-                0,
                 () -> AIR,
                 block -> block == WATER,
                 java.util.List.of(transformReference)
@@ -107,7 +154,6 @@ class UnderillaFactoryTest {
         Patcher<ChunkData> patcher = Patchers.referenceWorldPatcher(
                 referenceWorld,
                 (x, _, z) -> x == 32 && z == -16,
-                0,
                 () -> AIR,
                 null,
                 java.util.List.of(_ -> {})

@@ -70,7 +70,6 @@ final class LegacyMergerPatcher {
                 Patchers.referenceWorldPatcher(
                         cavesWorld,
                         (x, y, z) -> !worldMask.contains(x, y, z),
-                        config.generationAreaMinY(),
                         blocks::air,
                         null,
                         java.util.List.of()
@@ -87,7 +86,6 @@ final class LegacyMergerPatcher {
         return new ReferenceWorldPatcher(
                 surfaceWorld,
                 worldMask,
-                config.generationAreaMinY(),
                 blocks::air,
                 block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
                 block -> {

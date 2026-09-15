@@ -153,7 +153,6 @@ class PatcherStrategyTest {
         Patcher<ChunkData> patcher = new ReferenceWorldPatcher(
                 referenceWorld,
                 emptyMask,
-                config.generationAreaMinY(),
                 blocks::air,
                 _ -> false,
                 UnaryOperator.identity()
@@ -178,7 +177,6 @@ class PatcherStrategyTest {
         Patcher<ChunkData> patcher = new ReferenceWorldPatcher(
                 referenceWorld,
                 singleBlockMask,
-                config.generationAreaMinY(),
                 blocks::air,
                 _ -> false,
                 UnaryOperator.identity()
@@ -234,11 +232,10 @@ class PatcherStrategyTest {
             TestConfig config
     ) {
         BlockFactory blocks = blockFactory();
-        return new WorldHeightMaskPatcher(config.generationAreaMinY(), heightMask ->
+        return new WorldHeightMaskPatcher(heightMask ->
                 new ReferenceWorldPatcher(
                         surfaceWorld,
                         new UnionWorldMask(heightMask, worldMask),
-                        config.generationAreaMinY(),
                         blocks::air,
                         block -> config.shouldKeepSurfaceBlockInCaves(block.id()),
                         block -> config.surfaceBlockReplacement(block.id()).map(blocks::create).orElse(block)

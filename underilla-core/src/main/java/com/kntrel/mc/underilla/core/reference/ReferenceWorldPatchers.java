@@ -47,13 +47,11 @@ public final class ReferenceWorldPatchers {
             WorldReader negativeWorld,
             WorldMask worldMask,
             boolean surfaceFill,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             Collection<Patcher<ChunkBlock>> transformations,
             NoodleCavesPolicy policy,
             boolean useTopYOnly,
-            int topY,
             ChunkCache cache
     ) {
         Objects.requireNonNull(referenceWorld, "referenceWorld");
@@ -70,7 +68,6 @@ public final class ReferenceWorldPatchers {
                     negativeWorld,
                     worldMask,
                     surfaceFill,
-                    minimumY,
                     air,
                     survivingBlock,
                     blockTransformations
@@ -80,13 +77,11 @@ public final class ReferenceWorldPatchers {
                     negativeWorld,
                     worldMask,
                     surfaceFill,
-                    minimumY,
                     air,
                     survivingBlock,
                     blockTransformations,
                     surface,
                     useTopYOnly,
-                    topY,
                     cache
             );
         };
@@ -97,7 +92,6 @@ public final class ReferenceWorldPatchers {
             WorldReader negativeWorld,
             WorldMask worldMask,
             boolean surfaceFill,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             List<Patcher<ChunkBlock>> transformations
@@ -105,12 +99,10 @@ public final class ReferenceWorldPatchers {
         Patcher<ChunkData> afterCarvers = withEffectiveMask(
                 worldMask,
                 surfaceFill,
-                minimumY,
                 mask -> combinedReferenceWorldPatcher(
                         referenceWorld,
                         negativeWorld,
                         mask,
-                        minimumY,
                         air,
                         survivingBlock,
                         transformations,
@@ -125,28 +117,24 @@ public final class ReferenceWorldPatchers {
             WorldReader negativeWorld,
             WorldMask worldMask,
             boolean surfaceFill,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             NoodleCavesPolicy.Surface policy,
             boolean useTopYOnly,
-            int topY,
             ChunkCache cache
     ) {
         TopicChunkCache<DeferredBlockWrites> deferredWrites = cache.topicView(DeferredBlockWrites.class);
         PatchTimeValue<ChunkData, DeferredBlockWrites> currentWrites = Patcher.value(_ -> new DeferredBlockWrites());
-        Predicate<ChunkBlock> shouldDefer = shouldDefer(referenceWorld, policy, useTopYOnly, topY);
+        Predicate<ChunkBlock> shouldDefer = shouldDefer(referenceWorld, policy, useTopYOnly);
 
         Patcher<ChunkData> collect = withEffectiveMask(
                 worldMask,
                 surfaceFill,
-                minimumY,
                 mask -> combinedReferenceWorldPatcher(
                         referenceWorld,
                         negativeWorld,
                         mask,
-                        minimumY,
                         air,
                         survivingBlock,
                         transformations,
@@ -168,11 +156,9 @@ public final class ReferenceWorldPatchers {
         Patcher<ChunkData> recompute = withEffectiveMask(
                 worldMask,
                 surfaceFill,
-                minimumY,
                 mask -> referenceWorldPatcher(
                         referenceWorld,
                         mask,
-                        minimumY,
                         air,
                         survivingBlock,
                         transformations,
@@ -195,13 +181,12 @@ public final class ReferenceWorldPatchers {
     private static Patcher<ChunkData> withEffectiveMask(
             WorldMask worldMask,
             boolean surfaceFill,
-            int minimumY,
             Function<WorldMask, Patcher<ChunkData>> patcher
     ) {
         if (!surfaceFill) {
             return patcher.apply(worldMask);
         }
-        return new WorldHeightMaskPatcher(minimumY, heightMask ->
+        return new WorldHeightMaskPatcher(heightMask ->
                 patcher.apply(new UnionWorldMask(heightMask, worldMask)));
     }
 
@@ -209,7 +194,6 @@ public final class ReferenceWorldPatchers {
             WorldReader referenceWorld,
             WorldReader negativeWorld,
             WorldMask worldMask,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
@@ -219,7 +203,6 @@ public final class ReferenceWorldPatchers {
             return referenceWorldPatcher(
                     referenceWorld,
                     worldMask,
-                    minimumY,
                     air,
                     survivingBlock,
                     transformations,
@@ -243,9 +226,9 @@ public final class ReferenceWorldPatchers {
                 List.of(),
                 ReferenceWorldPatchers::adopt
         );
-        Patcher<ChunkData> referenceOnly = perBlock(minimumY, reference);
-        Patcher<ChunkData> negativeOnly = perBlock(minimumY, negative);
-        Patcher<ChunkData> both = perBlock(minimumY, negative, reference);
+        Patcher<ChunkData> referenceOnly = perBlock(reference);
+        Patcher<ChunkData> negativeOnly = perBlock(negative);
+        Patcher<ChunkData> both = perBlock(negative, reference);
 
         return Patcher.<ChunkData>iff(chunk -> chunkExists(referenceWorld, chunk))
                 .then(Patcher.<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
@@ -261,16 +244,13 @@ public final class ReferenceWorldPatchers {
     private static Patcher<ChunkData> referenceWorldPatcher(
             WorldReader referenceWorld,
             WorldMask worldMask,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
-        Patcher<ChunkBlock> eligibleHeight = Patcher.<ChunkBlock>iff(block -> block.y() >= minimumY)
-                .then(perBlock(referenceWorld, worldMask, air, survivingBlock, transformations, acceptedWrite))
-                .end();
-        Patcher<ChunkData> blocks = new PerBlockChunkPatcher(eligibleHeight);
+        Patcher<ChunkData> blocks = new PerBlockChunkPatcher(
+                perBlock(referenceWorld, worldMask, air, survivingBlock, transformations, acceptedWrite));
         return Patcher.<ChunkData>iff(targetChunk -> referenceWorld
                         .readChunk(targetChunk.getChunkX(), targetChunk.getChunkZ())
                         .isPresent())
@@ -279,11 +259,8 @@ public final class ReferenceWorldPatchers {
     }
 
     @SafeVarargs
-    private static Patcher<ChunkData> perBlock(int minimumY, Patcher<ChunkBlock>... patchers) {
-        Patcher<ChunkBlock> eligibleHeight = Patcher.<ChunkBlock>iff(block -> block.y() >= minimumY)
-                .then(Patcher.sequence(patchers))
-                .end();
-        return new PerBlockChunkPatcher(eligibleHeight);
+    private static Patcher<ChunkData> perBlock(Patcher<ChunkBlock>... patchers) {
+        return new PerBlockChunkPatcher(Patcher.sequence(patchers));
     }
 
     private static boolean chunkExists(WorldReader world, ChunkData chunk) {
@@ -318,11 +295,13 @@ public final class ReferenceWorldPatchers {
     private static Predicate<ChunkBlock> shouldDefer(
             WorldReader referenceWorld,
             NoodleCavesPolicy.Surface policy,
-            boolean useTopYOnly,
-            int topY
+            boolean useTopYOnly
     ) {
         Predicate<ChunkBlock> mayWriteBeforeCarvers = block -> referenceWorld
-                .biomeAt(block.globalX(), useTopYOnly ? topY : block.y(), block.globalZ())
+                .biomeAt(
+                        block.globalX(),
+                        useTopYOnly ? block.targetChunk().getMaxHeight() : block.y(),
+                        block.globalZ())
                 .filter(policy.predicate())
                 .isPresent();
         if (policy.restoreLiquids()) {

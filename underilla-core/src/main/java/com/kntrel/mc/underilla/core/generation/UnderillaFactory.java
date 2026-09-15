@@ -13,6 +13,7 @@ import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.TransformationBlockPatcher;
+import com.kntrel.mc.underilla.core.patch.VerticalBoundChunkPatcher;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -40,6 +41,9 @@ import java.util.function.UnaryOperator;
  * returned builder collects the inputs used to assemble a generation plan.</p>
  */
 public final class UnderillaFactory {
+
+    private static final int DEFAULT_MINIMUM_Y = -64;
+    private static final int DEFAULT_MAXIMUM_Y = 320;
 
     private UnderillaFactory() {}
 
@@ -272,12 +276,10 @@ public final class UnderillaFactory {
                     negativeWorld,
                     worldMask,
                     configuredSurfaceFill,
-                    configuredMinimumY,
                     configuredAir,
                     keptSurfaceBlock,
                     surfaceBlockTransformer,
                     surfaceBiomeUseTopYOnly,
-                    configuredMaximumY,
                     chunkCache
             );
             List<Patcher<ChunkData>> featurePatchers = new ArrayList<>();
@@ -308,7 +310,7 @@ public final class UnderillaFactory {
             if (instrumenter != null) {
                 plan.instrumenter(instrumenter);
             }
-            return plan
+            WorldGenerationPlan generationPlan = plan
                     .coverage(coverage)
                     .biomePatch(biomePatcher)
                     .afterSurface(terrain.afterSurface())
@@ -318,6 +320,35 @@ public final class UnderillaFactory {
                     .flags(flags)
                     .altimeter(altimeter)
                     .done();
+            return configuredMinimumY > DEFAULT_MINIMUM_Y || configuredMaximumY < DEFAULT_MAXIMUM_Y
+                    ? verticallyBound(generationPlan, configuredMinimumY, configuredMaximumY)
+                    : generationPlan;
+        }
+
+        private static WorldGenerationPlan verticallyBound(
+                WorldGenerationPlan plan,
+                int minimumY,
+                int maximumY
+        ) {
+            return new WorldGenerationPlan(
+                    plan.coverage(),
+                    verticallyBound(plan.afterNoise(), minimumY, maximumY),
+                    verticallyBound(plan.afterSurface(), minimumY, maximumY),
+                    verticallyBound(plan.afterCarvers(), minimumY, maximumY),
+                    verticallyBound(plan.afterFeatures(), minimumY, maximumY),
+                    verticallyBound(plan.afterLoad(), minimumY, maximumY),
+                    plan.biomePatch(),
+                    plan.flags(),
+                    plan.altimeter()
+            );
+        }
+
+        private static Patcher<ChunkData> verticallyBound(
+                Patcher<ChunkData> patcher,
+                int minimumY,
+                int maximumY
+        ) {
+            return new VerticalBoundChunkPatcher(patcher, minimumY, maximumY);
         }
 
         private Patcher<BiomeData> biomePatcher(WorldMask worldMask, int maximumY) {
@@ -352,12 +383,10 @@ public final class UnderillaFactory {
                 WorldReader negativeWorld,
                 WorldMask worldMask,
                 boolean surfaceFill,
-                int minimumY,
                 Supplier<Block> air,
                 Predicate<Block> survivingBlock,
                 UnaryOperator<Block> blockTransformer,
                 boolean useTopYOnly,
-                int topY,
                 ChunkCache chunkCache
         ) {
             ReferenceWorldPatchers reference = ReferenceWorldPatchers.create(
@@ -365,13 +394,11 @@ public final class UnderillaFactory {
                     negativeWorld,
                     worldMask,
                     surfaceFill,
-                    minimumY,
                     air,
                     survivingBlock,
                     transformations(blockTransformer),
                     policy,
                     useTopYOnly,
-                    topY,
                     chunkCache
             );
             return new TerrainPhases(

@@ -19,7 +19,6 @@ public final class ReferenceWorldPatcher implements Patcher<ChunkData> {
 
     private final WorldReader referenceWorld;
     private final WorldMask worldMask;
-    private final int minimumY;
     private final Supplier<Block> air;
     private final Predicate<Block> keptSurfaceBlock;
     private final UnaryOperator<Block> surfaceBlockTransformer;
@@ -27,14 +26,12 @@ public final class ReferenceWorldPatcher implements Patcher<ChunkData> {
     public ReferenceWorldPatcher(
             WorldReader referenceWorld,
             WorldMask worldMask,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> keptSurfaceBlock,
             UnaryOperator<Block> surfaceBlockTransformer
     ) {
         this.referenceWorld = Objects.requireNonNull(referenceWorld, "referenceWorld");
         this.worldMask = Objects.requireNonNull(worldMask, "worldMask");
-        this.minimumY = minimumY;
         this.air = Objects.requireNonNull(air, "air");
         this.keptSurfaceBlock = Objects.requireNonNull(keptSurfaceBlock, "keptSurfaceBlock");
         this.surfaceBlockTransformer = Objects.requireNonNull(surfaceBlockTransformer, "surfaceBlockTransformer");
@@ -50,7 +47,7 @@ public final class ReferenceWorldPatcher implements Patcher<ChunkData> {
 
         VectorIterable iterable = new VectorIterable(
                 0, GenerationConstants.CHUNK_SIZE,
-                Math.max(minimumY, targetChunk.getMinHeight()), targetChunk.getMaxHeight(),
+                targetChunk.getMinHeight(), targetChunk.getMaxHeight(),
                 0, GenerationConstants.CHUNK_SIZE
         );
         for (Vector<Integer> vector : iterable) {

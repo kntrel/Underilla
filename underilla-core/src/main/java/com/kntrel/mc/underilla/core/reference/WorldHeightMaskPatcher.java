@@ -14,12 +14,10 @@ import java.util.function.Function;
 /** Runs a patcher with a temporary mask selecting positions above the target chunk's surface. */
 public final class WorldHeightMaskPatcher implements Patcher<ChunkData> {
 
-    private final int minimumY;
     private final TempChunkHeightMask mask;
     private final Patcher<ChunkData> delegate;
 
-    public WorldHeightMaskPatcher(int minimumY, Function<WorldMask, Patcher<ChunkData>> delegateFactory) {
-        this.minimumY = minimumY;
+    public WorldHeightMaskPatcher(Function<WorldMask, Patcher<ChunkData>> delegateFactory) {
         this.mask = new TempChunkHeightMask();
         this.delegate = Objects.requireNonNull(delegateFactory, "delegateFactory").apply(mask);
         Objects.requireNonNull(delegate, "delegate");
@@ -28,37 +26,37 @@ public final class WorldHeightMaskPatcher implements Patcher<ChunkData> {
     @Override
     public void patch(ChunkData targetChunk) {
         Objects.requireNonNull(targetChunk, "targetChunk");
-        ChunkHeightMap heightMap = calculateHeightMap(targetChunk, minimumY);
+        ChunkHeightMap heightMap = calculateHeightMap(targetChunk);
         try (TempChunkHeightMask.Lease _ = mask.install(heightMap)) {
             delegate.patch(targetChunk);
         }
     }
 
     /** Captures the target chunk's current solid-surface mask for use during one patch invocation. */
-    public static WorldMask snapshot(ChunkData targetChunk, int minimumY) {
+    public static WorldMask snapshot(ChunkData targetChunk) {
         Objects.requireNonNull(targetChunk, "targetChunk");
-        ChunkHeightMap heightMap = calculateHeightMap(targetChunk, minimumY);
+        ChunkHeightMap heightMap = calculateHeightMap(targetChunk);
         return heightMap::contains;
     }
 
-    private static ChunkHeightMap calculateHeightMap(ChunkData chunk, int minimumY) {
+    private static ChunkHeightMap calculateHeightMap(ChunkData chunk) {
         short[][] heights = new short[GenerationConstants.CHUNK_SIZE][GenerationConstants.CHUNK_SIZE];
         for (int x = 0; x < GenerationConstants.CHUNK_SIZE; x++) {
             for (int z = 0; z < GenerationConstants.CHUNK_SIZE; z++) {
-                heights[x][z] = (short) heightAt(chunk, minimumY, x, z);
+                heights[x][z] = (short) heightAt(chunk, x, z);
             }
         }
         return new ChunkHeightMap(chunk.getChunkX(), chunk.getChunkZ(), heights);
     }
 
-    private static int heightAt(ChunkData chunk, int minimumY, int x, int z) {
-        for (int y = chunk.getMaxHeight() - 1; y >= Math.max(minimumY, chunk.getMinHeight()); y--) {
+    private static int heightAt(ChunkData chunk, int x, int z) {
+        for (int y = chunk.getMaxHeight() - 1; y >= chunk.getMinHeight(); y--) {
             Block block = chunk.getBlock(x, y, z);
             if (block != null && block.isSolid()) {
                 return y;
             }
         }
-        return minimumY;
+        return chunk.getMinHeight();
     }
 
     private record ChunkHeightMap(int x, int z, short[][] heights) {

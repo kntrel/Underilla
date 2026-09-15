@@ -77,7 +77,6 @@ class Patchers {
     static Patcher<ChunkData> referenceWorldPatcher(
             WorldReader referenceWorld,
             WorldMask worldMask,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             Collection<Patcher<ChunkBlock>> transformations
@@ -86,15 +85,13 @@ class Patchers {
         Objects.requireNonNull(worldMask, "worldMask");
         Objects.requireNonNull(air, "air");
 
-        Patcher<ChunkBlock> blockPatch = Patcher.<ChunkBlock>iff(block -> block.y() >= minimumY)
-                .then(referenceWorldBlockPatcher(
-                        referenceWorld,
-                        worldMask,
-                        air,
-                        survivingBlock,
-                        transformations
-                ))
-                .end();
+        Patcher<ChunkBlock> blockPatch = referenceWorldBlockPatcher(
+                referenceWorld,
+                worldMask,
+                air,
+                survivingBlock,
+                transformations
+        );
         Patcher<ChunkData> chunkPatch = new PerBlockChunkPatcher(blockPatch);
         return Patcher.<ChunkData>iff(targetChunk -> referenceWorld
                         .readChunk(targetChunk.getChunkX(), targetChunk.getChunkZ())
@@ -107,7 +104,6 @@ class Patchers {
             WorldReader positiveWorld,
             WorldReader negativeWorld,
             WorldMask worldMask,
-            int minimumY,
             Supplier<Block> air,
             Predicate<Block> survivingBlock,
             Collection<Patcher<ChunkBlock>> transformations
@@ -127,9 +123,9 @@ class Patchers {
                 null,
                 null
         );
-        Patcher<ChunkData> surfacePatch = perBlock(minimumY, surface);
-        Patcher<ChunkData> undergroundPatch = perBlock(minimumY, underground);
-        Patcher<ChunkData> both = perBlock(minimumY, underground, surface);
+        Patcher<ChunkData> surfacePatch = perBlock(surface);
+        Patcher<ChunkData> undergroundPatch = perBlock(underground);
+        Patcher<ChunkData> both = perBlock(underground, surface);
 
         return Patcher.<ChunkData>iff(chunk -> chunkExists(positiveWorld, chunk))
                 .then(Patcher.<ChunkData>iff(chunk -> chunkExists(negativeWorld, chunk))
@@ -143,11 +139,8 @@ class Patchers {
     }
 
     @SafeVarargs
-    private static Patcher<ChunkData> perBlock(int minimumY, Patcher<ChunkBlock>... patchers) {
-        Patcher<ChunkBlock> aboveMinimumY = Patcher.<ChunkBlock>iff(block -> block.y() >= minimumY)
-                .then(Patcher.sequence(patchers))
-                .end();
-        return new PerBlockChunkPatcher(aboveMinimumY);
+    private static Patcher<ChunkData> perBlock(Patcher<ChunkBlock>... patchers) {
+        return new PerBlockChunkPatcher(Patcher.sequence(patchers));
     }
 
     private static boolean chunkExists(WorldReader world, ChunkData chunk) {

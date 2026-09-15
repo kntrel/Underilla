@@ -22,7 +22,7 @@ class WorldHeightMaskPatcherTest {
     @Test
     void exposesTheChunkHeightMaskOnlyWhileTheDelegateRuns() {
         AtomicReference<WorldMask> capturedMask = new AtomicReference<>();
-        WorldHeightMaskPatcher patcher = new WorldHeightMaskPatcher(0, mask -> {
+        WorldHeightMaskPatcher patcher = new WorldHeightMaskPatcher(mask -> {
             capturedMask.set(mask);
             return _ -> {
                 assertFalse(mask.contains(0, 2, 0));
@@ -39,7 +39,7 @@ class WorldHeightMaskPatcherTest {
     @Test
     void clearsTheChunkHeightMaskWhenTheDelegateFails() {
         AtomicReference<WorldMask> capturedMask = new AtomicReference<>();
-        WorldHeightMaskPatcher patcher = new WorldHeightMaskPatcher(0, mask -> {
+        WorldHeightMaskPatcher patcher = new WorldHeightMaskPatcher(mask -> {
             capturedMask.set(mask);
             return _ -> {
                 throw new IllegalStateException("failure");
