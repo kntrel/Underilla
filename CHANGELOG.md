@@ -1,3 +1,9 @@
+# 3.0.0
+- Rebuild the generation engine around composable generation phases and split the project into reusable core and Paper modules.
+- Move the Java API from `fr.formiko.mc.underilla` to `com.kntrel.mc.underilla`.
+- Improve world-generation performance and diagnostics.
+- Split the source-world cache setting into separately documented region-file and chunk caches.
+
 # 2.3.4
 - Support from 1.21.5 to 26.1.2.
 
