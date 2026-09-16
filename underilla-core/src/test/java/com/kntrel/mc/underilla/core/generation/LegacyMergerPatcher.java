@@ -8,13 +8,12 @@ import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
-import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
 import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 
 import java.util.Objects;
 
-/** Builds the production patcher pipeline used by the merger characterization fixture. */
+/** Builds the historical patcher pipeline used by the merger characterization fixture. */
 final class LegacyMergerPatcher {
 
     private final Patcher<ChunkData> patcher;
@@ -67,7 +66,7 @@ final class LegacyMergerPatcher {
             return strategyPatcher;
         }
         return new PatcherPipeline<>(
-                new ReferenceWorldPatcher(
+                new LegacyReferenceWorldPatcher(
                         cavesWorld,
                         (x, y, z) -> !worldMask.contains(x, y, z),
                         blocks::air,
@@ -83,7 +82,7 @@ final class LegacyMergerPatcher {
             TestGenerationConfig config,
             BlockFactory blocks
     ) {
-        return new ReferenceWorldPatcher(
+        return new LegacyReferenceWorldPatcher(
                 surfaceWorld,
                 worldMask,
                 blocks::air,

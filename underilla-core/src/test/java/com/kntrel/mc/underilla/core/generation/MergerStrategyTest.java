@@ -19,7 +19,6 @@ import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
-import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatcher;
 import com.kntrel.mc.underilla.core.reference.WorldHeightMaskPatcher;
 import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask;
@@ -150,7 +149,7 @@ class PatcherStrategyTest {
         }
         WorldMask emptyMask = (_, _, _) -> false;
         BlockFactory blocks = blockFactory();
-        Patcher<ChunkData> patcher = new ReferenceWorldPatcher(
+        Patcher<ChunkData> patcher = new LegacyReferenceWorldPatcher(
                 referenceWorld,
                 emptyMask,
                 blocks::air,
@@ -174,7 +173,7 @@ class PatcherStrategyTest {
         FakeChunkData destination = new FakeChunkData(0, 4, 0, 0, GENERATED);
         WorldMask singleBlockMask = (x, y, z) -> x == 0 && y == 1 && z == 0;
         BlockFactory blocks = blockFactory();
-        Patcher<ChunkData> patcher = new ReferenceWorldPatcher(
+        Patcher<ChunkData> patcher = new LegacyReferenceWorldPatcher(
                 referenceWorld,
                 singleBlockMask,
                 blocks::air,
@@ -233,7 +232,7 @@ class PatcherStrategyTest {
     ) {
         BlockFactory blocks = blockFactory();
         return new WorldHeightMaskPatcher(heightMask ->
-                new ReferenceWorldPatcher(
+                new LegacyReferenceWorldPatcher(
                         surfaceWorld,
                         new UnionWorldMask(heightMask, worldMask),
                         blocks::air,
