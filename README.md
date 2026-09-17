@@ -127,8 +127,7 @@ It can also be used to add feature to some biome. For example a quartz_ore featu
 ## Statistics
 [![bStats Graph Data](https://bstats.org/signatures/bukkit/Underilla.svg)](https://bstats.org/plugin/bukkit/Underilla/24393)
 
-# Build, Test & deploy
-
+# Build & testz
 Feature requests or pull requests are welcome. Concider creating an issue first to talk about your new feature before sending a pull request.
 
 ## Build
@@ -139,40 +138,11 @@ Build with `./gradlew assemble`. The core library will be in `underilla-core/bui
 
 ## Test
 
-You can test the plugin directly in a Minecraft server with `./gradlew runServer`.
-You can also try it on an other server by placing the .jar in `plugins/`.
-You might want to update the plugin config to fit your needs.
+Run `./gradlew build` to compile the plugin and run the automated tests. To try it on a Paper server, place the built JAR from `underilla-paper/build/libs/` in the server's `plugins/` directory and configure it for your world.
 
-Run a local paper server with the example map & datapack on Linux.
-```sh
-rm -rf run/world_surface run/world
-mkdir -p run/world_surface/dimensions/minecraft/overworld run/world/datapacks
-cp -r testMap/world/region run/world_surface/dimensions/minecraft/overworld/
-cp -r DatapackExamples/UnderillaBaseDataPack/ run/world/datapacks/
-./gradlew runServer
-```
+## Devs
 
-## Deploy
+- [**kntrel**](https://github.com/kntrel) — original creator and maintainer.
+- [**HydrolienF**](https://github.com/HydrolienF) — maintainer and Paper port lead.
 
-### To Github releases, Hangar & Modrinth
-
-Push tag to git to trigger a github action release that will create a new Github release and publish to Hangar & Modrinth.
-```sh
-git tag 1.2.3
-git push --tags
-```
-
-### To Maven central
-
-*Require ossrhUsername & ossrhPassword in ~/.gradle/gradle.properties*
-
-```sh
-./gradlew clean publish
-./gradlew jreleaserDeploy
-```
-The published modules use the `com.kntrel.mc.underilla` group with the `underilla-core` and `underilla-paper` artifact IDs.
-
-## Thanks
-
-Underilla was created by **kntrel** for Minecraft 1.19.4 and substantially maintained and expanded by [**HydrolienF**](https://github.com/HydrolienF) from Minecraft 1.20 onward.
 If you find an issue, please report it in the [GitHub issue tracker](https://github.com/kntrel/underilla/issues).

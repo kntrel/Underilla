@@ -1,6 +1,5 @@
 plugins {
     base
-    id("org.sonarqube") version "7.3.0.8198"
 }
 
 group = "com.kntrel.mc.underilla"
@@ -8,7 +7,7 @@ version = "3.0.0"
 description = "Generate vanilla caves in custom worlds."
 
 extra["mainMinecraftVersion"] = "26.2"
-extra["supportedMinecraftVersions"] = "1.21.5 - 26.2"
+extra["supportedMinecraftVersions"] = "26.2"
 extra["voidWorldGeneratorVersion"] = "1.3.12"
 extra["chunkyVersion"] = "1.4.55"
 
@@ -31,8 +30,6 @@ subprojects {
     plugins.withId("java") {
         extensions.configure<JavaPluginExtension> {
             toolchain.languageVersion.set(JavaLanguageVersion.of(25))
-            withJavadocJar()
-            withSourcesJar()
         }
     }
 }
@@ -54,13 +51,5 @@ tasks.register("echoVersion") {
 tasks.register("echoReleaseName") {
     doLast {
         println("${project.version} [${extra["supportedMinecraftVersions"]}]")
-    }
-}
-
-sonar {
-    properties {
-        property("sonar.projectKey", "Underilla")
-        property("sonar.projectName", "Underilla")
-        property("sonar.host.url", "https://mvndisonar.formiko.fr")
     }
 }
