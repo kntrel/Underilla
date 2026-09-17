@@ -237,5 +237,5 @@ cache:
 
 # Dependencies versions -----------------------------------------------------------------------------------------------
 # No need to change this unless you know what you are doing.
-chunky: "$chunkyVersion"
-voidWorldGenerator: "$voidWorldGeneratorVersion"
+chunkyVersion: "$chunkyVersion"
+voidWorldGeneratorVersion: "$voidWorldGeneratorVersion"
