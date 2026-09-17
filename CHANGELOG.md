@@ -1,8 +1,18 @@
 # 3.0.0
-- Rebuild the generation engine around composable generation phases and split the project into reusable core and Paper modules.
-- Move the Java API from `fr.formiko.mc.underilla` to `com.kntrel.mc.underilla`.
-- Improve world-generation performance and diagnostics.
-- Split the source-world cache setting into separately documented region-file and chunk caches.
+- Requires Java 25 and targets Paper 26.2. Chunky and VoidWorldGenerator are still used for pregeneration and out-of-bounds chunks; the configured setup step can download them.
+- Existing configurations need migration: replace `surfaceWorld.name` and `cavesWorld.name` with `worldPath` and `dimension` in each section. The default source layout is `<worldPath>/dimensions/minecraft/overworld/region`; use `regionPath` for a different layout. Set `surfaceWorld.entitiesPath` when entity files cannot be resolved from the world and dimension.
+- Reference-world entities can now be copied from entity region files into newly generated chunks. If no entity region directory is available, generation continues without copying them.
+- Replace `cache.size` with `cache.regionFiles` (default `16`) and `cache.chunks` (default `64`). The chunk cache reduces repeated source-world reads; values below `32` may substantially slow generation.
+- Use namespaced block, biome, and entity IDs in configuration, such as `minecraft:sand` and `minecraft:item`. Unqualified IDs use the `minecraft` namespace. Block and entity regex patterns now match complete namespaced IDs, so existing patterns should be reviewed.
+- Block support and replacement cleanup now runs during generation, and entity removal runs when a newly generated chunk loads. Remove `steps.cleaningBlocks` and the previously misspelled `steps.cleaingEntities` from existing configurations; only `steps.underillaGeneration` needs to be reset to `todo` for a new generation pass.
+- Removed `clean.blocks.removeUnstableBlocks` and its unstable-block survival checks. The end-of-generation block transformer hook was also removed; plugin integrations using it must be updated.
+- `vanillaPopulation.enabled` now controls mob generation as well as feature generation.
+- Improved terrain and cave merging, including filling gaps between a high reference surface and lower generated terrain when no separate caves world is supplied, and preserving configured reference terrain around cave carvers.
+- The bundled biome-merging list now includes `minecraft:sulfur_caves`.
+- Generation timings and aggregate statistics are written to `plugins/Underilla/metrics.json` during generation and on shutdown.
+- The bundled example datapacks and test worlds have been removed. Bring your own datapack when customizing vanilla features or cave generation.
+- The Java integration packages moved from `fr.formiko.mc.underilla` to `com.kntrel.mc.underilla`; downstream plugins and libraries must update their imports. The project now builds separate core and Paper modules.
+- Pushes to `main` build and run tests. When the project version increases, the release workflow creates a `v` tag and publishes the JAR to GitHub Releases and Hangar. Modrinth and Maven Central publishing are no longer configured.
 
 # 2.3.4
 - Support from 1.21.5 to 26.1.2.
