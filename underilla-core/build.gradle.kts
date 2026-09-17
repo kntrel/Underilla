@@ -18,3 +18,12 @@ dependencies {
 tasks.test {
     useJUnitPlatform()
 }
+
+tasks.register<JavaExec>("inspect") {
+    group = "verification"
+    description = "Render the synthetic world-generation slice without running tests."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("com.kntrel.mc.underilla.core.inspector.Inspector")
+    workingDir = project.projectDir
+}
