@@ -9,7 +9,7 @@ description = "Generate vanilla caves in custom worlds."
 extra["mainMinecraftVersion"] = "26.2"
 extra["supportedMinecraftVersions"] = "26.2"
 extra["voidWorldGeneratorVersion"] = "1.3.12"
-extra["chunkyVersion"] = "1.4.55"
+extra["chunkyVersion"] = "1.5.3"
 
 allprojects {
     group = rootProject.group
