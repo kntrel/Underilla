@@ -13,10 +13,12 @@ import com.kntrel.mc.underilla.paper.impl.BukkitEntity;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
+import org.jspecify.annotations.Nullable;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
-import javax.annotation.Nullable;
+import java.util.function.Function;
 
 /** Maps Underilla's Paper configuration to the platform-neutral generation-plan API. */
 public final class PaperGenerationPlanFactory {
@@ -84,9 +86,18 @@ public final class PaperGenerationPlanFactory {
                 .mobs(config.vanillaPopulationEnabled())
                 .structures(config.structuresEnabled())
                 .noodleCaves(noodleCavesPolicy);
-        if (config.getBoolean(BooleanKeys.CLEAN_BLOCKS_ENABLED)) {
-            builder.blockCleanup(config::cleanupSupportReplacement, config::cleanupBlockReplacement);
-        }
+
+        Function<ID, Optional<ID>> cleanUpSupport = config.getBoolean(BooleanKeys.CLEAN_BLOCKS_ENABLED)
+                ? config::cleanupSupportReplacement
+                : null;
+        Function<ID, Optional<ID>> cleanUpBlock = config.getBoolean(BooleanKeys.CLEAN_BLOCKS_ENABLED)
+                ? config::cleanupSupportReplacement
+                : null;
+        Function<ID, Optional<ID>> cleanUpIllegalBlock = config.getBoolean(BooleanKeys.CLEAN_ILLEGAL_BLOCKS_ENABLED)
+                ? config::cleanupIllegalBlockReplacement
+                : null;
+        builder.blockCleanup(cleanUpSupport, cleanUpBlock, cleanUpIllegalBlock);
+
         if (config.getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
             builder.entityCleanup(
                     entity -> config.shouldRemoveEntity(entity.id()),

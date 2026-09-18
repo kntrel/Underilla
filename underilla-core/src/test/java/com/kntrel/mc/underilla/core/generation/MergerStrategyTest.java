@@ -314,6 +314,9 @@ class PatcherStrategyTest {
 
         @Override
         public ID id() { return id; }
+
+        @Override
+        public boolean isLegal() { return true; }
     }
 
     private record Position(int x, int y, int z) {}

@@ -1,7 +1,7 @@
 package com.kntrel.mc.underilla.paper.io;
 
 import java.util.List;
-import javax.annotation.Nonnull;
+import org.jspecify.annotations.NonNull;
 
 public class Tools {
     private Tools() {}
@@ -14,7 +14,7 @@ public class Tools {
      * @param name the name
      * @return a normalized name
      */
-    public static @Nonnull String normalizeName(@Nonnull String name) {
+    public static @NonNull String normalizeName(@NonNull String name) {
         name = name.toLowerCase();
         if (!name.contains(":")) {
             name = "minecraft:" + name;
@@ -29,7 +29,7 @@ public class Tools {
      * @param nameList a list of names
      * @return a list of normalized names
      */
-    public static @Nonnull List<String> normalizeNameList(@Nonnull List<String> nameList) {
+    public static @NonNull List<String> normalizeNameList(@NonNull List<String> nameList) {
         return nameList.stream().map(Tools::normalizeName).toList();
     }
 }

@@ -5,7 +5,7 @@
 - Replace `cache.size` with `cache.regionFiles` (default `16`) and `cache.chunks` (default `64`). The chunk cache reduces repeated source-world reads; values below `32` may substantially slow generation.
 - Use namespaced block, biome, and entity IDs in configuration, such as `minecraft:sand` and `minecraft:item`. Unqualified IDs use the `minecraft` namespace. Block and entity regex patterns now match complete namespaced IDs, so existing patterns should be reviewed.
 - Block support and replacement cleanup now runs during generation, and entity removal runs when a newly generated chunk loads. Remove `steps.cleaningBlocks` and the previously misspelled `steps.cleaingEntities` from existing configurations; only `steps.underillaGeneration` needs to be reset to `todo` for a new generation pass.
-- Removed `clean.blocks.removeUnstableBlocks` and its unstable-block survival checks. The end-of-generation block transformer hook was also removed; plugin integrations using it must be updated.
+- `clean.blocks.removeUnstableBlocks` now checks newly generated chunks after they load. The end-of-generation block transformer hook was removed; plugin integrations using it must be updated.
 - `vanillaPopulation.enabled` now controls mob generation as well as feature generation.
 - Improved terrain and cave merging, including filling gaps between a high reference surface and lower generated terrain when no separate caves world is supplied, and preserving configured reference terrain around cave carvers.
 - The bundled biome-merging list now includes `minecraft:sulfur_caves`.

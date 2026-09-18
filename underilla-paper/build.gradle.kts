@@ -23,6 +23,7 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:6.0.1"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("net.kyori:adventure-text-serializer-ansi:4.17.0")
+    testImplementation("io.papermc.paper:paper-api:$compileMinecraftVersion.build.+")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

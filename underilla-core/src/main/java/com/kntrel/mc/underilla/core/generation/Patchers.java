@@ -13,10 +13,7 @@ import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.ToIntFunction;
+import java.util.function.*;
 
 class Patchers {
 
@@ -49,7 +46,7 @@ class Patchers {
     }
 
     /** Applies configured support and replacement rules to every block in a chunk. */
-    static Patcher<ChunkData> blockCleanupPatcher(
+    static PerBlockChunkPatcher blockCleanupPatcher(
             BlockFactory blocks,
             Function<ID, Optional<ID>> supportReplacement,
             Function<ID, Optional<ID>> blockReplacement
@@ -70,4 +67,14 @@ class Patchers {
         return new PerBlockChunkPatcher(unsupportedBlock, replacement);
     }
 
+    static PerBlockChunkPatcher illegalBlockPatcher(BlockFactory blocks, Function<ID, Optional<ID>> replacement) {
+        return new PerBlockChunkPatcher(b -> {
+            Block block = b.block();
+            if (block.isAir()) { return; }
+            if (block.isLegal()) { return; }
+
+            Block replacementBlock = replacement.apply(block.id()).map(blocks::create).orElseGet(blocks::air);
+            b.replace(replacementBlock);
+        });
+    }
 }
