@@ -6,14 +6,14 @@ plugins {
 
 description = "Paper plugin that generates vanilla caves in custom worlds."
 
-val mainMinecraftVersion = rootProject.extra["mainMinecraftVersion"] as String
-val voidWorldGeneratorVersion = rootProject.extra["voidWorldGeneratorVersion"] as String
-val chunkyVersion = rootProject.extra["chunkyVersion"] as String
+val compileMinecraftVersion = rootProject.providers.gradleProperty("compileMinecraftVersion").get()
+val voidWorldGeneratorVersion = rootProject.providers.gradleProperty("voidWorldGeneratorVersion").get()
+val chunkyVersion = rootProject.providers.gradleProperty("chunkyVersion").get()
 
 dependencies {
     implementation(project(":underilla-core"))
 
-    paperweight.paperDevBundle("$mainMinecraftVersion.build.+")
+    paperweight.paperDevBundle("$compileMinecraftVersion.build.+")
     compileOnly("net.kyori:adventure-text-serializer-ansi:4.17.0")
 
     implementation("com.github.FormikoLudo:Utils:0.0.9")
@@ -56,13 +56,13 @@ tasks {
 
     processResources {
         val props = mapOf(
-            "name" to "Underilla",
-            "version" to project.version,
-            "description" to project.description,
-            "apiVersion" to "1.21.5",
-            "group" to project.group,
+            "name"                      to rootProject.name,
+            "version"                   to project.version,
+            "description"               to project.description,
+            "apiVersion"                to compileMinecraftVersion,
+            "mainClass"                 to "${project.group}.paper.Underilla",
             "voidWorldGeneratorVersion" to voidWorldGeneratorVersion,
-            "chunkyVersion" to chunkyVersion,
+            "chunkyVersion"             to chunkyVersion,
         )
         inputs.properties(props)
         filesMatching(listOf("paper-plugin.yml", "config.yml")) {
