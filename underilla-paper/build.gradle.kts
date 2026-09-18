@@ -1,7 +1,6 @@
 plugins {
     java
     id("com.gradleup.shadow") version "9.4.1"
-    id("io.papermc.paperweight.userdev") version "2.0.0-beta.22"
 }
 
 description = "Paper plugin that generates vanilla caves in custom worlds."
@@ -13,7 +12,7 @@ val chunkyVersion = rootProject.providers.gradleProperty("chunkyVersion").get()
 dependencies {
     implementation(project(":underilla-core"))
 
-    paperweight.paperDevBundle("$compileMinecraftVersion.build.+")
+    compileOnly("io.papermc.paper:paper-api:$compileMinecraftVersion.build.+")
     compileOnly("net.kyori:adventure-text-serializer-ansi:4.17.0")
 
     implementation("com.github.FormikoLudo:Utils:0.0.9")
