@@ -1,0 +1,473 @@
+package com.kntrel.mc.underilla.core.generation;
+
+import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.BlockFactory;
+import com.kntrel.mc.underilla.core.api.Biome;
+import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.Entity;
+import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.cache.ChunkCache;
+import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
+import com.kntrel.mc.underilla.core.patch.*;
+import com.kntrel.mc.underilla.core.profiling.Instrumenter;
+import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
+import com.kntrel.mc.underilla.core.reader.WorldReader;
+import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatchers;
+import com.kntrel.mc.underilla.core.reference.SurfaceAltimeter;
+import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
+import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
+import java.util.function.UnaryOperator;
+
+/**
+ * Entry point for composing an Underilla world-generation plan.
+ *
+ * <p>Its strategy-named entry points make the chosen reference-terrain strategy explicit while the
+ * returned builder collects the inputs used to assemble a generation plan.</p>
+ */
+public final class UnderillaFactory {
+
+    private static final int DEFAULT_MINIMUM_Y = -64;
+    private static final int DEFAULT_MAXIMUM_Y = 320;
+
+    private UnderillaFactory() {}
+
+    public static Builder absolute(WorldReader referenceWorld) {
+        return new Builder(Strategy.ABSOLUTE, referenceWorld, true);
+    }
+
+    public static Builder surface(WorldReader referenceWorld) {
+        return new Builder(Strategy.SURFACE, referenceWorld, true);
+    }
+
+    public static Builder none(WorldReader referenceWorld) {
+        return new Builder(Strategy.NONE, referenceWorld, true);
+    }
+
+    private enum Strategy {
+        ABSOLUTE,
+        SURFACE,
+        NONE
+    }
+
+    private record TerrainPhases(
+            List<Patcher<ChunkData>> afterSurface,
+            List<Patcher<ChunkData>> afterCarvers
+    ) {
+        private TerrainPhases {
+            afterSurface = List.copyOf(afterSurface);
+            afterCarvers = List.copyOf(afterCarvers);
+        }
+    }
+
+    /** Mutable input collector for one strategy-specific plan. */
+    public static final class Builder {
+
+        private final Strategy strategy;
+        private WorldReader referenceWorld;
+        private WorldReader negativeWorld;
+        private Instrumenter instrumenter;
+        private Integer minimumY;
+        private Integer maximumY;
+        private Integer maximumCaveY;
+        private int mergeDepth;
+        private int adaptiveMaximumDepth;
+        private int adaptiveMinimumHiddenDepth;
+        private int chunkCacheSize = 64;
+        private BlockFactory blocks;
+        private GenerationArea generationArea = GenerationArea.everywhere();
+        private Predicate<ID> surfaceOnlyBiome = _ -> false;
+        private Predicate<ID> preservedGeneratedBiome = _ -> false;
+        private Predicate<ID> ignoredSurfaceBlock = _ -> false;
+        private Predicate<Block> keptSurfaceBlock;
+        private UnaryOperator<Block> surfaceBlockTransformer;
+        private Function<ID, Optional<ID>> cleanupSupportReplacement;
+        private Function<ID, Optional<ID>> cleanupBlockReplacement;
+        private Function<ID, Optional<ID>> cleanupIllegalBlockReplacement;
+        private Predicate<Entity> cleanupEntityRemoval;
+        private Consumer<Entity> cleanupEntityTransformer;
+        private boolean surfaceBiomeUseTopYOnly;
+        private boolean preserveGeneratedBiomesOnlyUnderSurface;
+        private boolean surfaceFill;
+        private boolean carversEnabled = true;
+        private boolean featuresEnabled = true;
+        private boolean mobsEnabled = true;
+        private boolean structuresEnabled = true;
+        private NoodleCavesPolicy noodleCavesPolicy = NoodleCavesPolicy.underground();
+
+        private Builder(Strategy strategy, WorldReader referenceWorld, boolean surfaceFill) {
+            this.strategy = Objects.requireNonNull(strategy, "strategy");
+            this.referenceWorld = Objects.requireNonNull(referenceWorld, "referenceWorld");
+            this.surfaceFill = surfaceFill;
+        }
+
+        public Builder underground(WorldReader negativeWorld) {
+            this.negativeWorld = Objects.requireNonNull(negativeWorld, "negativeWorld");
+            return this;
+        }
+
+        public Builder instrumenter(Instrumenter instrumenter) {
+            this.instrumenter = Objects.requireNonNull(instrumenter, "instrumenter");
+            return this;
+        }
+
+        public Builder verticalRange(int minimumY, int maximumY) {
+            if (maximumY < minimumY) {
+                throw new IllegalArgumentException("maximumY must be greater than or equal to minimumY");
+            }
+            this.minimumY = minimumY;
+            this.maximumY = maximumY;
+            return this;
+        }
+
+        public Builder maximumCaveY(int maximumCaveY) {
+            this.maximumCaveY = maximumCaveY;
+            return this;
+        }
+
+        public Builder surfaceDepth(int mergeDepth, int adaptiveMaximumDepth, int adaptiveMinimumHiddenDepth) {
+            this.mergeDepth = mergeDepth;
+            this.adaptiveMaximumDepth = adaptiveMaximumDepth;
+            this.adaptiveMinimumHiddenDepth = adaptiveMinimumHiddenDepth;
+            return this;
+        }
+
+        public Builder chunkCacheSize(int cacheSize) {
+            if (cacheSize < 1) {
+                throw new IllegalArgumentException("cacheSize must be at least 1");
+            }
+            this.chunkCacheSize = cacheSize;
+            return this;
+        }
+
+        public Builder blocks(BlockFactory blocks) {
+            this.blocks = Objects.requireNonNull(blocks, "blocks");
+            return this;
+        }
+
+        public Builder generationArea(int minimumX, int minimumZ, int maximumX, int maximumZ) {
+            this.generationArea = new GenerationArea(minimumX, minimumZ, maximumX, maximumZ);
+            return this;
+        }
+
+        public Builder surfaceOnlyBiomes(Predicate<ID> surfaceOnlyBiome) {
+            this.surfaceOnlyBiome = Objects.requireNonNull(surfaceOnlyBiome, "surfaceOnlyBiome");
+            return this;
+        }
+
+        public Builder preservedGeneratedBiomes(Predicate<ID> preservedGeneratedBiome) {
+            this.preservedGeneratedBiome = Objects.requireNonNull(
+                    preservedGeneratedBiome, "preservedGeneratedBiome");
+            return this;
+        }
+
+        public Builder preserveGeneratedBiomesOnlyUnderSurface(boolean enabled) {
+            preserveGeneratedBiomesOnlyUnderSurface = enabled;
+            return this;
+        }
+
+        public Builder ignoredSurfaceBlocks(Predicate<ID> ignoredSurfaceBlock) {
+            this.ignoredSurfaceBlock = Objects.requireNonNull(ignoredSurfaceBlock, "ignoredSurfaceBlock");
+            return this;
+        }
+
+        public Builder keptSurfaceBlocks(Predicate<Block> keptSurfaceBlock) {
+            this.keptSurfaceBlock = Objects.requireNonNull(keptSurfaceBlock, "keptSurfaceBlock");
+            return this;
+        }
+
+        public Builder surfaceBlockTransformer(UnaryOperator<Block> surfaceBlockTransformer) {
+            this.surfaceBlockTransformer = Objects.requireNonNull(surfaceBlockTransformer, "surfaceBlockTransformer");
+            return this;
+        }
+
+        /** Copies reference blocks above the generated surface even when they are outside the world mask. */
+        public Builder surfaceFill(boolean enabled) {
+            surfaceFill = enabled;
+            return this;
+        }
+
+        /** Configures block support and replacement cleanup after vanilla features are generated. */
+        public Builder blockCleanup(
+                Function<ID, Optional<ID>> supportReplacement,
+                Function<ID, Optional<ID>> blockReplacement,
+                Function<ID, Optional<ID>> illegalBlockReplacement
+        ) {
+            this.cleanupSupportReplacement = Objects.requireNonNull(supportReplacement, "supportReplacement");
+            this.cleanupBlockReplacement = Objects.requireNonNull(blockReplacement, "blockReplacement");
+            return this;
+        }
+
+        /** Configures entity removal and final transformation after the generated chunk becomes live. */
+        public Builder entityCleanup(
+                Predicate<Entity> shouldRemove,
+                Consumer<Entity> survivingEntityTransformer
+        ) {
+            this.cleanupEntityRemoval = Objects.requireNonNull(shouldRemove, "shouldRemove");
+            this.cleanupEntityTransformer = Objects.requireNonNull(
+                    survivingEntityTransformer, "survivingEntityTransformer");
+            return this;
+        }
+
+        public Builder surfaceBiomeUseTopYOnly(boolean surfaceBiomeUseTopYOnly) {
+            this.surfaceBiomeUseTopYOnly = surfaceBiomeUseTopYOnly;
+            return this;
+        }
+
+        public Builder carvers(boolean enabled) {
+            carversEnabled = enabled;
+            return this;
+        }
+
+        public Builder features(boolean enabled) {
+            featuresEnabled = enabled;
+            return this;
+        }
+
+        public Builder mobs(boolean enabled) {
+            mobsEnabled = enabled;
+            return this;
+        }
+
+        public Builder structures(boolean enabled) {
+            structuresEnabled = enabled;
+            return this;
+        }
+
+        public Builder noodleCaves(NoodleCavesPolicy noodleCavesPolicy) {
+            this.noodleCavesPolicy = Objects.requireNonNull(noodleCavesPolicy, "noodleCavesPolicy");
+            return this;
+        }
+
+        /**
+         * Builds the complete phase plan for this strategy and noodle-cave policy.
+         */
+        public WorldGenerationPlan build() {
+            ChunkCache chunkCache = new ChunkCache(chunkCacheSize);
+            referenceWorld = bindReader(referenceWorld, chunkCache);
+            negativeWorld = bindReader(negativeWorld, chunkCache);
+
+            int configuredMinimumY = requiredValue(minimumY, "verticalRange");
+            int configuredMaximumY = requiredValue(maximumY, "verticalRange");
+            int configuredMaximumCaveY = maximumCaveY == null ? configuredMaximumY : maximumCaveY;
+            BlockFactory configuredBlocks = Objects.requireNonNull(blocks, "blocks");
+            Supplier<Block> configuredAir = configuredBlocks::air;
+            boolean configuredSurfaceFill = surfaceFill && negativeWorld == null;
+            WorldMask worldMask = worldMask(configuredMinimumY, configuredMaximumY, configuredMaximumCaveY,
+                    configuredAir.get(), chunkCache);
+
+            Patcher<BiomeData> biomePatcher = biomePatcher(worldMask, configuredMaximumY);
+            TerrainPhases terrain = terrain(
+                    noodleCavesPolicy,
+                    referenceWorld,
+                    negativeWorld,
+                    worldMask,
+                    configuredSurfaceFill,
+                    configuredAir,
+                    keptSurfaceBlock,
+                    surfaceBlockTransformer,
+                    surfaceBiomeUseTopYOnly,
+                    chunkCache
+            );
+            List<Patcher<ChunkData>> featurePatchers = new ArrayList<>();
+            List<Patcher<ChunkData>> loadPatchers = new ArrayList<>(2);
+
+            PerBlockChunkPatcher illegalBlocksPatcher = null;
+            if (cleanupIllegalBlockReplacement != null) {
+                illegalBlocksPatcher = Patchers.illegalBlockPatcher(blocks, cleanupIllegalBlockReplacement);
+            }
+
+            // If illegal block clean up is not enabled, but support and replacement are, then the patch happens on afterFeatures
+            // If illegal block clean up is enabled, all block cleanup happens on afterLoad
+            // The idea is to have only one cleanup pass
+            if (cleanupSupportReplacement != null) {
+                PerBlockChunkPatcher cleanUpPatcher = Patchers.blockCleanupPatcher(
+                        configuredBlocks,
+                        cleanupSupportReplacement,
+                        cleanupBlockReplacement
+                );
+                if (illegalBlocksPatcher != null) {
+                    loadPatchers.add(cleanUpPatcher.merge(illegalBlocksPatcher));
+                } else {
+                    featurePatchers.add(cleanUpPatcher);
+                }
+            } else if (illegalBlocksPatcher != null) {
+                loadPatchers.add(illegalBlocksPatcher);
+            }
+
+            featurePatchers.add(Patchers.referenceWorldEntityPatcher(referenceWorld));
+
+            if (cleanupEntityRemoval != null) {
+                loadPatchers.add(new EntityCleanupPatcher(cleanupEntityRemoval, cleanupEntityTransformer));
+            }
+
+            GenerationFlags flags = new GenerationFlags(
+                    strategy != Strategy.NONE,
+                    true,
+                    carversEnabled,
+                    featuresEnabled,
+                    mobsEnabled,
+                    structuresEnabled
+            );
+            ChunkCoverage coverage = this::coversChunk;
+            Altimeter altimeter = new SurfaceAltimeter(referenceWorld, configuredAir);
+
+            WorldGenerationPlanBuilder plan = WorldGenerationPlan.build();
+            if (instrumenter != null) {
+                plan.instrumenter(instrumenter);
+            }
+            WorldGenerationPlan generationPlan = plan
+                    .coverage(coverage)
+                    .biomePatch(biomePatcher)
+                    .afterSurface(terrain.afterSurface())
+                    .afterCarvers(terrain.afterCarvers())
+                    .afterFeatures(featurePatchers)
+                    .afterLoad(loadPatchers)
+                    .flags(flags)
+                    .altimeter(altimeter)
+                    .done();
+            return configuredMinimumY > DEFAULT_MINIMUM_Y || configuredMaximumY < DEFAULT_MAXIMUM_Y
+                    ? verticallyBound(generationPlan, configuredMinimumY, configuredMaximumY)
+                    : generationPlan;
+        }
+
+        private static WorldGenerationPlan verticallyBound(
+                WorldGenerationPlan plan,
+                int minimumY,
+                int maximumY
+        ) {
+            return new WorldGenerationPlan(
+                    plan.coverage(),
+                    verticallyBound(plan.afterNoise(), minimumY, maximumY),
+                    verticallyBound(plan.afterSurface(), minimumY, maximumY),
+                    verticallyBound(plan.afterCarvers(), minimumY, maximumY),
+                    verticallyBound(plan.afterFeatures(), minimumY, maximumY),
+                    verticallyBound(plan.afterLoad(), minimumY, maximumY),
+                    plan.biomePatch(),
+                    plan.flags(),
+                    plan.altimeter()
+            );
+        }
+
+        private static Patcher<ChunkData> verticallyBound(
+                Patcher<ChunkData> patcher,
+                int minimumY,
+                int maximumY
+        ) {
+            return new VerticalBoundChunkPatcher(patcher, minimumY, maximumY);
+        }
+
+        private Patcher<BiomeData> biomePatcher(WorldMask worldMask, int maximumY) {
+            Predicate<BiomeData> included = biome -> generationArea.contains(biome.getX(), biome.getZ());
+            ToIntFunction<BiomeData> referenceY = surfaceBiomeUseTopYOnly
+                    ? _ -> maximumY
+                    : BiomeData::getY;
+            BiPredicate<BiomeData, Biome> shouldReplace = (biome, referenceBiome) ->
+                    surfaceOnlyBiome.test(referenceBiome.id())
+                    || !preservedGeneratedBiome.test(biome.get().id())
+                    || preserveGeneratedBiomesOnlyUnderSurface && biomeCellIntersectsMask(biome, worldMask);
+            return Patchers.referenceWorldBiomePatcher(referenceWorld, included, referenceY, shouldReplace);
+        }
+
+        private static boolean biomeCellIntersectsMask(BiomeData biome, WorldMask worldMask) {
+            int cellSize = GenerationConstants.BIOME_CELL_SIZE;
+            int cellX = biome.getBiomeX() * cellSize;
+            int cellZ = biome.getBiomeZ() * cellSize;
+            for (int x = cellX; x < cellX + cellSize; x++) {
+                for (int z = cellZ; z < cellZ + cellSize; z++) {
+                    if (worldMask.contains(x, biome.getY(), z)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static TerrainPhases terrain(
+                NoodleCavesPolicy policy,
+                WorldReader referenceWorld,
+                WorldReader negativeWorld,
+                WorldMask worldMask,
+                boolean surfaceFill,
+                Supplier<Block> air,
+                Predicate<Block> survivingBlock,
+                UnaryOperator<Block> blockTransformer,
+                boolean useTopYOnly,
+                ChunkCache chunkCache
+        ) {
+            ReferenceWorldPatchers reference = ReferenceWorldPatchers.from(
+                    referenceWorld,
+                    negativeWorld,
+                    worldMask,
+                    surfaceFill,
+                    air,
+                    survivingBlock,
+                    transformations(blockTransformer),
+                    policy,
+                    useTopYOnly,
+                    chunkCache
+            );
+            return new TerrainPhases(
+                    List.of(reference.afterSurface()),
+                    List.of(reference.afterCarvers())
+            );
+        }
+
+        private static List<Patcher<ChunkBlock>> transformations(UnaryOperator<Block> transformer) {
+            return transformer == null
+                    ? List.of()
+                    : List.of(TransformationBlockPatcher.fromBlocks(transformer));
+        }
+
+        private static WorldReader bindReader(WorldReader reader, ChunkCache cache) {
+            return reader instanceof DiskWorldReader disk ? disk.withChunkCache(cache) : reader;
+        }
+
+        private WorldMask worldMask(int minimumY, int maximumY, int maximumCaveY, Block air, ChunkCache cache) {
+            return switch (strategy) {
+                case ABSOLUTE -> new AbsoluteWorldMask(maximumCaveY, minimumY, maximumY);
+                case SURFACE -> new ReferenceHeightWorldMask(
+                        referenceWorld,
+                        air,
+                        minimumY,
+                        maximumY,
+                        maximumCaveY,
+                        mergeDepth,
+                        adaptiveMaximumDepth,
+                        adaptiveMinimumHiddenDepth,
+                        surfaceOnlyBiome,
+                        ignoredSurfaceBlock,
+                        cache
+                );
+                case NONE -> new AbsoluteWorldMask(minimumY);
+            };
+        }
+
+        private static int requiredValue(Integer value, String source) {
+            if (value == null) {
+                throw new IllegalStateException(source + " must be configured");
+            }
+            return value;
+        }
+
+        private boolean coversChunk(int chunkX, int chunkZ) {
+            int blockX = chunkX * GenerationConstants.CHUNK_SIZE;
+            int blockZ = chunkZ * GenerationConstants.CHUNK_SIZE;
+            return generationArea.contains(blockX, blockZ)
+                    && referenceWorld.readChunk(chunkX, chunkZ).isPresent();
+        }
+
+    }
+}

@@ -1,4 +1,4 @@
-[download]: https://img.shields.io/github/downloads/HydrolienF/Underilla/total
+[download]: https://img.shields.io/github/downloads/kntrel/underilla/total
 [downloadLink]: https://hangar.papermc.io/Hydrolien/Underilla
 [discord-shield]: https://img.shields.io/discord/728592434577014825?label=discord
 [discord-invite]: https://discord.gg/RPNbtRSFqG
@@ -7,14 +7,14 @@
 [ ![download][] ][downloadLink]
 [ ![discord-shield][] ][discord-invite]
 
-[**Discord**](https://discord.gg/RPNbtRSFqG) | [**Hangar**](https://hangar.papermc.io/Hydrolien/Underilla) | [**GitHub**](https://github.com/HydrolienF/Underilla) | [**Original author Github** (Outdated)](https://github.com/Jeshuakrc/Underilla)
+[**Discord**](https://discord.gg/RPNbtRSFqG) | [**Hangar**](https://hangar.papermc.io/Hydrolien/Underilla) | [**GitHub**](https://github.com/kntrel/underilla)
 
 # Underilla
 Underilla is a minecraft plugin to 'merge' existing custom Minecraft word surfaces and vanilla undergrounds. It works by allowing the vanilla generation engine create chunks as normal, then intercepting the generator and forcing the surface of the original world, which works as a reference. In other worlds, Underilla generates a brand-new world with vanilla undergrounds, but cloning the surface of an already existing world.
 
 It's original purpose is adding vanilla caves to custom [WorldPainter](https://www.worldpainter.net/) worlds, but it would perfectly work for any pre-generated world.
 
-![Underilla](https://github.com/HydrolienF/Underilla/assets/71718798/5d4c0812-443e-42db-90cf-a138f11ec6c9)
+![Underilla](https://github.com/kntrel/underilla/assets/71718798/5d4c0812-443e-42db-90cf-a138f11ec6c9)
 
 ## Main features
 - Merge the original world surface and vanilla underground.
@@ -26,8 +26,8 @@ And many more options in the config to transform your custom world.
 ## Getting started
 ### Perquisites
 
-- [Java 21](https://adoptium.net/temurin/releases/?version=21).
-- A pre-generated world to use as a reference (Such as a [WorldPainter](https://www.worldpainter.net/) world).
+- [Java 25](https://adoptium.net/temurin/releases/?version=25).
+- A pre-generated world to use as a reference (Such as a [WorldPainter](https://www.worldpainter.net/) world). Its directory layout must use the Minecraft Java 26.1+ world format. For worlds using an older layout, configure `surfaceWorld.regionPath` to point directly to the world's `region/` directory instead.
 - A [Paper](https://papermc.io/software/paper) (or forks) Minecraft Server. Supported Minecraft version are in the release name.
 
 ### Single player or non-Paper
@@ -46,15 +46,15 @@ If you are strugeling with world generation, you can ask for **help on the Disco
 This guide will help you to generate the 0, 0 to 512, 512 area as a first test of Underilla.
 
 1.
-    1. Download and install [Java 21](https://adoptium.net/temurin/releases/?version=21).
+    1. Download and install [Java 25](https://adoptium.net/temurin/releases/?version=25).
     2. Download the latest paper version [here](https://papermc.io/downloads/paper).
     3. Create a new directory for your server and move the paper .jar file inside.
     4. Start the server in a terminal with `java -jar paper-1.21.4-222.jar -nogui` (Replace `1.21.4-222` by your paper version).
     5. Open `eula.txt`, set `eula=true` and restart the server.
 2. 
-    1. Download the latest Underilla version from the [releases](https://github.com/HydrolienF/Underilla/releases).
+    1. Download the latest Underilla version from the [releases](https://github.com/kntrel/underilla/releases).
     2. Move the downloaded jar file to the existing directory `plugins/` in your server directory.
-    3. Copy your custom world to a new directory called `world_surface/` inside your server directory. (Only the `region/` sub directory of your world matters. Make sure to have some region file in `world_surface/region/`.)
+    3. Copy your custom world to a new directory called `world_surface/` inside your server directory. The default configuration reads `world_surface/dimensions/minecraft/overworld/region`, which is the Minecraft Java 26.1+ world layout. If your reference world uses an older layout, configure `surfaceWorld.regionPath` to point directly to its `region/` directory.
 3. 
    1. Restart the server again. Underilla will update some settings & download 2 needed plugins and stop the server.
    2. Restart the server again. Underilla is launched, you can join the server once it's running or after it have finished and check the result.
@@ -64,7 +64,7 @@ See the full guide below to generate other area than 0, 0 to 512, 512 & improve 
 ### Guide - Complete version
 
 1. Setup a paper server
-    1. Download and install [Java 21](https://adoptium.net/temurin/releases/?version=21).
+    1. Download and install [Java 25](https://adoptium.net/temurin/releases/?version=25).
     2. Download the latest paper version [here](https://papermc.io/downloads/paper).
     3. Create a new directory for your server and move the paper .jar file inside.
     4. Create a `start.sh` on Linux or MacOS or a `start.bat` in Windows with `java -jar paper-1.21.4-222.jar -nogui` inside. (Replace `1.21.4-222` by your paper version.)
@@ -75,33 +75,31 @@ See the full guide below to generate other area than 0, 0 to 512, 512 & improve 
     9. You can edit the mob spawning settings or any other server config here if you want.
     10. You now have a vanilla ready to work server. Time to setup Underilla.
 2. Setup Underilla
-    1. Download the latest Underilla version from the [releases](https://github.com/HydrolienF/Underilla/releases).
+    1. Download the latest Underilla version from the [releases](https://github.com/kntrel/underilla/releases).
     2. Move the downloaded jar file to the existing directory `plugins/` in your server directory.
 3. Setup your custom world
-    1. Copy your custom world to a new directory called `world_surface/` inside your server directory. (Only the `region/` sub directory of your world matters. Make sure to have some region file in `world_surface/region/`.)
+    1. Copy your custom world to a new directory called `world_surface/` inside your server directory. The default configuration expects the Minecraft Java 26.1+ layout, with Overworld regions in `world_surface/dimensions/minecraft/overworld/region`. For an older world layout, configure `surfaceWorld.regionPath` to point directly to the world's `region/` directory.
 4. Configure Underilla
-    1. Copy the config from [this file](https://github.com/HydrolienF/Underilla/blob/main/src/main/resources/config.yml) and save it as config.yml in `plugins/Underilla/`. The default config can also be initialized by running underilla, but copying it from the repo ensure that Underilla config is configured before Underilla starts. If the `plugins/Underilla/` directory does not exist yet, you can create it.
-    2. Edit `generationArea` inside `plugins/Underilla/config.yml` to match your surface world size. If you just want to test Underilla for a 1st generation, you can keep default values.
-    3. You can read the other fields of the config and edit some of them. This steps can be done later after a 1st generation try, to customize your world generation.
-    4. If you have already done a generation, you need to switch back some step (underillaGeneration, cleaningBlocks, cleaingEntities) from "done" to "todo".
+    1. Copy the config from [this file](https://github.com/kntrel/underilla/blob/main/underilla-paper/src/main/resources/config.yml) and save it as config.yml in `plugins/Underilla/`. The default config can also be initialized by running underilla, but copying it from the repo ensure that Underilla config is configured before Underilla starts. If the `plugins/Underilla/` directory does not exist yet, you can create it.
+    2. Select each source using either `worldPath` plus a dimension ID, or a direct `regionPath`. When `regionPath` is non-empty it overrides `worldPath` and `dimension`.
+    3. Edit `generationArea` inside `plugins/Underilla/config.yml` to match your surface world size. If you just want to test Underilla for a 1st generation, you can keep default values.
+    4. You can read the other fields of the config and edit some of them. This steps can be done later after a 1st generation try, to customize your world generation.
+    5. If you have already completed a generation and want to run it again, change `steps.underillaGeneration` from `"done"` to `"todo"`.
 5. Configure datapack
     1. If your custom world already have a datapack, you can move it to `world/datapacks/` to keep your custom biomes etc.
     2. If you don't have a datapack yet, you should create one from [vanilla biome files](https://github.com/misode/mcmeta/tree/data) where you have remove the features you don't want. For example if your custom surface world already have trees and most important, have caves high enought for your world.
-    3. /!\ Make sure that cave will be generated under montains by having a high y level on your datapack. You can use [this basic datapack](https://github.com/HydrolienF/Underilla/tree/main/DatapackExamples/UnderillaBaseDataPack) to take care of the height or include it's files into your datapack. If you miss this step, there might be some empty space under montains in your world, but the generation will work.
+    3. /!\ Make sure that cave will be generated under montains by having a high y level on your datapack. You can use [this basic datapack](https://github.com/kntrel/underilla/tree/main/DatapackExamples/UnderillaBaseDataPack) to take care of the height or include it's files into your datapack. If you miss this step, there might be some empty space under montains in your world, but the generation will work.
 6. Start **caves generation**
     1. Run the server again, this time the eula have been accepted, so the server will start. The 1st time you start the server Underilla will download it's dependencies to your `plugins/`, configure paper for faster world generation & set Underilla as world Generator in `bukkit.yml`. This steps can be disabled in the config.
     2. If you have set a start script, the server should restart automaticaly, if not you will have to restart it manually.
     3. The generation is now started, yopu just have to wait until it's done now. If you stop the server, the generation will restart the next time you start the server.
-    You can explore the map while it's being generated to check how it's doing. Be aware that being on the server while the map is generated migth edit the world, even in spectator mod and might result in a sligtly different world generation because of water or falling sand being updated before the cleaning tasks. Best will be to stay out of the server for you last generation try.
-    The generation process will be done in 3 steps:
-        1. **Merging** your **surface world** to a new world with **vanilla caves**. This step merge blocks & biomes and generate new features, new structures & new mobs. It is by far the longest steps and it will takes hours for the biggest worlds.
-        2. Cleaning the blocks of the final world.
-        3. Cleaning the entities of the final world.
+    You can explore the map while it's being generated to check how it's doing. Be aware that being on the server while the map is generated migth edit the world, even in spectator mod and might result in a sligtly different world generation because of water or falling sand being updated before generation-time cleanup. Best will be to stay out of the server for you last generation try.
+    The generation process merges your **surface world** into a new world with **vanilla caves**. Blocks, biomes, features, structures, mobs, and the configured block and entity cleanup are handled as part of this single generation pass. It can take hours for the biggest worlds.
 7. What's next
-    1. Check that the world meet what you expected and redo the generation since step 4 if needed. (You should keep a save of `world` somewhere just in case.) Don't forget to switch back some step (underillaGeneration, cleaningBlocks, cleaingEntities) from "done" to "todo", else the generation won't be done again.
+    1. Check that the world meets what you expected and redo the generation from step 4 if needed. You should keep a backup of `world` just in case. Before running it again, change `steps.underillaGeneration` from `"done"` to `"todo"`.
     2. You can now delete the `world_surface/` (You should keep a save somewhere just in case)
     3. You can now remove Underilla from `plugins/` & edit `bukkit.yml` to make `VoidWorldGenerator` your world generator. This will ensure that no chunk is generated by the vanilla generator outside of the final world area. If you wich to have a vanilla world merging with the generated world, you can remove the generator from `bukkit.yml`. Vanilla generator will try to merge it's custom world with the existing one. You can also add a datapack to have only ocean biome generated over the generated world.
-    4. I hope Underilla will improve the cave experience of your players. If you find any bugs please report them in the [Github issues](https://github.com/HydrolienF/Underilla/issues).
+    4. I hope Underilla will improve the cave experience of your players. If you find any bugs please report them in the [Github issues](https://github.com/kntrel/underilla/issues).
 
 
 ## Known issues & workarounds
@@ -114,7 +112,7 @@ See the full guide below to generate other area than 0, 0 to 512, 512 & improve 
 
 ## WorldPainter considerations
 If you're going to plug your custom WorldPainter world into Underilla, consider before exporting:
-- Disable caves, caverns, and chasms altogether, allow Underilla to take over that step. This is due to biome placement, every underground non-solid block in the surfaceWorld drags its biome over along with it, this interferes with proper underground vanilla biomes.
+- Disable caves, caverns, and chasms if you want Underilla to generate the underground completely. With the default `surfaceWorld.useTopYBiomeOnly: true`, Underilla copies only the top biome from each column, so underground biomes in the reference world do not interfere with vanilla cave biomes. Set this option to `false` only if you intentionally want to preserve vertically varying biomes from the reference world.
 - Always disable the `Allow Minecraft to populate the entire terrain` option. Rather use the `vanillaPopulation` option in Underilla's `config.yml` file.
 - Don't use the resource layer. Underilla will have the vanilla generator take care of that for you.
 - The Populate layer has no effect. Weather all or none of the terrain will be populated based on the above point.
@@ -126,62 +124,25 @@ Cave generation on custom biomes is working. Features (ores, flowers etc) & stru
 If you want to remove some of the game features, for example the `monster_room` you can create a datapack where you have customize witch feature can spawn in each biome. Underilla will generate feature according to your cusomized biome.
 It can also be used to add feature to some biome. For example a quartz_ore feature if your nether is disabled you you still want your builders to have quartz.
 
-## Performances
-Huge map generation can takes hours or even days, here is some stats about performance to help you choose your configuration settings.
-All tests have been done on paper 1.20.4 on a 1000*1000 map generation of the same world painter generated world with default settings except strategy. We can't garanty that your computer will be as fast as mine, but it should be enoth to imagine how much time your world will need.
-- Minecraft Vanilla generator (No Underilla) 1:36
-- None strategy 3:25 (2.13 times longer than Vanilla generation)
-- Absolute stategy 4:34 (2.85 times longer than Vanilla generation)
-- Surface srategy 4:32 (2.83 times longer than Vanilla generation)
-- Relative strategy (have been removed since) 11:07 (6.94 times longer than Vanilla generation)
-
-For a 50000 * 30000 world, it would take 40 hours to generate with Minecraft vanilla generator, 113 hours in surface strategie and 279 hours in relative.
-
 ## Statistics
 [![bStats Graph Data](https://bstats.org/signatures/bukkit/Underilla.svg)](https://bstats.org/plugin/bukkit/Underilla/24393)
 
-# Build, Test & deploy
-
+# Build & testz
 Feature requests or pull requests are welcome. Concider creating an issue first to talk about your new feature before sending a pull request.
 
 ## Build
 
-Clone the [repo](https://github.com/HydrolienF/Underilla) `git clone git@github.com:HydrolienF/Underilla.git`
+Clone the [repo](https://github.com/kntrel/underilla) `git clone git@github.com:kntrel/underilla.git`
 
-Build with `./gradlew assemble`. The plugin .jar file will be in `build/libs/`.
+Build with `./gradlew assemble`. The core library will be in `underilla-core/build/libs/`, and the plugin will be in `underilla-paper/build/libs/`.
 
 ## Test
 
-You can test the plugin directly in a Minecraft server with `./gradlew runServer`.
-You can also try it on an other server by placing the .jar in `plugins/`.
-You might want to update the plugin config to fit your needs.
+Run `./gradlew build` to compile the plugin and run the automated tests. To try it on a Paper server, place the built JAR from `underilla-paper/build/libs/` in the server's `plugins/` directory and configure it for your world.
 
-Run a local paper server with the example map & datapack on Linux.
-```sh
-rm run/world_surface/ -fr; cp testMap/world/ run/world_surface/; rm -fr run/world/; mkdir -p run/world/datapacks; cp DatapackExamples/UnderillaBaseDataPack/ run/world/datapacks; ./gradlew runServer
-```
+## Devs
 
-## Deploy
+- [**kntrel**](https://github.com/kntrel) — original creator and maintainer.
+- [**HydrolienF**](https://github.com/HydrolienF) — maintainer and Paper port lead.
 
-### To Github releases, Hangar & Modrinth
-
-Push tag to git to trigger a github action release that will create a new Github release and publish to Hangar & Modrinth.
-```sh
-git tag 1.2.3
-git push --tags
-```
-
-### To Maven central
-
-*Require ossrhUsername & ossrhPassword in ~/.gradle/gradle.properties*
-
-```sh
-./gradlew clean publish
-./gradlew jreleaserDeploy
-```
-The published lib will be available [on maven central](https://central.sonatype.com/artifact/fr.formiko.mc.underilla/underilla).
-
-## Thanks
-
-Thanks a lot to [**Jeshuakrc**](https://github.com/Jeshuakrc) for creating this incredible project in 1.19.4 !
-Since Minecraft 1.20, I'm maintaining the project. If you have any issues or have found a bug, please let me know [here](https://github.com/HydrolienF/Underilla/issues).
+If you find an issue, please report it in the [GitHub issue tracker](https://github.com/kntrel/underilla/issues).

@@ -1,11 +1,12 @@
 name: Build and Publish Release
 on:
   push:
-    # Tag triggers releases, push triggers pre-releases
-    # branches: [ master, main ]
-    tags:
-      - '*'
-    
+    branches: [main]
+
+concurrency:
+  group: underilla-main-release
+  queue: max
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -13,77 +14,106 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Set up JDK 21
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '25'
           distribution: 'temurin'
           cache: gradle
       # Configure Gradle for optimal use in GitHub Actions, including caching of downloaded dependencies.
       # See: https://github.com/gradle/actions/blob/main/setup-gradle/README.md
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
-      # build
-      - name: Build with Gradle Wrapper
-        run: ./gradlew assemble
-
-      - name: Get version & release name
-        id: version
+      - name: Read current version
+        id: current
         run: |
-          echo "version=$(./gradlew -q echoVersion)" >> $GITHUB_OUTPUT
-          echo "releaseName=$(./gradlew -q echoReleaseName)" >> $GITHUB_OUTPUT
-      
-      - name: Print version & release name
-        run: |
-          echo "Version: ${{ steps.version.outputs.version }}"
-          echo "Release Name: ${{ steps.version.outputs.releaseName }}"
+          version="$(python3 .github/scripts/get-version.py)"
+          echo "Current version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
 
-
-      - name: Create an empty CHANGELOG.md if missing
+      - name: Read previous release version
+        id: previous
         run: |
-          if [ ! -f CHANGELOG.md ]; then
-            touch CHANGELOG.md
+          version="$(python3 .github/scripts/get-version.py 'v*')"
+          echo "Previous version: ${version:-none}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Gate release version
+        id: gate
+        env:
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
+          PREVIOUS_VERSION: ${{ steps.previous.outputs.version }}
+        run: |
+          comparison="$(python3 .github/scripts/sameVer-compare.py "$CURRENT_VERSION" "$PREVIOUS_VERSION")"
+          if [ "$comparison" -le 0 ]; then
+            echo "Version has not advanced; skipping release"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          echo "release=true" >> "$GITHUB_OUTPUT"
 
-      - name: Remove all lines after the 2nd title in CHANGELOG.md
-        shell: pwsh
+      - name: Build and test
+        run: ./gradlew build
+
+      - name: Read release name
+        if: steps.gate.outputs.release == 'true'
+        id: releaseName
+        run: echo "value=$(./gradlew -q echoReleaseName)" >> "$GITHUB_OUTPUT"
+
+      - name: Read compatible Minecraft versions
+        if: steps.gate.outputs.release == 'true'
+        id: worksOnMinecraftVersions
         run: |
-          $changelogPath = "CHANGELOG.md"
-          $content = Get-Content -Path CHANGELOG.md
-          $indices = ($content | ForEach-Object { $_ } | Select-String -Pattern "^#" | ForEach-Object { $_.LineNumber - 1 })
+          versions="$(./gradlew -q echoWorksOnMinecraftVersions)"
+          echo "Supported Paper versions: $versions"
+          echo "value=$versions" >> "$GITHUB_OUTPUT"
 
-          if ($indices.Count -ge 2) {
-              $startIndex = $indices[0]
-              $endIndex = $indices[1]
+      - name: Prepare release notes
+        if: steps.gate.outputs.release == 'true'
+        id: releaseNotes
+        env:
+          RELEASE_VERSION: ${{ steps.current.outputs.version }}
+        run: |
+          notes="$(python3 .github/scripts/get-md-section.py CHANGELOG.md "$RELEASE_VERSION")"
+          delimiter="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+          {
+            echo "body<<$delimiter"
+            printf '%s\n' "$notes"
+            echo "$delimiter"
+          } >> "$GITHUB_OUTPUT"
 
-              $changes = $content[$startIndex..($endIndex - 1)]
-
-              $changes = $changes | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-
-              $changes -join "`n" | Set-Content -Path $changelogPath
-              Write-Output "Changelog updated"
-          } else {
-              Write-Output "Not as much lines as expected"
-          }
-
+      - name: Tag commit
+        if: steps.gate.outputs.release == 'true'
+        run: |
+          git tag "${{ steps.current.outputs.tag }}" "$GITHUB_SHA"
+          git push origin "refs/tags/${{ steps.current.outputs.tag }}"
 
       - name: Create Release
+        if: steps.gate.outputs.release == 'true'
         id: createRelease
         uses: ncipollo/release-action@v1.14.0
         with:
-          allowUpdates: true
-          updateOnlyUnreleased: true
-          artifacts: build/libs/Underilla-${{ steps.version.outputs.version }}.jar
+          artifacts: underilla-paper/build/libs/Underilla-${{ steps.current.outputs.version }}.jar
           token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.releaseName }}
-          bodyFile: CHANGELOG.md
-          # prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }} #Always release for now
+          tag: ${{ steps.current.outputs.tag }}
+          name: ${{ steps.releaseName.outputs.value }}
+          body: ${{ steps.releaseNotes.outputs.body }}
           skipIfReleaseExists: true
-      
-      - name: Publish to hangar #& modrinth
+
+      - name: Publish to Hangar
+        if: steps.gate.outputs.release == 'true'
         env:
-          # Make sure you have added a repository secret in the repository's settings
           HANGAR_API_TOKEN: ${{ secrets.HANGAR_API_TOKEN }}
-          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-        run: ./gradlew assemble publishPluginPublicationToHangar #modrinth
+          RELEASE_NOTES: ${{ steps.releaseNotes.outputs.body }}
+          RELEASE_VERSION: ${{ steps.current.outputs.version }}
+          PAPER_VERSIONS: ${{ steps.worksOnMinecraftVersions.outputs.value }}
+        run: |
+          python3 .github/scripts/publish-to-hangar.py \
+            --slug Underilla \
+            --version "$RELEASE_VERSION" \
+            --description "$RELEASE_NOTES" \
+            --paper-versions "$PAPER_VERSIONS" \
+            --file "underilla-paper/build/libs/Underilla-${RELEASE_VERSION}.jar"
