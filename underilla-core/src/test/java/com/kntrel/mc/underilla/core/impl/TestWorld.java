@@ -4,6 +4,7 @@ import com.jkantrell.nbt.tag.CompoundTag;
 import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -81,10 +82,16 @@ public final class TestWorld implements WorldReader {
                         Math.floorMod(z, GenerationConstants.CHUNK_SIZE)));
     }
 
+    public Optional<ChunkData> chunkData(int chunkX, int chunkZ) {
+        return Optional.ofNullable(chunks.get(new ChunkCoordinate(chunkX, chunkZ)));
+    }
+
     @Override
     public Optional<ChunkReader> readChunk(int chunkX, int chunkZ) {
         return Optional.ofNullable(chunks.get(new ChunkCoordinate(chunkX, chunkZ))).map(GridChunkReader::new);
     }
+
+
 
     private Optional<TestChunkGrid> gridAt(int globalX, int globalZ) {
         int chunkX = Math.floorDiv(globalX, GenerationConstants.CHUNK_SIZE);
