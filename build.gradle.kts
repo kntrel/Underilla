@@ -6,11 +6,6 @@ group = "com.kntrel.mc.underilla"
 version = "3.0.0"
 description = "Generate vanilla caves in custom worlds."
 
-extra["mainMinecraftVersion"] = "26.2"
-extra["supportedMinecraftVersions"] = "26.2"
-extra["voidWorldGeneratorVersion"] = "1.3.12"
-extra["chunkyVersion"] = "1.4.55"
-
 allprojects {
     group = rootProject.group
     version = rootProject.version
@@ -50,6 +45,12 @@ tasks.register("echoVersion") {
 
 tasks.register("echoReleaseName") {
     doLast {
-        println("${project.version} [${extra["supportedMinecraftVersions"]}]")
+        println("${project.version} [${providers.gradleProperty("worksOnMinecraftVersions").get()}]")
+    }
+}
+
+tasks.register("echoWorksOnMinecraftVersions") {
+    doLast {
+        println(providers.gradleProperty("worksOnMinecraftVersions").get())
     }
 }

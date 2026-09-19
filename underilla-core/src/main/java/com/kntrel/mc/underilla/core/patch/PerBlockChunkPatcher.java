@@ -3,7 +3,11 @@ package com.kntrel.mc.underilla.core.patch;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+
+import java.awt.image.AreaAveragingScaleFilter;
+import java.util.Arrays;
 import java.util.Objects;
+import java.util.stream.Stream;
 
 /** Applies an ordered set of block patchers during one traversal of a chunk. */
 public final class PerBlockChunkPatcher implements Patcher<ChunkData> {
@@ -37,6 +41,13 @@ public final class PerBlockChunkPatcher implements Patcher<ChunkData> {
                 }
             }
         }
+    }
+
+    public PerBlockChunkPatcher merge(PerBlockChunkPatcher other) {
+        Patcher<ChunkBlock>[] patchers = Arrays.copyOf(this.blockPatchers, this.blockPatchers.length + other.blockPatchers.length);
+        System.arraycopy(other.blockPatchers, 0, patchers, this.blockPatchers.length, other.blockPatchers.length);
+
+        return new PerBlockChunkPatcher(patchers);
     }
 
 }

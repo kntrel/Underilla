@@ -77,5 +77,11 @@ public class BukkitBlock implements Block {
     public ID id() {
         return BukkitIDs.from(blockData_.getMaterial().asBlockType().getKey());
     }
+
+    @Override
+    public boolean isLegal() {
+        return true;
+    }
+
     public org.bukkit.Material getMaterial() { return this.blockData_.getMaterial(); }
 }

@@ -10,10 +10,7 @@ import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
-import com.kntrel.mc.underilla.core.patch.ChunkBlock;
-import com.kntrel.mc.underilla.core.patch.Patcher;
-import com.kntrel.mc.underilla.core.patch.TransformationBlockPatcher;
-import com.kntrel.mc.underilla.core.patch.VerticalBoundChunkPatcher;
+import com.kntrel.mc.underilla.core.patch.*;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -98,6 +95,7 @@ public final class UnderillaFactory {
         private UnaryOperator<Block> surfaceBlockTransformer;
         private Function<ID, Optional<ID>> cleanupSupportReplacement;
         private Function<ID, Optional<ID>> cleanupBlockReplacement;
+        private Function<ID, Optional<ID>> cleanupIllegalBlockReplacement;
         private Predicate<Entity> cleanupEntityRemoval;
         private Consumer<Entity> cleanupEntityTransformer;
         private boolean surfaceBiomeUseTopYOnly;
@@ -204,7 +202,8 @@ public final class UnderillaFactory {
         /** Configures block support and replacement cleanup after vanilla features are generated. */
         public Builder blockCleanup(
                 Function<ID, Optional<ID>> supportReplacement,
-                Function<ID, Optional<ID>> blockReplacement
+                Function<ID, Optional<ID>> blockReplacement,
+                Function<ID, Optional<ID>> illegalBlockReplacement
         ) {
             this.cleanupSupportReplacement = Objects.requireNonNull(supportReplacement, "supportReplacement");
             this.cleanupBlockReplacement = Objects.requireNonNull(blockReplacement, "blockReplacement");
@@ -283,18 +282,37 @@ public final class UnderillaFactory {
                     chunkCache
             );
             List<Patcher<ChunkData>> featurePatchers = new ArrayList<>();
+            List<Patcher<ChunkData>> loadPatchers = new ArrayList<>(2);
+
+            PerBlockChunkPatcher illegalBlocksPatcher = null;
+            if (cleanupIllegalBlockReplacement != null) {
+                illegalBlocksPatcher = Patchers.illegalBlockPatcher(blocks, cleanupIllegalBlockReplacement);
+            }
+
+            // If illegal block clean up is not enabled, but support and replacement are, then the patch happens on afterFeatures
+            // If illegal block clean up is enabled, all block cleanup happens on afterLoad
+            // The idea is to have only one cleanup pass
             if (cleanupSupportReplacement != null) {
-                featurePatchers.add(Patchers.blockCleanupPatcher(
+                PerBlockChunkPatcher cleanUpPatcher = Patchers.blockCleanupPatcher(
                         configuredBlocks,
                         cleanupSupportReplacement,
                         cleanupBlockReplacement
-                ));
+                );
+                if (illegalBlocksPatcher != null) {
+                    loadPatchers.add(cleanUpPatcher.merge(illegalBlocksPatcher));
+                } else {
+                    featurePatchers.add(cleanUpPatcher);
+                }
+            } else if (illegalBlocksPatcher != null) {
+                loadPatchers.add(illegalBlocksPatcher);
             }
+
             featurePatchers.add(Patchers.referenceWorldEntityPatcher(referenceWorld));
 
-            List<Patcher<ChunkData>> loadPatchers = cleanupEntityRemoval == null
-                    ? List.of()
-                    : List.of(new EntityCleanupPatcher(cleanupEntityRemoval, cleanupEntityTransformer));
+            if (cleanupEntityRemoval != null) {
+                loadPatchers.add(new EntityCleanupPatcher(cleanupEntityRemoval, cleanupEntityTransformer));
+            }
+
             GenerationFlags flags = new GenerationFlags(
                     strategy != Strategy.NONE,
                     true,

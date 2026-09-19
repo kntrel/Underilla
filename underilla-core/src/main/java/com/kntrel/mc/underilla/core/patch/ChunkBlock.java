@@ -133,6 +133,9 @@ public class ChunkBlock {
         }
 
         @Override
+        public boolean isLegal() { return block.isLegal(); }
+
+        @Override
         public void waterlog() {
             block.waterlog();
             changed = true;
@@ -195,6 +198,9 @@ public class ChunkBlock {
 
             @Override
             public boolean isWaterloggable() { return candidate.isWaterloggable(); }
+
+            @Override
+            public boolean isLegal() { return candidate.isLegal(); }
 
             @Override
             public void waterlog() {

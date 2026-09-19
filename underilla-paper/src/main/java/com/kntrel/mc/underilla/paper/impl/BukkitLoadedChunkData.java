@@ -28,6 +28,8 @@ public final class BukkitLoadedChunkData implements ChunkData {
         this.absoluteZ = chunk.getZ() * Underilla.CHUNK_SIZE;
     }
 
+    public Chunk chunk() { return chunk; }
+
     @Override
     public int getMaxHeight() { return world.getMaxHeight(); }
 
@@ -42,7 +44,12 @@ public final class BukkitLoadedChunkData implements ChunkData {
 
     @Override
     public Block getBlock(int x, int y, int z) {
-        return new BukkitBlock(chunk.getBlock(x, y, z).getBlockData());
+        org.bukkit.block.Block block = chunk.getBlock(x, y, z);
+        return new BukkitBlock(block.getBlockData()) {
+            @Override public boolean isLegal() {
+                return this.getBlockData().isSupported(block);
+            }
+        };
     }
 
     @Override

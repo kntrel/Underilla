@@ -7,6 +7,7 @@ public interface Block extends Cloneable {
     boolean isSolid();
     boolean isLiquid();
     boolean isWaterloggable();
+    boolean isLegal();
     void waterlog();
     ID id();
 

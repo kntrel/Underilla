@@ -8,13 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jkantrell.nbt.tag.CompoundTag;
-import com.kntrel.mc.underilla.core.api.Biome;
-import com.kntrel.mc.underilla.core.api.BiomeData;
-import com.kntrel.mc.underilla.core.api.Block;
-import com.kntrel.mc.underilla.core.api.ChunkData;
-import com.kntrel.mc.underilla.core.api.Entity;
-import com.kntrel.mc.underilla.core.api.HeightMapType;
-import com.kntrel.mc.underilla.core.api.WorldInfo;
+import com.kntrel.mc.underilla.core.api.*;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
@@ -463,10 +457,12 @@ class UnderillaFactoryTest {
                 .maximumCaveY(0)
                 .blocks(blocks)
                 .blockCleanup(
-                        id -> id.equals(com.kntrel.mc.underilla.core.api.ID.of("sand"))
-                                ? java.util.Optional.of(com.kntrel.mc.underilla.core.api.ID.of("sandstone"))
-                                : java.util.Optional.empty(),
-                        _ -> java.util.Optional.empty())
+                    id -> id.equals(ID.of("sand"))
+                            ? Optional.of(ID.of("sandstone"))
+                            : Optional.empty(),
+                    _ -> Optional.empty(),
+                    _ -> Optional.empty()
+                )
                 .build();
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS);
         target.setBlock(0, 1, 0, sand);

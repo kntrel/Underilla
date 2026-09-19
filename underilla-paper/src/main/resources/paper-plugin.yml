@@ -1,7 +1,7 @@
-name: Underilla
+name: $name
 authors: [ kntrel, Hydrolien ]
 version: '$version'
-main: ${group}.paper.Underilla
+main: $mainClass
 description: $description
 api-version: "$apiVersion"
 load: STARTUP

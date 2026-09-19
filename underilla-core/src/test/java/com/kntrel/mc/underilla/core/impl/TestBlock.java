@@ -74,5 +74,10 @@ public final class TestBlock implements Block {
     public ID id() { return id; }
 
     @Override
+    public boolean isLegal() {
+        return true;
+    }
+
+    @Override
     public String toString() { return id.toString(); }
 }

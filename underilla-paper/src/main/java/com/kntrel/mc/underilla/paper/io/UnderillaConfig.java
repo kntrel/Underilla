@@ -19,11 +19,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.bukkit.Bukkit;
 import org.bukkit.Registry;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.generator.structure.Structure;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,6 +151,9 @@ public class UnderillaConfig {
     }
     public Optional<ID> cleanupBlockReplacement(ID block) {
         return cleanupBlockReplacement(MapBlockKeys.CLEAN_BLOCK_TO_REPLACE, block);
+    }
+    public Optional<ID> cleanupIllegalBlockReplacement(ID block) {
+        return cleanupBlockReplacement(MapBlockKeys.CLEAN_ILLEGAL_BLOCKS, block);
     }
     public boolean shouldRemoveEntity(ID entityType) {
         return getSetEntityType(SetEntityTypeKeys.CLEAN_ENTITY_TO_REMOVE).contains(entityType);
@@ -550,6 +553,8 @@ public class UnderillaConfig {
         BIOME_MERGING_FROM_CAVES_GENERATION_ENABLED("biomesMerging.fromCavesGeneration.enabled", true),
         BIOME_MERGING_FROM_CAVES_GENERATION_ONLY_UNDER_SURFACE("biomesMerging.fromCavesGeneration.onlyUnderSurface", true),
         CLEAN_BLOCKS_ENABLED("clean.blocks.enabled", true),
+        CLEAN_ILLEGAL_BLOCKS_ENABLED("clean.ilegalBlocks.enabled", true),
+        CLEAN_BLOCKS_REMOVE_UNSTABLE_BLOCKS("clean.blocks.removeUnstableBlocks", true),
         CLEAN_ENTITIES_ENABLED("clean.entities.enabled", true);
         // @formatter:on
 
@@ -663,7 +668,8 @@ public class UnderillaConfig {
                 ID.of("red_sand"), ID.of("red_sandstone"),
                 ID.of("gravel"), ID.of("andesite"))),
         CLEAN_BLOCK_TO_REPLACE("clean.blocks.toReplace"),
-        SURFACE_WORLD_BLOCK_TO_REPLACE("surfaceWorld.blocks.toReplace");
+        SURFACE_WORLD_BLOCK_TO_REPLACE("surfaceWorld.blocks.toReplace"),
+        CLEAN_ILLEGAL_BLOCKS("clean.illegalBlocks.replace");
         // @formatter:on
 
         private final String path;
