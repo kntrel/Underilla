@@ -168,7 +168,7 @@ public class Inspector implements Callable<Integer> {
         };
 
         NoodleCavesPolicy cavesPolicy = surfaceCavers
-                ? NoodleCavesPolicy.surface(_ -> false, true)
+                ? NoodleCavesPolicy.surface(_ -> true, true)
                 : NoodleCavesPolicy.underground();
 
         return planBuilder
