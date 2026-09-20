@@ -1,7 +1,9 @@
 package com.kntrel.mc.underilla.core.simulation.generator;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.simulation.caver.BezierCurve;
@@ -14,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.SplittableRandom;
 
 /** Hooks for the inspector's synthetic generation stages. */
 public abstract class Generator {
@@ -25,6 +28,20 @@ public abstract class Generator {
     private static final double CAVE_RESOLUTION_FACTOR = 0.1;
     private static final int CAVE_STEP_SIZE = 2;
     private static final int CAVE_CARVING_RADIUS = 2;
+    private static final int TREE_ATTEMPT_LIMIT = 32;
+    private static final Map<ID, Integer> TREE_QUOTAS = Map.ofEntries(
+            Map.entry(ID.of("minecraft:plains"), 10),
+            Map.entry(ID.of("minecraft:forest"), 4),
+            Map.entry(ID.of("minecraft:flower_forest"), 4),
+            Map.entry(ID.of("minecraft:birch_forest"), 4),
+            Map.entry(ID.of("minecraft:dark_forest"), 6),
+            Map.entry(ID.of("minecraft:taiga"), 4),
+            Map.entry(ID.of("minecraft:old_growth_pine_taiga"), 5),
+            Map.entry(ID.of("minecraft:old_growth_spruce_taiga"), 5),
+            Map.entry(ID.of("minecraft:jungle"), 6),
+            Map.entry(ID.of("minecraft:sparse_jungle"), 3),
+            Map.entry(ID.of("minecraft:savanna"), 2),
+            Map.entry(ID.of("minecraft:swamp"), 2));
 
     private static final TestBlock AIR = TestBlock.air("minecraft:air");
     private static final TestBlock STONE = TestBlock.solid("minecraft:stone");
@@ -90,7 +107,41 @@ public abstract class Generator {
                 doCavers(worldInfo, chunk);
                 afterCaves(worldInfo, chunk);
             }
+            if (generateFeatures(chunk)) {
+                doFeatures(chunk);
+                afterFeatures(worldInfo, chunk);
+            }
+            afterLoad(worldInfo, chunk);
         }
+    }
+
+    private void doFeatures(Chunk chunk) {
+        ChunkData chunkData = world.chunkData(chunk.x(), chunk.z()).orElse(null);
+        if (chunkData == null) {
+            return;
+        }
+
+        int topY = chunkData.getMaxHeight() - 1;
+        int quota = 10;
+        int placements = 0;
+        for (int attempt = 0; attempt < TREE_ATTEMPT_LIMIT && placements < quota; attempt++) {
+            SplittableRandom random = new SplittableRandom(featureSalt(chunk, attempt));
+            int x = random.nextInt(CHUNK_SIZE);
+            int z = random.nextInt(CHUNK_SIZE);
+            if (Tree.place(chunkData, x, z)) {
+                placements++;
+            }
+        }
+    }
+
+    private long featureSalt(Chunk chunk, int attempt) {
+        long value = seed;
+        value ^= 0x9E3779B97F4A7C15L * (chunk.x() + 1L);
+        value ^= 0xBF58476D1CE4E5B9L * (chunk.z() + 1L);
+        value ^= 0x94D049BB133111EBL * (attempt + 1L);
+        value = (value ^ (value >>> 30)) * 0xBF58476D1CE4E5B9L;
+        value = (value ^ (value >>> 27)) * 0x94D049BB133111EBL;
+        return value ^ (value >>> 31);
     }
 
     private Map<Chunk, List<CaveCurve>> planCaves(WorldInfo worldInfo, List<Chunk> chunks) {

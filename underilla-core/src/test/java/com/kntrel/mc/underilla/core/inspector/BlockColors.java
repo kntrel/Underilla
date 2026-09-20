@@ -19,6 +19,8 @@ final class BlockColors {
             Map.entry(ID.of("minecraft:bedrock"), new Color(0x303034)),
             Map.entry(ID.of("minecraft:dirt"), new Color(0x805432)),
             Map.entry(ID.of("minecraft:grass_block"), new Color(0x6FA449)),
+            Map.entry(ID.of("minecraft:oak_log"), new Color(0x6B5135)),
+            Map.entry(ID.of("minecraft:oak_leaves"), new Color(0x4F8A3A)),
             Map.entry(ID.of("minecraft:sand"), new Color(0xD9CC8F)),
             Map.entry(ID.of("minecraft:sandstone"), new Color(0xC9B775)),
             Map.entry(ID.of("minecraft:gravel"), new Color(0x9B9690)),

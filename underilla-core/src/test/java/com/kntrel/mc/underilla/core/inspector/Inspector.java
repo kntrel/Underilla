@@ -49,6 +49,13 @@ public class Inspector implements Callable<Integer> {
     private Strategy strategy;
 
     @Option(
+            names = "--surface-depth",
+            description = "How many surface-world blocks to preserve below the reference surface",
+            defaultValue = "6"
+    )
+    private int surfaceDepth;
+
+    @Option(
             names = { "--output", "-o" },
             description = "Path of to which to write the output images",
             defaultValue = "./build/underilla-inspector"
@@ -71,31 +78,41 @@ public class Inspector implements Callable<Integer> {
 
     @Option(
             names = "--surface-fill",
-            negatable = true
+            negatable = true,
+            defaultValue = "true",
+            fallbackValue = "true"
     )
     private boolean surfaceFill = true;
 
     @Option(
             names = "--cavers",
-            negatable = true
+            negatable = true,
+            defaultValue = "true",
+            fallbackValue = "true"
     )
     private boolean cavers = true;
 
     @Option(
             names = "--features",
-            negatable = true
+            negatable = true,
+            defaultValue = "true",
+            fallbackValue = "true"
     )
     private boolean features = true;
 
     @Option(
             names = "--surface-cavers",
-            negatable = true
+            negatable = true,
+            defaultValue = "true",
+            fallbackValue = "true"
     )
     private boolean surfaceCavers = true;
 
     @Option(
             names = "--clean-up",
-            negatable = true
+            negatable = true,
+            defaultValue = "true",
+            fallbackValue = "true"
     )
     private boolean cleanUp = true;
 
@@ -164,7 +181,8 @@ public class Inspector implements Callable<Integer> {
         UnderillaFactory.Builder planBuilder = switch (strategy) {
             case NONE     -> UnderillaFactory.none(reference);
             case ABSOLUTE -> UnderillaFactory.absolute(reference);
-            case SURFACE  -> UnderillaFactory.surface(reference);
+            case SURFACE  -> UnderillaFactory.surface(reference)
+                    .surfaceDepth(surfaceDepth, 50, 2);
         };
 
         NoodleCavesPolicy cavesPolicy = surfaceCavers
