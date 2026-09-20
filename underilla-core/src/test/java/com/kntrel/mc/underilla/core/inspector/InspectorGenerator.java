@@ -39,14 +39,22 @@ public final class InspectorGenerator extends Generator {
         }
     }
 
-    private static final int SLICE_Z = 0;
-
     private final WorldGenerationPlan plan;
+    private final int sliceZ;
     private final EnumMap<GenerationTiming, EnumMap<GenerationStage, List<Consumer<WorldSlice>>>> hooks;
 
     public InspectorGenerator(WorldGenerationPlan plan, TestWorld world, long seed, int chunkSize) {
+        this(plan, world, seed, chunkSize, 0);
+    }
+
+    public InspectorGenerator(WorldGenerationPlan plan, TestWorld world, long seed, int chunkSize, int sliceZ) {
         super(world, seed, chunkSize, 1);
         this.plan = Objects.requireNonNull(plan, "plan");
+        if (sliceZ < 0 || sliceZ >= GenerationConstants.CHUNK_SIZE) {
+            throw new IllegalArgumentException("sliceZ must be between 0 and "
+                    + (GenerationConstants.CHUNK_SIZE - 1));
+        }
+        this.sliceZ = sliceZ;
         this.hooks = new EnumMap<>(GenerationTiming.class);
         for (GenerationTiming timing : GenerationTiming.values()) {
             EnumMap<GenerationStage, List<Consumer<WorldSlice>>> stageHooks = new EnumMap<>(GenerationStage.class);
@@ -118,7 +126,7 @@ public final class InspectorGenerator extends Generator {
         int startX = Math.multiplyExact(chunk.x(), GenerationConstants.CHUNK_SIZE);
         WorldSlice slice = WorldSlice.from(
                 world,
-                SLICE_Z,
+                sliceZ,
                 startX,
                 startX + GenerationConstants.CHUNK_SIZE,
                 worldInfo.minimumY(),

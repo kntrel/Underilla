@@ -77,6 +77,13 @@ public class Inspector implements Callable<Integer> {
     private int chunkSize;
 
     @Option(
+            names = { "--z-slice", "-z" },
+            description = "Local Z coordinate of the vertical slice to inspect",
+            defaultValue = "0"
+    )
+    private int zSlice;
+
+    @Option(
             names = "--surface-fill",
             negatable = true,
             defaultValue = "true",
@@ -132,6 +139,10 @@ public class Inspector implements Callable<Integer> {
         if (chunkSize < 1) {
             throw new IllegalArgumentException("chunkSize must be positive");
         }
+        if (zSlice < 0 || zSlice >= GenerationConstants.CHUNK_SIZE) {
+            throw new IllegalArgumentException("zSlice must be between 0 and "
+                    + (GenerationConstants.CHUNK_SIZE - 1));
+        }
 
         WorldReader reference = referenceWorld();
 
@@ -143,7 +154,8 @@ public class Inspector implements Callable<Integer> {
                         TestBlock.air("minecraft:air"),
                         new TestBiome("minecraft:plains")),
                 seed,
-                chunkSize);
+                chunkSize,
+                zSlice);
 
         StageImageSet.Builder imageSetBuilder = StageImageSet.with(inspectorGenerator).baseIndex(1.0f);
         for (InspectorGenerator.GenerationStage stage : InspectorGenerator.GenerationStage.values()) {
@@ -153,7 +165,13 @@ public class Inspector implements Callable<Integer> {
         }
         StageImageSet imageSet = imageSetBuilder.build();
 
-        WorldSlice referenceSlice = WorldSlice.from(reference, 0, 0, chunkSize * GenerationConstants.CHUNK_SIZE, MINIMUM_Y, MAXIMUM_Y);
+        WorldSlice referenceSlice = WorldSlice.from(
+                reference,
+                zSlice,
+                0,
+                chunkSize * GenerationConstants.CHUNK_SIZE,
+                MINIMUM_Y,
+                MAXIMUM_Y);
         imageSet.stage("reference", referenceSlice, 0);
 
         inspectorGenerator.generate();
