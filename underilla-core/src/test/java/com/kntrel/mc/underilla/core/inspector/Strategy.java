@@ -25,7 +25,7 @@ enum Strategy {
         this.name_ = name;
     }
 
-    class Converter implements CommandLine.ITypeConverter<Strategy> {
+    static class Converter implements CommandLine.ITypeConverter<Strategy> {
 
         @Override
         public Strategy convert(String value) {

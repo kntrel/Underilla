@@ -8,14 +8,15 @@ import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
+import com.kntrel.mc.underilla.core.impl.TestDiskWorldReader;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 
@@ -33,7 +34,7 @@ public class Inspector implements Callable<Integer> {
             index = "0",
             paramLabel = "mcaFile",
             description = "Path to the .mca file to use as reference",
-            defaultValue = "./underilla-core/src/test/resources/mca/surface.mca"
+            defaultValue = "./src/test/resources/mca/surface.mca"
     )
     private File file;
 
@@ -41,14 +42,15 @@ public class Inspector implements Callable<Integer> {
             names = "--strategy",
             description = "Merge strategy to use: none, absolute, surface",
             paramLabel = "<none|absolute|surface>",
-            defaultValue = "surface"
+            defaultValue = "surface",
+            converter = Strategy.Converter.class
     )
     private Strategy strategy;
 
     @Option(
             names = { "--output", "-o" },
             description = "Path of to which to write the output images",
-            defaultValue = "./underilla-inspector"
+            defaultValue = "./build/underilla-inspector"
     )
     private Path outputPath;
 
@@ -100,7 +102,8 @@ public class Inspector implements Callable<Integer> {
     public Integer call() {
         try {
             this.callInner();
-        } catch (Throwable _) {
+        } catch (Throwable e) {
+            e.printStackTrace();
             return 1;
         }
         return 0;
@@ -112,10 +115,6 @@ public class Inspector implements Callable<Integer> {
             throw new IllegalArgumentException("chunkSize must be positive");
         }
 
-        BufferedImage image = new BufferedImage(
-                Math.multiplyExact(Math.multiplyExact(chunkSize, GenerationConstants.CHUNK_SIZE), PIXELS_PER_BLOCK),
-                Math.multiplyExact(MAXIMUM_Y - MINIMUM_Y, PIXELS_PER_BLOCK),
-                BufferedImage.TYPE_INT_RGB);
         InspectorGenerator inspectorGenerator = new InspectorGenerator(
                 plan(),
                 new TestWorld(
@@ -124,17 +123,24 @@ public class Inspector implements Callable<Integer> {
                         TestBlock.air("minecraft:air"),
                         new TestBiome("minecraft:plains")),
                 seed,
-                chunkSize,
-                image);
+                chunkSize);
+        WorldSliceImageSurface imageSurface = new WorldSliceImageSurface(
+                0,
+                MINIMUM_Y,
+                Math.multiplyExact(chunkSize, GenerationConstants.CHUNK_SIZE),
+                MAXIMUM_Y - MINIMUM_Y,
+                PIXELS_PER_BLOCK);
+        inspectorGenerator.hook().before().noise(imageSurface);
         inspectorGenerator.generate();
         try {
-            WorldSliceRenderer.writePng(image, outputPath);
+            WorldSliceRenderer.writePng(imageSurface.image(), outputPath);
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not write inspector image to " + outputPath, exception);
         }
     }
 
-    private WorldGenerationPlan plan(WorldReader reference) {
+    private WorldGenerationPlan plan() {
+        WorldReader reference = referenceWorld();
         UnderillaFactory.Builder planBuilder = switch (strategy) {
             case NONE     -> UnderillaFactory.none(reference);
             case ABSOLUTE -> UnderillaFactory.absolute(reference);
@@ -150,13 +156,35 @@ public class Inspector implements Callable<Integer> {
                 .features(features)
                 .surfaceFill(surfaceFill)
                 .blocks(new TestBlockFactory(TestBlock.air(AIR_ID.toString())))
+                .verticalRange(MINIMUM_Y, MAXIMUM_Y)
                 .chunkCacheSize(chunkSize)
                 .generationArea(0, 0, chunkSize, 1)
                 .noodleCaves(cavesPolicy)
                 .build();
     }
 
-    static void main(String[] args) {
+    private WorldReader referenceWorld() {
+        try {
+            Path temporaryWorld = Files.createTempDirectory("underilla-inspector-");
+            Path regions = Files.createDirectories(temporaryWorld.resolve("region"));
+            Path referenceRegion = regions.resolve("r.0.0.mca");
+            Files.copy(file.toPath(), referenceRegion);
+
+            referenceRegion.toFile().deleteOnExit();
+            regions.toFile().deleteOnExit();
+            temporaryWorld.toFile().deleteOnExit();
+            return new TestDiskWorldReader(
+                    regions.toFile(),
+                    1,
+                    new TestBlockFactory(TestBlock.air(AIR_ID.toString())));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Could not prepare reference world from " + file, exception);
+        } catch (NoSuchFieldException exception) {
+            throw new IllegalStateException("Could not read prepared reference world from " + file, exception);
+        }
+    }
+
+    public static void main(String[] args) {
         int out = new CommandLine(new Inspector()).execute(args);
         System.exit(out);
     }
