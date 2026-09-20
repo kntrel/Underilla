@@ -16,17 +16,27 @@ import java.util.function.Consumer;
 
 public final class InspectorGenerator extends Generator {
 
-    private enum GenerationTiming {
+    public enum GenerationTiming {
         BEFORE,
         AFTER
     }
 
-    private enum GenerationStage {
-        NOISE,
-        SURFACE,
-        CAVES,
-        FEATURES,
-        LOAD
+    public enum GenerationStage {
+        NOISE(0),
+        SURFACE(1),
+        CAVES(2),
+        FEATURES(3),
+        LOAD(4);
+
+        private final int index;
+
+        GenerationStage(int index) {
+            this.index = index;
+        }
+
+        public int index() {
+            return index;
+        }
     }
 
     private static final int SLICE_Z = 0;

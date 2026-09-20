@@ -13,11 +13,13 @@ import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.Callable;
 
 @Command(
@@ -27,7 +29,6 @@ public class Inspector implements Callable<Integer> {
 
     private static final int MINIMUM_Y = -64;
     private static final int MAXIMUM_Y = 320;
-    private static final int PIXELS_PER_BLOCK = 2;
     private static final ID AIR_ID = new ID("minecraft", "air");
 
     @Parameters(
@@ -115,8 +116,10 @@ public class Inspector implements Callable<Integer> {
             throw new IllegalArgumentException("chunkSize must be positive");
         }
 
+        WorldReader reference = referenceWorld();
+
         InspectorGenerator inspectorGenerator = new InspectorGenerator(
-                plan(),
+                plan(reference),
                 new TestWorld(
                         MINIMUM_Y,
                         MAXIMUM_Y,
@@ -124,23 +127,40 @@ public class Inspector implements Callable<Integer> {
                         new TestBiome("minecraft:plains")),
                 seed,
                 chunkSize);
-        WorldSliceImageSurface imageSurface = new WorldSliceImageSurface(
-                0,
-                MINIMUM_Y,
-                Math.multiplyExact(chunkSize, GenerationConstants.CHUNK_SIZE),
-                MAXIMUM_Y - MINIMUM_Y,
-                PIXELS_PER_BLOCK);
-        inspectorGenerator.hook().before().noise(imageSurface);
+
+        StageImageSet.Builder imageSetBuilder = StageImageSet.with(inspectorGenerator).baseIndex(1.0f);
+        for (InspectorGenerator.GenerationStage stage : InspectorGenerator.GenerationStage.values()) {
+            for (InspectorGenerator.GenerationTiming timing : InspectorGenerator.GenerationTiming.values()) {
+                imageSetBuilder.include(timing, stage);
+            }
+        }
+        StageImageSet imageSet = imageSetBuilder.build();
+
+        WorldSlice referenceSlice = WorldSlice.from(reference, 0, 0, chunkSize * GenerationConstants.CHUNK_SIZE, MINIMUM_Y, MAXIMUM_Y);
+        imageSet.stage("reference", referenceSlice, 0);
+
         inspectorGenerator.generate();
+        render(imageSet.images());
+    }
+
+    private void render(Map<String, BufferedImage> images) {
+        Path outputDirectory = outputPath.toAbsolutePath().normalize();
         try {
-            WorldSliceRenderer.writePng(imageSurface.image(), outputPath);
+            if (Files.exists(outputDirectory) && !Files.isDirectory(outputDirectory)) {
+                throw new IllegalArgumentException("--output must be a directory: " + outputDirectory);
+            }
+            Files.createDirectories(outputDirectory);
+            for (Map.Entry<String, BufferedImage> image : images.entrySet()) {
+                WorldSliceRenderer.writePng(
+                        image.getValue(),
+                        outputDirectory.resolve(image.getKey() + ".png"));
+            }
         } catch (IOException exception) {
-            throw new UncheckedIOException("Could not write inspector image to " + outputPath, exception);
+            throw new UncheckedIOException("Could not write inspector images to " + outputDirectory, exception);
         }
     }
 
-    private WorldGenerationPlan plan() {
-        WorldReader reference = referenceWorld();
+    private WorldGenerationPlan plan(WorldReader reference) {
         UnderillaFactory.Builder planBuilder = switch (strategy) {
             case NONE     -> UnderillaFactory.none(reference);
             case ABSOLUTE -> UnderillaFactory.absolute(reference);
@@ -184,7 +204,7 @@ public class Inspector implements Callable<Integer> {
         }
     }
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         int out = new CommandLine(new Inspector()).execute(args);
         System.exit(out);
     }
