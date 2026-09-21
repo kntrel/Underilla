@@ -131,3 +131,6 @@ bin/
 testMap/worldY/
 UnderillaHighYDataPack/
 UnderillaBaseDataPack 2/
+
+# Local notes and working files
+/local/
