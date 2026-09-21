@@ -20,8 +20,11 @@ public final class StageImageSet {
 
     private final Map<String, BufferedImage> images = new LinkedHashMap<>();
     private final Map<String, Bounds> bounds = new LinkedHashMap<>();
+    private final boolean biomeOverlay;
 
-    private StageImageSet() {}
+    private StageImageSet(boolean biomeOverlay) {
+        this.biomeOverlay = biomeOverlay;
+    }
 
     public static Builder with(InspectorGenerator generator) {
         return new Builder(generator);
@@ -70,7 +73,7 @@ public final class StageImageSet {
             bounds.put(key, imageBounds);
         }
 
-        BufferedImage sliceImage = WorldSliceRenderer.render(slice, PIXELS_PER_BLOCK);
+        BufferedImage sliceImage = WorldSliceRenderer.render(slice, PIXELS_PER_BLOCK, biomeOverlay);
         Graphics2D graphics = image.createGraphics();
         try {
             graphics.drawImage(
@@ -95,6 +98,7 @@ public final class StageImageSet {
         private final InspectorGenerator generator;
         private final EnumMap<GenerationTiming, EnumSet<GenerationStage>> includedStages;
         private float baseIndex;
+        private boolean biomeOverlay;
 
         private Builder(InspectorGenerator generator) {
             this.generator = Objects.requireNonNull(generator, "generator");
@@ -112,6 +116,12 @@ public final class StageImageSet {
             return this;
         }
 
+        /** Enables or disables the translucent biome overlay on staged images. */
+        public Builder biomeOverlay(boolean biomeOverlay) {
+            this.biomeOverlay = biomeOverlay;
+            return this;
+        }
+
         public Builder include(GenerationTiming timing, GenerationStage stage) {
             includedStages.get(Objects.requireNonNull(timing, "timing"))
                     .add(Objects.requireNonNull(stage, "stage"));
@@ -119,7 +129,7 @@ public final class StageImageSet {
         }
 
         public StageImageSet build() {
-            StageImageSet stageImageSet = new StageImageSet();
+            StageImageSet stageImageSet = new StageImageSet(biomeOverlay);
             for (GenerationTiming timing : GenerationTiming.values()) {
                 InspectorGenerator.StageHook hook = timing == GenerationTiming.AFTER
                         ? generator.hook().after()

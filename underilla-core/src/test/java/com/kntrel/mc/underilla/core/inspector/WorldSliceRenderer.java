@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.inspector;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.Biome;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
@@ -18,6 +19,14 @@ public final class WorldSliceRenderer {
     private WorldSliceRenderer() {}
 
     public static BufferedImage render(WorldSlice slice, int pixelsPerBlock) {
+        return render(slice, pixelsPerBlock, false);
+    }
+
+    /**
+     * Renders a slice, optionally drawing its biome cells as a translucent overlay.
+     * Missing biome data does not alter the corresponding block pixels.
+     */
+    public static BufferedImage render(WorldSlice slice, int pixelsPerBlock, boolean biomeOverlay) {
         Objects.requireNonNull(slice, "slice");
         if (pixelsPerBlock < 1) {
             throw new IllegalArgumentException("pixelsPerBlock must be positive");
@@ -39,6 +48,18 @@ public final class WorldSliceRenderer {
                             (slice.getHeight() - 1 - localY) * pixelsPerBlock,
                             pixelsPerBlock,
                             pixelsPerBlock);
+                    if (biomeOverlay) {
+                        Biome biome = slice.getBiome(x, y);
+                        if (biome != null) {
+                            Color color = BiomeColors.get(biome.id());
+                            graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 128));
+                            graphics.fillRect(
+                                    localX * pixelsPerBlock,
+                                    (slice.getHeight() - 1 - localY) * pixelsPerBlock,
+                                    pixelsPerBlock,
+                                    pixelsPerBlock);
+                        }
+                    }
                 }
             }
         } finally {
@@ -49,6 +70,12 @@ public final class WorldSliceRenderer {
 
     public static void writePng(WorldSlice slice, Path output, int pixelsPerBlock) throws IOException {
         writePng(render(slice, pixelsPerBlock), output);
+    }
+
+    /** Writes a slice PNG, optionally with its translucent biome overlay. */
+    public static void writePng(WorldSlice slice, Path output, int pixelsPerBlock, boolean biomeOverlay)
+            throws IOException {
+        writePng(render(slice, pixelsPerBlock, biomeOverlay), output);
     }
 
     public static void writePng(BufferedImage image, Path output) throws IOException {

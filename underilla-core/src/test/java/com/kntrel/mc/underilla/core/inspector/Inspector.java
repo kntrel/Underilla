@@ -123,6 +123,12 @@ public class Inspector implements Callable<Integer> {
     )
     private boolean cleanUp = true;
 
+    @Option(
+            names = "--show-biomes",
+            description = "Overlay biome colors on the rendered inspector images"
+    )
+    private boolean showBiomes;
+
     @Override
     public Integer call() {
         try {
@@ -157,7 +163,9 @@ public class Inspector implements Callable<Integer> {
                 chunkSize,
                 zSlice);
 
-        StageImageSet.Builder imageSetBuilder = StageImageSet.with(inspectorGenerator).baseIndex(1.0f);
+        StageImageSet.Builder imageSetBuilder = StageImageSet.with(inspectorGenerator)
+                .baseIndex(1.0f)
+                .biomeOverlay(showBiomes);
         for (InspectorGenerator.GenerationStage stage : InspectorGenerator.GenerationStage.values()) {
             for (InspectorGenerator.GenerationTiming timing : InspectorGenerator.GenerationTiming.values()) {
                 imageSetBuilder.include(timing, stage);
