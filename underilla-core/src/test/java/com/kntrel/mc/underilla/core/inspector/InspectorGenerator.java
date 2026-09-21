@@ -8,6 +8,7 @@ import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.simulation.generator.Chunk;
 import com.kntrel.mc.underilla.core.simulation.generator.Generator;
 import com.kntrel.mc.underilla.core.simulation.generator.WorldInfo;
+import com.kntrel.mc.underilla.core.simulation.biome.BiomeProvider;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -40,6 +41,7 @@ public final class InspectorGenerator extends Generator {
     }
 
     private final WorldGenerationPlan plan;
+    private final BiomeProvider biomeProvider;
     private final int sliceZ;
     private final EnumMap<GenerationTiming, EnumMap<GenerationStage, List<Consumer<WorldSlice>>>> hooks;
 
@@ -50,6 +52,7 @@ public final class InspectorGenerator extends Generator {
     public InspectorGenerator(WorldGenerationPlan plan, TestWorld world, long seed, int chunkSize, int sliceZ) {
         super(world, seed, chunkSize, 1);
         this.plan = Objects.requireNonNull(plan, "plan");
+        this.biomeProvider = new InspectorBiomeProvider(plan.biomePatch(), super.getBiomeProvider());
         if (sliceZ < 0 || sliceZ >= GenerationConstants.CHUNK_SIZE) {
             throw new IllegalArgumentException("sliceZ must be between 0 and "
                     + (GenerationConstants.CHUNK_SIZE - 1));
@@ -73,6 +76,11 @@ public final class InspectorGenerator extends Generator {
      */
     public TimingHook hook() {
         return new TimingHook(this);
+    }
+
+    @Override
+    public BiomeProvider getBiomeProvider() {
+        return biomeProvider;
     }
 
     @Override

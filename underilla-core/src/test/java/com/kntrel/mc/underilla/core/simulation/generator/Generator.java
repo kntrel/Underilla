@@ -6,11 +6,12 @@ import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.simulation.biome.BiomeProvider;
 import com.kntrel.mc.underilla.core.simulation.caver.BezierCurve;
 import com.kntrel.mc.underilla.core.simulation.caver.CaveCurve;
 import com.kntrel.mc.underilla.core.simulation.caver.CurveWalker;
 import com.kntrel.mc.underilla.core.simulation.caver.Point;
-import com.kntrel.mc.underilla.core.simulation.generator.noise.FastNoiseLite;
+import com.kntrel.mc.underilla.core.simulation.noise.FastNoiseLite;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,6 +55,7 @@ public abstract class Generator {
     protected final long seed;
     private final int chunksX;
     private final int chunksZ;
+    private final BiomeProvider biomeProvider;
     private final FastNoiseLite terrainNoise;
     private final FastNoiseLite caveNoise;
     private Map<Chunk, List<CaveCurve>> plannedCaves = Map.of();
@@ -70,6 +72,7 @@ public abstract class Generator {
         this.seed = seed;
         this.chunksX = chunksX;
         this.chunksZ = chunksZ;
+        biomeProvider = BiomeProvider.fromSeed(seed);
         terrainNoise = new FastNoiseLite(Long.hashCode(seed));
         terrainNoise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
         terrainNoise.SetFractalType(FastNoiseLite.FractalType.FBm);
@@ -93,6 +96,7 @@ public abstract class Generator {
                 chunks.add(chunk);
             }
         }
+        defineBiomes(worldInfo, chunks);
         plannedCaves = planCaves(worldInfo, chunks);
         for (Chunk chunk : chunks) {
             if (generateNoise(chunk)) {
@@ -112,6 +116,30 @@ public abstract class Generator {
                 afterFeatures(worldInfo, chunk);
             }
             afterLoad(worldInfo, chunk);
+        }
+    }
+
+    /** Returns the biome source used to define this generator's world before its generation stages run. */
+    public BiomeProvider getBiomeProvider() {
+        return biomeProvider;
+    }
+
+    private void defineBiomes(WorldInfo worldInfo, List<Chunk> chunks) {
+        int biomeSize = GenerationConstants.BIOME_CELL_SIZE;
+        BiomeProvider provider = getBiomeProvider();
+        for (Chunk chunk : chunks) {
+            int chunkMinimumX = Math.multiplyExact(chunk.x(), CHUNK_SIZE);
+            int chunkMinimumZ = Math.multiplyExact(chunk.z(), CHUNK_SIZE);
+            for (int localX = 0; localX < CHUNK_SIZE; localX += biomeSize) {
+                int x = chunkMinimumX + localX;
+                for (int localZ = 0; localZ < CHUNK_SIZE; localZ += biomeSize) {
+                    int z = chunkMinimumZ + localZ;
+                    for (int y = worldInfo.minimumY(); y < worldInfo.maximumY(); y += biomeSize) {
+                        var biome = provider.getAt(x, y, z);
+                        world.setBiome(x, y, z, biome);
+                    }
+                }
+            }
         }
     }
 

@@ -52,7 +52,7 @@
 // /*FNLfloat*/ float
 // /*FNLfloat*/ double
 
-package com.kntrel.mc.underilla.core.simulation.generator.noise;
+package com.kntrel.mc.underilla.core.simulation.noise;
 
 public class FastNoiseLite
 {
