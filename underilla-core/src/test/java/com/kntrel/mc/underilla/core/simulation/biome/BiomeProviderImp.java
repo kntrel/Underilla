@@ -8,6 +8,8 @@ import java.util.List;
 /** Seeded surface-biome map. Cave-biome selection will be layered onto this later. */
 final class BiomeProviderImp implements BiomeProvider {
 
+    private static final int CAVE_BIOME_MAXIMUM_Y = 64;
+    private static final float CAVE_BIOME_THRESHOLD = 0.2f;
     private static final List<Biome> SURFACE_BIOMES = List.of(
             new TestBiome("minecraft:plains"),
             new TestBiome("minecraft:sunflower_plains"),
@@ -48,8 +50,14 @@ final class BiomeProviderImp implements BiomeProvider {
             new TestBiome("minecraft:lukewarm_ocean"),
             new TestBiome("minecraft:cold_ocean"),
             new TestBiome("minecraft:frozen_ocean"));
+    private static final List<Biome> CAVE_BIOMES = List.of(
+            new TestBiome("minecraft:deep_dark"),
+            new TestBiome("minecraft:dripstone_caves"),
+            new TestBiome("minecraft:lush_caves"));
 
     private final FastNoiseLite surfaceNoise;
+    private final FastNoiseLite caveNoise;
+    private final FastNoiseLite caveBiomeNoise;
 
     BiomeProviderImp(long seed) {
         surfaceNoise = new FastNoiseLite(Long.hashCode(seed ^ 0xD1B54A32D192ED03L));
@@ -57,12 +65,32 @@ final class BiomeProviderImp implements BiomeProvider {
         surfaceNoise.SetFractalType(FastNoiseLite.FractalType.FBm);
         surfaceNoise.SetFractalOctaves(3);
         surfaceNoise.SetFrequency(0.0015f);
+
+        caveNoise = threeDimensionalNoise(seed ^ 0x94D049BB133111EBL, 0.02f);
+        caveBiomeNoise = threeDimensionalNoise(seed ^ 0xBF58476D1CE4E5B9L, 0.01f);
     }
 
     @Override
     public Biome getAt(int x, int y, int z) {
-        float normalized = (surfaceNoise.GetNoise(x, z) + 1.0f) * 0.5f;
-        int index = Math.clamp((int) (normalized * SURFACE_BIOMES.size()), 0, SURFACE_BIOMES.size() - 1);
-        return SURFACE_BIOMES.get(index);
+        Biome surfaceBiome = biomeForNoise(SURFACE_BIOMES, surfaceNoise.GetNoise(x, z));
+        if (y >= CAVE_BIOME_MAXIMUM_Y || caveNoise.GetNoise(x, y, z) < CAVE_BIOME_THRESHOLD) {
+            return surfaceBiome;
+        }
+        return biomeForNoise(CAVE_BIOMES, caveBiomeNoise.GetNoise(x, y, z));
+    }
+
+    private static FastNoiseLite threeDimensionalNoise(long seed, float frequency) {
+        FastNoiseLite noise = new FastNoiseLite(Long.hashCode(seed));
+        noise.SetNoiseType(FastNoiseLite.NoiseType.Perlin);
+        noise.SetFractalType(FastNoiseLite.FractalType.FBm);
+        noise.SetFractalOctaves(3);
+        noise.SetFrequency(frequency);
+        return noise;
+    }
+
+    private static Biome biomeForNoise(List<Biome> biomes, float noise) {
+        float normalized = (noise + 1.0f) * 0.5f;
+        int index = Math.clamp((int) (normalized * biomes.size()), 0, biomes.size() - 1);
+        return biomes.get(index);
     }
 }

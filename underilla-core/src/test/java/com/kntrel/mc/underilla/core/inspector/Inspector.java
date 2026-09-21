@@ -20,6 +20,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 @Command(
@@ -30,6 +31,10 @@ public class Inspector implements Callable<Integer> {
     private static final int MINIMUM_Y = -64;
     private static final int MAXIMUM_Y = 320;
     private static final ID AIR_ID = new ID("minecraft", "air");
+    private static final Set<ID> CAVE_BIOMES = Set.of(
+            ID.of("minecraft:deep_dark"),
+            ID.of("minecraft:dripstone_caves"),
+            ID.of("minecraft:lush_caves"));
 
     @Parameters(
             index = "0",
@@ -222,7 +227,12 @@ public class Inspector implements Callable<Integer> {
                 .blocks(new TestBlockFactory(TestBlock.air(AIR_ID.toString())))
                 .verticalRange(MINIMUM_Y, MAXIMUM_Y)
                 .chunkCacheSize(chunkSize)
-                .generationArea(0, 0, chunkSize, 1)
+                .generationArea(
+                        0,
+                        0,
+                        Math.multiplyExact(chunkSize, GenerationConstants.CHUNK_SIZE),
+                        GenerationConstants.CHUNK_SIZE)
+                .preservedGeneratedBiomes(CAVE_BIOMES::contains)
                 .noodleCaves(cavesPolicy)
                 .build();
     }
