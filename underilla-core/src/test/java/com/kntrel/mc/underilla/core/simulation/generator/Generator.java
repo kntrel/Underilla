@@ -46,10 +46,19 @@ public abstract class Generator {
 
     private static final TestBlock AIR = TestBlock.air("minecraft:air");
     private static final TestBlock STONE = TestBlock.solid("minecraft:stone");
+    private static final TestBlock DEEPSLATE = TestBlock.solid("minecraft:deepslate");
+    private static final TestBlock BEDROCK = TestBlock.solid("minecraft:bedrock");
     private static final TestBlock WATER = TestBlock.liquid("minecraft:water");
     private static final TestBlock GRASS = TestBlock.solid("minecraft:grass_block");
     private static final TestBlock DIRT = TestBlock.solid("minecraft:dirt");
     private static final TestBlock SAND = TestBlock.solid("minecraft:sand");
+
+    private static final int DEEPSLATE_MINIMUM_Y = -4;
+    private static final int DEEPSLATE_MAXIMUM_Y = 0;
+    private static final int BEDROCK_MINIMUM_Y = -64;
+    private static final int BEDROCK_MAXIMUM_Y = -62;
+    private static final long DEEPSLATE_SALT = 0x4F9939F508L;
+    private static final long BEDROCK_SALT = 0x9E3779B97F4A7C15L;
 
     protected final TestWorld world;
     protected final long seed;
@@ -280,6 +289,51 @@ public abstract class Generator {
                 }
             }
         }
+        world.chunkData(chunk.x(), chunk.z()).ifPresent(Generator::applyUndergroundLayers);
+    }
+
+    /**
+     * Adds the vanilla-like lower material layers after top-surface placement.
+     * The per-column boundaries are coordinate-stable rather than noise-based so inspector output
+     * stays reproducible without depending on the terrain or cave noise fields.
+     */
+    static void applyUndergroundLayers(ChunkData chunk) {
+        int chunkMinimumX = Math.multiplyExact(chunk.getChunkX(), CHUNK_SIZE);
+        int chunkMinimumZ = Math.multiplyExact(chunk.getChunkZ(), CHUNK_SIZE);
+        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
+            int globalX = chunkMinimumX + localX;
+            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
+                int globalZ = chunkMinimumZ + localZ;
+                replaceStoneDownward(chunk, localX, localZ, bedrockTopY(globalX, globalZ), BEDROCK);
+                replaceStoneDownward(chunk, localX, localZ, deepslateTopY(globalX, globalZ), DEEPSLATE);
+            }
+        }
+    }
+
+    static int deepslateTopY(int globalX, int globalZ) {
+        return pseudoRandomHeight(globalX, globalZ, DEEPSLATE_MINIMUM_Y, DEEPSLATE_MAXIMUM_Y, DEEPSLATE_SALT);
+    }
+
+    static int bedrockTopY(int globalX, int globalZ) {
+        return pseudoRandomHeight(globalX, globalZ, BEDROCK_MINIMUM_Y, BEDROCK_MAXIMUM_Y, BEDROCK_SALT);
+    }
+
+    private static void replaceStoneDownward(ChunkData chunk, int x, int z, int topY, Block replacement) {
+        for (int y = Math.min(topY, chunk.getMaxHeight() - 1); y >= chunk.getMinHeight(); y--) {
+            if (chunk.getBlock(x, y, z).id().equals(STONE.id())) {
+                chunk.setBlock(x, y, z, replacement);
+            }
+        }
+    }
+
+    private static int pseudoRandomHeight(int x, int z, int minimumY, int maximumY, long salt) {
+        long hash = salt;
+        hash ^= (long) x * 0x9E3779B97F4A7C15L;
+        hash ^= (long) z * 0xC2B2AE3D27D4EB4FL;
+        hash = (hash ^ (hash >>> 30)) * 0xBF58476D1CE4E5B9L;
+        hash = (hash ^ (hash >>> 27)) * 0x94D049BB133111EBL;
+        hash ^= hash >>> 31;
+        return minimumY + (int) Math.floorMod(hash, (long) maximumY - minimumY + 1);
     }
 
     private void fillDirt(int x, int startY, int z, int minimumY) {
