@@ -257,7 +257,27 @@ public abstract class Generator {
                             && y > minimumY + 4
                             && y < height - 6
                             && caveNoise.GetNoise(x, y, z) > 0.18;
-                    world.setBlock(x, y, z, terrain && !cave ? STONE : y <= seaLevel ? WATER : AIR);
+                    world.setBlock(x, y, z, terrain && !cave ? STONE : AIR);
+                }
+            }
+        }
+        world.chunkData(chunk.x(), chunk.z()).ifPresent(Generator::fillExposedAirWithWater);
+    }
+
+    /**
+     * Fills each vertical air column exposed at sea level, stopping at its first non-air block.
+     * This preserves sealed noise caves as air while filling only the underground space that is
+     * open to the sea.
+     */
+    static void fillExposedAirWithWater(ChunkData chunk) {
+        int waterLevel = Math.min(63, chunk.getMaxHeight() - 1);
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                for (int y = waterLevel; y >= chunk.getMinHeight(); y--) {
+                    if (!chunk.getBlock(x, y, z).isAir()) {
+                        break;
+                    }
+                    chunk.setBlock(x, y, z, WATER);
                 }
             }
         }
