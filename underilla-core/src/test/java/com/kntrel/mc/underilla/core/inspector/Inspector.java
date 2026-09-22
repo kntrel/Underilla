@@ -188,21 +188,24 @@ public class Inspector implements Callable<Integer> {
         imageSet.stage("reference", referenceSlice, 0);
 
         inspectorGenerator.generate();
-        render(imageSet.images());
+        render(imageSet);
     }
 
-    private void render(Map<String, BufferedImage> images) {
+    private void render(StageImageSet imageSet) {
         Path outputDirectory = outputPath.toAbsolutePath().normalize();
         try {
             if (Files.exists(outputDirectory) && !Files.isDirectory(outputDirectory)) {
                 throw new IllegalArgumentException("--output must be a directory: " + outputDirectory);
             }
             Files.createDirectories(outputDirectory);
-            for (Map.Entry<String, BufferedImage> image : images.entrySet()) {
+            for (Map.Entry<String, BufferedImage> image : imageSet.images().entrySet()) {
                 WorldSliceRenderer.writePng(
                         image.getValue(),
                         outputDirectory.resolve(image.getKey() + ".png"));
             }
+            WorldSliceRenderer.writePng(
+                    imageSet.composite(),
+                    outputDirectory.resolve("sequence.png"));
         } catch (IOException exception) {
             throw new UncheckedIOException("Could not write inspector images to " + outputDirectory, exception);
         }

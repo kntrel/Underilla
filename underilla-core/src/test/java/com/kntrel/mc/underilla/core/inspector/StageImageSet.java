@@ -2,7 +2,11 @@ package com.kntrel.mc.underilla.core.inspector;
 
 import com.kntrel.mc.underilla.core.inspector.InspectorGenerator.GenerationStage;
 import com.kntrel.mc.underilla.core.inspector.InspectorGenerator.GenerationTiming;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.Collections;
 import java.util.EnumMap;
@@ -17,6 +21,10 @@ import java.util.function.Consumer;
 public final class StageImageSet {
 
     private static final int PIXELS_PER_BLOCK = 2;
+    private static final int LABEL_PADDING = 8;
+    private static final Color LABEL_BACKGROUND = new Color(32, 32, 32);
+    private static final Color LABEL_FOREGROUND = Color.WHITE;
+    private static final Font LABEL_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 16);
 
     private final Map<String, BufferedImage> images = new LinkedHashMap<>();
     private final Map<String, Bounds> bounds = new LinkedHashMap<>();
@@ -45,6 +53,74 @@ public final class StageImageSet {
     /** Returns an unmodifiable snapshot of the images keyed by their stage labels. */
     public synchronized Map<String, BufferedImage> images() {
         return Collections.unmodifiableMap(new LinkedHashMap<>(images));
+    }
+
+    /**
+     * Renders all registered stage images, in registration order, as a labeled
+     * vertical strip.
+     *
+     * @throws IllegalStateException if no stage images have been registered
+     */
+    public synchronized BufferedImage composite() {
+        if (images.isEmpty()) {
+            throw new IllegalStateException("Cannot compose an empty stage image set");
+        }
+
+        BufferedImage measuringImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        Graphics2D measuringGraphics = measuringImage.createGraphics();
+        int labelHeight;
+        int width = 0;
+        try {
+            measuringGraphics.setFont(LABEL_FONT);
+            FontMetrics fontMetrics = measuringGraphics.getFontMetrics();
+            labelHeight = Math.addExact(
+                    fontMetrics.getHeight(),
+                    Math.multiplyExact(LABEL_PADDING, 2));
+            for (Map.Entry<String, BufferedImage> entry : images.entrySet()) {
+                width = Math.max(width, entry.getValue().getWidth());
+                width = Math.max(
+                        width,
+                        Math.addExact(
+                                fontMetrics.stringWidth(entry.getKey()),
+                                Math.multiplyExact(LABEL_PADDING, 2)));
+            }
+        } finally {
+            measuringGraphics.dispose();
+        }
+
+        int height = 0;
+        for (BufferedImage image : images.values()) {
+            height = Math.addExact(height, Math.addExact(labelHeight, image.getHeight()));
+        }
+
+        BufferedImage composite = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = composite.createGraphics();
+        try {
+            graphics.setFont(LABEL_FONT);
+            graphics.setRenderingHint(
+                    RenderingHints.KEY_TEXT_ANTIALIASING,
+                    RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            FontMetrics fontMetrics = graphics.getFontMetrics();
+
+            int y = 0;
+            for (Map.Entry<String, BufferedImage> entry : images.entrySet()) {
+                graphics.setColor(LABEL_BACKGROUND);
+                graphics.fillRect(0, y, width, labelHeight);
+                graphics.setColor(LABEL_FOREGROUND);
+                graphics.drawString(
+                        entry.getKey(),
+                        LABEL_PADDING,
+                        y + LABEL_PADDING + fontMetrics.getAscent());
+
+                BufferedImage image = entry.getValue();
+                int imageX = (width - image.getWidth()) / 2;
+                graphics.drawImage(image, imageX, y + labelHeight, null);
+                y += labelHeight + image.getHeight();
+            }
+        } finally {
+            graphics.dispose();
+        }
+        return composite;
     }
 
     private synchronized void stage(String key, WorldSlice slice) {
