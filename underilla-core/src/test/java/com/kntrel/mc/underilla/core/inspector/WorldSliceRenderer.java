@@ -14,8 +14,6 @@ import javax.imageio.ImageIO;
 /** Renders a block slice as a PNG with world Y increasing upward. */
 public final class WorldSliceRenderer {
 
-    private static final Color MISSING_COLOR = Color.BLACK;
-
     private WorldSliceRenderer() {}
 
     public static BufferedImage render(WorldSlice slice, int pixelsPerBlock) {
@@ -42,7 +40,7 @@ public final class WorldSliceRenderer {
                 for (int localY = 0; localY < slice.getHeight(); localY++) {
                     int y = slice.getOffsetY() + localY;
                     Block block = slice.getBlock(x, y);
-                    graphics.setColor(block == null ? MISSING_COLOR : BlockColors.get(block.id()));
+                    graphics.setColor(block == null ? BlockColors.AIR : BlockColors.get(block.id()));
                     graphics.fillRect(
                             localX * pixelsPerBlock,
                             (slice.getHeight() - 1 - localY) * pixelsPerBlock,
