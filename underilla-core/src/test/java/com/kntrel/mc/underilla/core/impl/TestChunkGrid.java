@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Dense 3D block and biome grid representing one chunk.
+ * Dense 3D block grid and biome-cell grid representing one chunk.
  *
  * <p>X and Z are local chunk coordinates. Y uses world coordinates.</p>
  */
@@ -36,7 +36,11 @@ public final class TestChunkGrid implements ChunkData {
         this.minimumY = minimumY;
         this.maximumY = maximumY;
         this.blocks = new Block[GenerationConstants.CHUNK_SIZE][maximumY - minimumY][GenerationConstants.CHUNK_SIZE];
-        this.biomes = new Biome[GenerationConstants.CHUNK_SIZE][maximumY - minimumY][GenerationConstants.CHUNK_SIZE];
+        int biomeSize = GenerationConstants.BIOME_CELL_SIZE;
+        this.biomes = new Biome
+                [GenerationConstants.CHUNK_SIZE / biomeSize]
+                [Math.ceilDiv(maximumY - minimumY, biomeSize)]
+                [GenerationConstants.CHUNK_SIZE / biomeSize];
         fill(Objects.requireNonNull(defaultBlock, "defaultBlock"));
         fillBiomes(Objects.requireNonNull(defaultBiome, "defaultBiome"));
     }
@@ -138,7 +142,7 @@ public final class TestChunkGrid implements ChunkData {
     @Override
     public Biome getBiome(int x, int y, int z) {
         requirePosition(x, y, z);
-        return biomes[x][y - minimumY][z];
+        return biomes[biomeX(x)][biomeY(y)][biomeZ(z)];
     }
 
     @Override
@@ -161,7 +165,7 @@ public final class TestChunkGrid implements ChunkData {
     @Override
     public void setBiome(int x, int y, int z, Biome biome) {
         requirePosition(x, y, z);
-        biomes[x][y - minimumY][z] = Objects.requireNonNull(biome, "biome");
+        biomes[biomeX(x)][biomeY(y)][biomeZ(z)] = Objects.requireNonNull(biome, "biome");
     }
 
     @Override
@@ -176,6 +180,12 @@ public final class TestChunkGrid implements ChunkData {
         requireHorizontalPosition(x, z);
         requireY(y);
     }
+
+    private static int biomeX(int x) { return x / GenerationConstants.BIOME_CELL_SIZE; }
+
+    private int biomeY(int y) { return (y - minimumY) / GenerationConstants.BIOME_CELL_SIZE; }
+
+    private static int biomeZ(int z) { return z / GenerationConstants.BIOME_CELL_SIZE; }
 
     private static void requireHorizontalPosition(int x, int z) {
         if (x < 0 || x >= GenerationConstants.CHUNK_SIZE || z < 0 || z >= GenerationConstants.CHUNK_SIZE) {

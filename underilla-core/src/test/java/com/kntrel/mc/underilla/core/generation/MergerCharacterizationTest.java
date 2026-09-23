@@ -102,7 +102,7 @@ class MergerCharacterizationTest {
         assertEquals("minecraft:air", blockName(caves, 0, 0, 0));
         assertEquals("minecraft:cave_air", blockName(caveAir, 12, -62, 1));
         assertTrue(caveAir.blockAt(12, -62, 1).orElseThrow().isAir());
-        assertEquals("minecraft:short_grass", blockName(mountain, 14, 174, 14));
+        assertEquals("minecraft:dirt", blockName(mountain, 14, 174, 14));
     }
 
     @Test

@@ -4,6 +4,7 @@ import com.jkantrell.nbt.tag.CompoundTag;
 import com.jkantrell.nbt.tag.StringTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
@@ -20,10 +21,50 @@ import java.util.function.Predicate;
 public final class TestWorld implements WorldReader {
 
     private final Map<ChunkCoordinate, TestChunkGrid> chunks = new HashMap<>();
+    private final int minimumY;
+    private final int maximumY;
+    private final Block defaultBlock;
+    private final Biome defaultBiome;
+
+    public TestWorld() {
+        this(-64, 320, TestBlock.air("minecraft:air"), new TestBiome("minecraft:plains"));
+    }
+
+    public TestWorld(int minimumY, int maximumY, Block defaultBlock, Biome defaultBiome) {
+        if (maximumY <= minimumY) {
+            throw new IllegalArgumentException("maximumY must be greater than minimumY");
+        }
+        this.minimumY = minimumY;
+        this.maximumY = maximumY;
+        this.defaultBlock = Objects.requireNonNull(defaultBlock, "defaultBlock");
+        this.defaultBiome = Objects.requireNonNull(defaultBiome, "defaultBiome");
+    }
+
+    public int getMinHeight() { return minimumY; }
+
+    public int getMaxHeight() { return maximumY; }
 
     public TestWorld addChunk(TestChunkGrid chunk) {
         Objects.requireNonNull(chunk, "chunk");
         chunks.put(new ChunkCoordinate(chunk.getChunkX(), chunk.getChunkZ()), chunk);
+        return this;
+    }
+
+    /** Writes a block at world coordinates, creating a chunk when needed. */
+    public TestWorld setBlock(int x, int y, int z, Block block) {
+        Objects.requireNonNull(block, "block");
+        chunkForWrite(x, y, z).setBlock(
+                Math.floorMod(x, GenerationConstants.CHUNK_SIZE), y,
+                Math.floorMod(z, GenerationConstants.CHUNK_SIZE), block);
+        return this;
+    }
+
+    /** Writes a biome at world coordinates, creating a chunk when needed. */
+    public TestWorld setBiome(int x, int y, int z, Biome biome) {
+        Objects.requireNonNull(biome, "biome");
+        chunkForWrite(x, y, z).setBiome(
+                Math.floorMod(x, GenerationConstants.CHUNK_SIZE), y,
+                Math.floorMod(z, GenerationConstants.CHUNK_SIZE), biome);
         return this;
     }
 
@@ -41,15 +82,36 @@ public final class TestWorld implements WorldReader {
                         Math.floorMod(z, GenerationConstants.CHUNK_SIZE)));
     }
 
+    public Optional<ChunkData> chunkData(int chunkX, int chunkZ) {
+        return Optional.ofNullable(chunks.get(new ChunkCoordinate(chunkX, chunkZ)));
+    }
+
     @Override
     public Optional<ChunkReader> readChunk(int chunkX, int chunkZ) {
         return Optional.ofNullable(chunks.get(new ChunkCoordinate(chunkX, chunkZ))).map(GridChunkReader::new);
     }
 
+
+
     private Optional<TestChunkGrid> gridAt(int globalX, int globalZ) {
         int chunkX = Math.floorDiv(globalX, GenerationConstants.CHUNK_SIZE);
         int chunkZ = Math.floorDiv(globalZ, GenerationConstants.CHUNK_SIZE);
         return Optional.ofNullable(chunks.get(new ChunkCoordinate(chunkX, chunkZ)));
+    }
+
+    private TestChunkGrid chunkForWrite(int x, int y, int z) {
+        ChunkCoordinate coordinate = new ChunkCoordinate(
+                Math.floorDiv(x, GenerationConstants.CHUNK_SIZE),
+                Math.floorDiv(z, GenerationConstants.CHUNK_SIZE));
+        TestChunkGrid existing = chunks.get(coordinate);
+        if (existing != null) {
+            return existing;
+        }
+        if (y < minimumY || y >= maximumY) {
+            throw new IndexOutOfBoundsException("Y outside world: " + y);
+        }
+        return chunks.computeIfAbsent(coordinate, key -> new TestChunkGrid(
+                key.x(), key.z(), minimumY, maximumY, defaultBlock, defaultBiome));
     }
 
     private record ChunkCoordinate(int x, int z) {}
