@@ -125,13 +125,13 @@ public final class Inspector {
         completedFrames.put(stage, frame);
         try {
             CompletableFuture.runAsync(() -> sink.publish(stage, frame), renderExecutor)
-                    .whenComplete((_, exception) -> rendered(stage, exception));
+                    .whenComplete((_, exception) -> rendered(exception));
         } catch (Throwable exception) {
             fail(exception);
         }
     }
 
-    private synchronized void rendered(InspectionStage point, Throwable exception) {
+    private synchronized void rendered(Throwable exception) {
         if (completion.isDone()) {
             return;
         }
@@ -141,7 +141,19 @@ public final class Inspector {
         }
         renderedFrames++;
         if (renderedFrames == states.size()) {
-            completion.complete(new InspectionReport(completedFrames));
+            InspectionReport report = new InspectionReport(completedFrames);
+            try {
+                CompletableFuture.runAsync(() -> sink.complete(report), renderExecutor)
+                        .whenComplete((_, finishError) -> {
+                            if (finishError == null) {
+                                completion.complete(report);
+                            } else {
+                                fail(finishError);
+                            }
+                        });
+            } catch (Throwable finishError) {
+                fail(finishError);
+            }
         }
     }
 

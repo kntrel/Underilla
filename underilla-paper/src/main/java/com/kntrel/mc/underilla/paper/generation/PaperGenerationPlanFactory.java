@@ -6,6 +6,7 @@ import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.generation.NoodleCavesPolicy;
 import com.kntrel.mc.underilla.core.generation.UnderillaFactory;
 import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
+import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.Underilla;
@@ -14,6 +15,7 @@ import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
 import org.jspecify.annotations.Nullable;
+import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -98,6 +100,10 @@ public final class PaperGenerationPlanFactory {
                 : null;
         builder.blockCleanup(cleanUpSupport, cleanUpBlock, cleanUpIllegalBlock);
 
+        if (config.inspectionEnabled()) {
+            builder.inspect(inspectionRegion(config), Path.of(config.inspectionOutput()));
+        }
+
         if (config.getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
             builder.entityCleanup(
                     entity -> config.shouldRemoveEntity(entity.id()),
@@ -109,6 +115,23 @@ public final class PaperGenerationPlanFactory {
                     });
         }
         return builder.build();
+    }
+
+    private static InspectionRegion inspectionRegion(UnderillaConfig config) {
+        String configuredAxis = config.inspectionAxis();
+        InspectionRegion.Axis axis;
+        try {
+            axis = InspectionRegion.Axis.valueOf(configuredAxis.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Configuration key 'inspect.axis' must be 'x' or 'z': " + configuredAxis, exception);
+        }
+        return new InspectionRegion(
+                axis,
+                config.inspectionSliceCoordinate(),
+                config.inspectionStartChunk(),
+                config.inspectionLengthChunks(),
+                config.generationAreaMinY(),
+                config.generationAreaMaxY());
     }
 
     private static Block transformSurfaceBlock(Block block, UnderillaConfig config, BlockFactory blocks) {

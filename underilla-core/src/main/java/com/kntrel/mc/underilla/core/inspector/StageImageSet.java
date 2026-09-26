@@ -34,6 +34,16 @@ public final class StageImageSet {
         this.stage(point.label(), slice, point.order() + 1.0f);
     }
 
+    /** Returns the rendered image for a completed inspection stage. */
+    public synchronized BufferedImage image(InspectionStage stage) {
+        Objects.requireNonNull(stage, "stage");
+        Frame frame = frames.get((stage.order() + 1.0f) + " " + stage.label());
+        if (frame == null) {
+            throw new IllegalStateException("No image has been published for " + stage);
+        }
+        return frame.image();
+    }
+
     /**
      * Adds a slice to a custom stage. Slices with the same generated key are composited
      * using their world-coordinate bounds.

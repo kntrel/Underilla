@@ -55,6 +55,21 @@ generationArea:
   minY: -64
   maxY: 320
 
+# Capture generation stages for one vertical slice and write them as PNG images.
+inspect:
+  # Enables inspection. It adds rendering work to generation, so keep this false outside diagnostics.
+  enabled: false
+  # [z|x] The horizontal coordinate kept constant by the slice: z gives an X-by-Y image; x gives a Z-by-Y image.
+  axis: z
+  # The fixed world coordinate on the selected axis (world Z for axis z, world X for axis x).
+  sliceCoordinate: 0
+  # The first chunk on the slice's traversed axis (X for axis z, Z for axis x).
+  startChunk: 0
+  # Number of consecutive chunks to inspect along the traversed axis. Must be at least 1.
+  lengthChunks: 32
+  # Directory where each stage PNG and the combined sequence.png are written.
+  output: ".\\underilla-inspect"
+
 # Which world generator to use for the chunks that are out of the surface world.
 # Possible values: "VoidWorldGenerator", "VANILLA" or any other world generator plugin name that is installed on your server.
 # VANILLA will generate the chunks with the default world generator.

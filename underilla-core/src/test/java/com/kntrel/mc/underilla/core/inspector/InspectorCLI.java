@@ -215,11 +215,11 @@ public class InspectorCLI implements Callable<Integer> {
             }
             Files.createDirectories(outputDirectory);
             for (Map.Entry<String, BufferedImage> image : imageSet.images().entrySet()) {
-                WorldSliceRenderer.writePng(
+                PngInspectionSink.writePng(
                         image.getValue(),
                         outputDirectory.resolve(image.getKey() + ".png"));
             }
-            WorldSliceRenderer.writePng(
+            PngInspectionSink.writePng(
                     imageSet.composite(),
                     outputDirectory.resolve("sequence.png"));
         } catch (IOException exception) {

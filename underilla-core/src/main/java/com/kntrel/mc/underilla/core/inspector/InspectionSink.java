@@ -5,4 +5,7 @@ package com.kntrel.mc.underilla.core.inspector;
 public interface InspectionSink {
 
     void publish(InspectionStage point, WorldSlice slice);
+
+    /** Called after every selected stage has been published. */
+    default void complete(InspectionReport report) {}
 }

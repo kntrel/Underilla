@@ -101,6 +101,18 @@ public class UnderillaConfig {
 
     public int generationAreaMaxZ() { return getInt(IntegerKeys.GENERATION_AREA_MAX_Z); }
 
+    public boolean inspectionEnabled() { return getBoolean(BooleanKeys.INSPECTION_ENABLED); }
+
+    public String inspectionAxis() { return getString(StringKeys.INSPECTION_AXIS); }
+
+    public int inspectionSliceCoordinate() { return getInt(IntegerKeys.INSPECTION_SLICE_COORDINATE); }
+
+    public int inspectionStartChunk() { return getInt(IntegerKeys.INSPECTION_START_CHUNK); }
+
+    public int inspectionLengthChunks() { return getInt(IntegerKeys.INSPECTION_LENGTH_CHUNKS); }
+
+    public String inspectionOutput() { return getString(StringKeys.INSPECTION_OUTPUT); }
+
     public int maxHeightOfCaves() { return getInt(IntegerKeys.MAX_HEIGHT_OF_CAVES); }
 
     public int mergeDepth() { return getInt(IntegerKeys.MERGE_DEPTH); }
@@ -555,7 +567,8 @@ public class UnderillaConfig {
         CLEAN_BLOCKS_ENABLED("clean.blocks.enabled", true),
         CLEAN_ILLEGAL_BLOCKS_ENABLED("clean.ilegalBlocks.enabled", true),
         CLEAN_BLOCKS_REMOVE_UNSTABLE_BLOCKS("clean.blocks.removeUnstableBlocks", true),
-        CLEAN_ENTITIES_ENABLED("clean.entities.enabled", true);
+        CLEAN_ENTITIES_ENABLED("clean.entities.enabled", true),
+        INSPECTION_ENABLED("inspect.enabled", false);
         // @formatter:on
 
         private final String path;
@@ -580,7 +593,10 @@ public class UnderillaConfig {
         ADAPTATIVE_MIN_HIDDEN_BLOCKS_MERGE_DEPTH("surface.adaptativeDepth.minHiddenBlocksDepth", 2),
         MAX_HEIGHT_OF_CAVES("surfaceAndAbsolute.limit", Integer.MAX_VALUE),
         REGION_FILE_CACHE_SIZE("cache.regionFiles", 16, 1, Integer.MAX_VALUE),
-        CHUNK_CACHE_SIZE("cache.chunks", 64, 1, Integer.MAX_VALUE);
+        CHUNK_CACHE_SIZE("cache.chunks", 64, 1, Integer.MAX_VALUE),
+        INSPECTION_SLICE_COORDINATE("inspect.sliceCoordinate", 0),
+        INSPECTION_START_CHUNK("inspect.startChunk", 0),
+        INSPECTION_LENGTH_CHUNKS("inspect.lengthChunks", 32, 1, Integer.MAX_VALUE);
         // @formatter:on
 
         private final String path;
@@ -604,7 +620,9 @@ public class UnderillaConfig {
         STEP_UNDERILLA_GENERATION("steps.underillaGeneration", "skip"),
         FINAL_WORLD_NAME("finalWorld.name", "world"),
         OUT_OF_THE_SURFACE_WORLD_GENERATOR("outOfTheSurfaceWorldGenerator", "VoidWorldGenerator"),
-        STRATEGY("strategy", "SURFACE");
+        STRATEGY("strategy", "SURFACE"),
+        INSPECTION_AXIS("inspect.axis", "z"),
+        INSPECTION_OUTPUT("inspect.output", ".\\underilla-inspect");
         // @formatter:on
 
         private final String path;
