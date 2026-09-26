@@ -36,10 +36,8 @@ public final class WorldSliceRenderer {
         Graphics2D graphics = image.createGraphics();
         try {
             for (int localX = 0; localX < slice.getWidth(); localX++) {
-                int x = slice.getOffsetX() + localX;
                 for (int localY = 0; localY < slice.getHeight(); localY++) {
-                    int y = slice.getOffsetY() + localY;
-                    Block block = slice.getBlock(x, y);
+                    Block block = slice.getBlock(localX, localY);
                     graphics.setColor(block == null ? BlockColors.AIR : BlockColors.get(block.id()));
                     graphics.fillRect(
                             localX * pixelsPerBlock,
@@ -47,7 +45,7 @@ public final class WorldSliceRenderer {
                             pixelsPerBlock,
                             pixelsPerBlock);
                     if (biomeOverlay) {
-                        Biome biome = slice.getBiome(x, y);
+                        Biome biome = slice.getBiome(localX, localY);
                         if (biome != null) {
                             Color color = BiomeColors.get(biome.id());
                             graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 128));

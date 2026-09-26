@@ -21,12 +21,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Callable;
 
 @Command(
         name = "inspect"
 )
-public class Inspector implements Callable<Integer> {
+public class InspectorCLI implements Callable<Integer> {
 
     private static final int MINIMUM_Y = -64;
     private static final int MAXIMUM_Y = 320;
@@ -157,38 +159,52 @@ public class Inspector implements Callable<Integer> {
 
         WorldReader reference = referenceWorld();
 
-        InspectorGenerator inspectorGenerator = new InspectorGenerator(
-                plan(reference),
-                new TestWorld(
-                        MINIMUM_Y,
-                        MAXIMUM_Y,
-                        TestBlock.air("minecraft:air"),
-                        new TestBiome("minecraft:plains")),
-                seed,
-                chunkSize,
-                zSlice);
-
-        StageImageSet.Builder imageSetBuilder = StageImageSet.with(inspectorGenerator)
-                .baseIndex(1.0f)
-                .biomeOverlay(showBiomes);
-        for (InspectorGenerator.GenerationStage stage : InspectorGenerator.GenerationStage.values()) {
-            for (InspectorGenerator.GenerationTiming timing : InspectorGenerator.GenerationTiming.values()) {
-                imageSetBuilder.include(timing, stage);
-            }
-        }
-        StageImageSet imageSet = imageSetBuilder.build();
-
-        WorldSlice referenceSlice = WorldSlice.from(
-                reference,
+        WorldGenerationPlan generationPlan = plan(reference);
+        StageImageSet imageSet = new StageImageSet(showBiomes);
+        Set<InspectionStage> points = enabledPoints(generationPlan);
+        InspectionRegion region = InspectionRegion.zSlice(
                 zSlice,
                 0,
-                chunkSize * GenerationConstants.CHUNK_SIZE,
+                chunkSize,
                 MINIMUM_Y,
                 MAXIMUM_Y);
-        imageSet.stage("reference", referenceSlice, 0);
 
-        inspectorGenerator.generate();
+        try (ExecutorService renderExecutor = Executors.newFixedThreadPool(
+                Math.max(1, Math.min(2, Runtime.getRuntime().availableProcessors())))) {
+            Inspector inspection = new Inspector(
+                    region,
+                    points,
+                    renderExecutor,
+                    imageSet::stage);
+            InspectorGenerator inspectorGenerator = new InspectorGenerator(
+                    inspection.instrument(generationPlan),
+                    new TestWorld(
+                            MINIMUM_Y,
+                            MAXIMUM_Y,
+                            TestBlock.air("minecraft:air"),
+                            new TestBiome("minecraft:plains")),
+                    seed,
+                    chunkSize);
+
+            WorldSlice referenceSlice = WorldSlice.from(reference, region);
+            imageSet.stage("reference", referenceSlice, 0);
+
+            inspectorGenerator.generate();
+            inspection.completion().toCompletableFuture().join();
+        }
         render(imageSet);
+    }
+
+    private static Set<InspectionStage> enabledPoints(WorldGenerationPlan plan) {
+        return InspectionStage.all().stream()
+                .filter(point -> switch (point.phase()) {
+                    case NOISE -> plan.flags().noise();
+                    case SURFACE -> plan.flags().surface();
+                    case CARVERS -> plan.flags().carvers();
+                    case FEATURES -> plan.flags().features();
+                    case LOAD -> true;
+                })
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     private void render(StageImageSet imageSet) {
@@ -262,7 +278,7 @@ public class Inspector implements Callable<Integer> {
     }
 
     static void main(String[] args) {
-        int out = new CommandLine(new Inspector()).execute(args);
+        int out = new CommandLine(new InspectorCLI()).execute(args);
         System.exit(out);
     }
 }

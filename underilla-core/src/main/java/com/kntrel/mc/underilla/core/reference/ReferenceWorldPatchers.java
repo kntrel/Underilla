@@ -21,7 +21,7 @@ import java.util.function.Supplier;
 
 /**
  * Builds the surface and post-carver phases for copying the positive reference world and its
- * optional negative world. Source selection and write timing are decided together per block.
+ * optional negative world. Source selection and write state are decided together per block.
  */
 public final class ReferenceWorldPatchers {
 
