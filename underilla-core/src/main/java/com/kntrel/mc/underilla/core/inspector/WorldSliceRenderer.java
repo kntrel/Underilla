@@ -41,7 +41,7 @@ public final class WorldSliceRenderer {
                             pixelsPerBlock,
                             pixelsPerBlock);
                     if (biomeOverlay) {
-                        Biome biome = slice.getBiome(localX, localY);
+                        Biome biome = slice.getBiomeAt(localX, localY);
                         if (biome != null) {
                             Color color = BiomeColors.get(biome.id());
                             graphics.setColor(new Color(color.getRed(), color.getGreen(), color.getBlue(), 128));

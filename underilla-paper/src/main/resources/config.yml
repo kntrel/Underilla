@@ -68,7 +68,7 @@ inspect:
   # Number of consecutive chunks to inspect along the traversed axis. Must be at least 1.
   lengthChunks: 32
   # Directory where each stage PNG and the combined sequence.png are written.
-  output: ".\\underilla-inspect"
+  output: ./underilla-inspect
 
 # Which world generator to use for the chunks that are out of the surface world.
 # Possible values: "VoidWorldGenerator", "VANILLA" or any other world generator plugin name that is installed on your server.

@@ -126,8 +126,10 @@ public final class WorldSlice {
                 int worldZ = region.axis() == InspectionRegion.Axis.Z
                         ? region.coordinate()
                         : worldHorizontal;
-                world.biomeAt(worldX, worldY, worldZ)
-                        .ifPresent(biome -> slice.setBiome(localHorizontal, localY, biome));
+                Biome biome = world.biomeAt(worldX, worldY, worldZ).orElse(null);
+                if (biome != null) {
+                    slice.setBiome(cellX, cellY, biome);
+                }
             }
         }
     }
@@ -153,7 +155,7 @@ public final class WorldSlice {
             for (int cellY = 0; cellY < slice.getBiomeHeight(); cellY++) {
                 int worldY = Math.max(region.minimumY(), (firstYCell + cellY) * cellSize);
                 int localY = worldY - region.minimumY();
-                slice.setBiome(localHorizontal, localY, chunk.getBiome(localX, worldY, localZ));
+                slice.setBiome(cellX, cellY, chunk.getBiome(localX, worldY, localZ));
             }
         }
     }
@@ -167,9 +169,9 @@ public final class WorldSlice {
                 if (block != null) {
                     copy.setBlock(x, y, block);
                 }
-                Biome biome = getBiome(x, y);
+                Biome biome = getBiomeAt(x, y);
                 if (biome != null) {
-                    copy.setBiome(x, y, biome);
+                    copy.setBiomeAt(x, y, biome);
                 }
             }
         }
@@ -196,9 +198,9 @@ public final class WorldSlice {
                 if (block != null) {
                     setBlock(destinationX, destinationY, block);
                 }
-                Biome biome = source.getBiome(x, y);
+                Biome biome = source.getBiomeAt(x, y);
                 if (biome != null) {
-                    setBiome(destinationX, destinationY, biome);
+                    setBiomeAt(destinationX, destinationY, biome);
                 }
             }
         }
@@ -225,22 +227,36 @@ public final class WorldSlice {
         blocks[requireLocalX(x)][requireLocalY(y)] = Objects.requireNonNull(block, "block");
     }
 
+    /** Returns the biome stored at local biome-cell coordinates. */
     public Biome getBiome(int x, int y) {
-        requireLocalX(x);
-        requireLocalY(y);
-        int cellSize = GenerationConstants.BIOME_CELL_SIZE;
-        return biomes[Math.floorDiv(offsetX + x, cellSize) - Math.floorDiv(offsetX, cellSize)]
-                [Math.floorDiv(offsetY + y, cellSize) - Math.floorDiv(offsetY, cellSize)];
+        return biomes[requireBiomeX(x)][requireBiomeY(y)];
     }
 
-    public void setBiome(int x, int y, Biome biome) {
-        requireMutable();
+    /** Resolves local block coordinates to their corresponding local biome cell. */
+    public Biome getBiomeAt(int x, int y) {
         requireLocalX(x);
         requireLocalY(y);
         int cellSize = GenerationConstants.BIOME_CELL_SIZE;
-        biomes[Math.floorDiv(offsetX + x, cellSize) - Math.floorDiv(offsetX, cellSize)]
-                [Math.floorDiv(offsetY + y, cellSize) - Math.floorDiv(offsetY, cellSize)]
-                = Objects.requireNonNull(biome, "biome");
+        return getBiome(
+                Math.floorDiv(offsetX + x, cellSize) - Math.floorDiv(offsetX, cellSize),
+                Math.floorDiv(offsetY + y, cellSize) - Math.floorDiv(offsetY, cellSize));
+    }
+
+    /** Stores a biome at local biome-cell coordinates. */
+    public void setBiome(int x, int y, Biome biome) {
+        requireMutable();
+        biomes[requireBiomeX(x)][requireBiomeY(y)] = Objects.requireNonNull(biome, "biome");
+    }
+
+    /** Resolves local block coordinates to their corresponding local biome cell before storing it. */
+    public void setBiomeAt(int x, int y, Biome biome) {
+        requireLocalX(x);
+        requireLocalY(y);
+        int cellSize = GenerationConstants.BIOME_CELL_SIZE;
+        setBiome(
+                Math.floorDiv(offsetX + x, cellSize) - Math.floorDiv(offsetX, cellSize),
+                Math.floorDiv(offsetY + y, cellSize) - Math.floorDiv(offsetY, cellSize),
+                biome);
     }
 
     private int requireLocalX(int x) {
@@ -253,6 +269,20 @@ public final class WorldSlice {
     private int requireLocalY(int y) {
         if (y < 0 || y >= getHeight()) {
             throw new IndexOutOfBoundsException("Y outside slice: " + y);
+        }
+        return y;
+    }
+
+    private int requireBiomeX(int x) {
+        if (x < 0 || x >= getBiomeWidth()) {
+            throw new IndexOutOfBoundsException("Biome X outside slice: " + x);
+        }
+        return x;
+    }
+
+    private int requireBiomeY(int y) {
+        if (y < 0 || y >= getBiomeHeight()) {
+            throw new IndexOutOfBoundsException("Biome Y outside slice: " + y);
         }
         return y;
     }

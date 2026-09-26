@@ -13,7 +13,9 @@ import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
 import com.kntrel.mc.underilla.core.inspector.InspectionStage;
 import com.kntrel.mc.underilla.core.inspector.Inspector;
+import com.kntrel.mc.underilla.core.inspector.InspectorPersister;
 import com.kntrel.mc.underilla.core.inspector.PngInspectionSink;
+import com.kntrel.mc.underilla.core.inspector.WorldSlice;
 import com.kntrel.mc.underilla.core.patch.*;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
@@ -24,6 +26,8 @@ import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.ArrayList;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -93,6 +97,7 @@ public final class UnderillaFactory {
         private Instrumenter instrumenter;
         private InspectionRegion inspectionRegion;
         private Path inspectionOutput;
+        private String inspectionWorldIdentity = "unspecified";
         private Integer minimumY;
         private Integer maximumY;
         private Integer maximumCaveY;
@@ -139,8 +144,17 @@ public final class UnderillaFactory {
 
         /** Captures the selected region during generation and writes stage PNGs to {@code output}. */
         public Builder inspect(InspectionRegion region, Path output) {
+            return inspect(region, output, inspectionWorldIdentity);
+        }
+
+        /**
+         * Captures the selected region during generation and writes stage PNGs to {@code output}.
+         * {@code worldIdentity} prevents accidentally reusing captures from another generated world.
+         */
+        public Builder inspect(InspectionRegion region, Path output, String worldIdentity) {
             this.inspectionRegion = Objects.requireNonNull(region, "region");
             this.inspectionOutput = Objects.requireNonNull(output, "output");
+            this.inspectionWorldIdentity = Objects.requireNonNull(worldIdentity, "worldIdentity");
             return this;
         }
 
@@ -393,10 +407,27 @@ public final class UnderillaFactory {
                         case LOAD -> true;
                     })
                     .collect(Collectors.toUnmodifiableSet());
-            PngInspectionSink sink = new PngInspectionSink(inspectionOutput, false);
             ExecutorService renderer = Executors.newSingleThreadExecutor(
                     Thread.ofVirtual().name("underilla-inspector-renderer").factory());
-            Inspector inspector = new Inspector(region, stages, renderer, sink);
+            Inspector inspector;
+            try {
+                InspectorPersister persister = new InspectorPersister(
+                        inspectionOutput,
+                        inspectionWorldIdentity,
+                        inspectionSettingsFingerprint(plan),
+                        region,
+                        stages,
+                        blocks);
+                PngInspectionSink sink = new PngInspectionSink(inspectionOutput, false);
+                sink.publishReference(WorldSlice.from(referenceWorld, region));
+                inspector = new Inspector(region, stages, renderer, sink, persister);
+            } catch (IOException exception) {
+                renderer.shutdown();
+                throw new UncheckedIOException("Could not initialize inspection captures in " + inspectionOutput, exception);
+            } catch (RuntimeException exception) {
+                renderer.shutdown();
+                throw exception;
+            }
             inspector.completion().whenComplete((_, error) -> {
                 renderer.shutdown();
                 if (error != null) {
@@ -404,6 +435,21 @@ public final class UnderillaFactory {
                 }
             });
             return inspector.instrument(plan);
+        }
+
+        private String inspectionSettingsFingerprint(WorldGenerationPlan plan) {
+            return "v1|strategy=" + strategy
+                    + "|minimumY=" + minimumY
+                    + "|maximumY=" + maximumY
+                    + "|maximumCaveY=" + maximumCaveY
+                    + "|mergeDepth=" + mergeDepth
+                    + "|adaptiveMaximumDepth=" + adaptiveMaximumDepth
+                    + "|adaptiveMinimumHiddenDepth=" + adaptiveMinimumHiddenDepth
+                    + "|generationArea=" + generationArea
+                    + "|surfaceBiomeUseTopYOnly=" + surfaceBiomeUseTopYOnly
+                    + "|preserveGeneratedBiomesOnlyUnderSurface=" + preserveGeneratedBiomesOnlyUnderSurface
+                    + "|surfaceFill=" + surfaceFill
+                    + "|flags=" + plan.flags();
         }
 
         private static WorldGenerationPlan verticallyBound(

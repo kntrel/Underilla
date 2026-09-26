@@ -622,7 +622,7 @@ public class UnderillaConfig {
         OUT_OF_THE_SURFACE_WORLD_GENERATOR("outOfTheSurfaceWorldGenerator", "VoidWorldGenerator"),
         STRATEGY("strategy", "SURFACE"),
         INSPECTION_AXIS("inspect.axis", "z"),
-        INSPECTION_OUTPUT("inspect.output", ".\\underilla-inspect");
+        INSPECTION_OUTPUT("inspect.output", "./underilla-inspect");
         // @formatter:on
 
         private final String path;

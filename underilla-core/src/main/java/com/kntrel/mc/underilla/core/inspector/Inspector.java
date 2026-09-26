@@ -5,6 +5,7 @@ import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.generation.Phase;
 import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
 import com.kntrel.mc.underilla.core.patch.Patcher;
+import java.io.IOException;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,6 +30,7 @@ public final class Inspector {
     private final Map<InspectionStage, FrameState> states;
     private final Executor renderExecutor;
     private final InspectionSink sink;
+    private final InspectorPersister persister;
     private final CompletableFuture<InspectionReport> completion = new CompletableFuture<>();
     private final Map<InspectionStage, WorldSlice> completedFrames = new LinkedHashMap<>();
     private int renderedFrames;
@@ -38,7 +40,21 @@ public final class Inspector {
             Set<InspectionStage> stages,
             Executor renderExecutor,
             InspectionSink sink
-    ) {
+    ) throws IOException {
+        this(region, stages, renderExecutor, sink, null);
+    }
+
+    /**
+     * Restores captures before accepting generation callbacks when {@code store} is non-null.
+     * A null store runs without persistence.
+     */
+    public Inspector(
+            InspectionRegion region,
+            Set<InspectionStage> stages,
+            Executor renderExecutor,
+            InspectionSink sink,
+            InspectorPersister persister
+    ) throws IOException {
         this.region = Objects.requireNonNull(region, "region");
         Objects.requireNonNull(stages, "points");
         if (stages.isEmpty()) {
@@ -46,12 +62,16 @@ public final class Inspector {
         }
         this.renderExecutor = Objects.requireNonNull(renderExecutor, "renderExecutor");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.persister = persister;
         this.states = new LinkedHashMap<>();
         stages.stream()
                 .sorted(Comparator.comparingInt(InspectionStage::order))
                 .forEach(point -> states.put(
                         Objects.requireNonNull(point, "points must not contain null"),
                         new FrameState(newCanvas(region))));
+        if (persister != null) {
+            restore(persister.load());
+        }
     }
 
     /**
@@ -103,20 +123,40 @@ public final class Inspector {
             }
             ChunkPosition position = new ChunkPosition(chunk.getChunkX(), chunk.getChunkZ());
             WorldSlice tile = WorldSlice.from(chunk, region);
-            accept(point, position, tile);
+            accept(point, position, tile, true);
         } catch (Throwable exception) {
             fail(exception);
         }
     }
 
-    private synchronized void accept(InspectionStage stage, ChunkPosition position, WorldSlice tile) {
+    private void restore(Iterable<InspectorPersister.Capture> captures) {
+        for (InspectorPersister.Capture capture : captures) {
+            accept(capture.stage(), new ChunkPosition(capture.chunkX(), capture.chunkZ()), capture.slice(), false);
+        }
+    }
+
+    private synchronized void accept(
+            InspectionStage stage,
+            ChunkPosition position,
+            WorldSlice tile,
+            boolean checkpoint
+    ) {
         if (completion.isDone()) {
             return;
         }
         FrameState state = states.get(stage);
-        if (state == null || !state.received().add(position)) {
+        if (state == null || state.received().contains(position)) {
             return;
         }
+        if (checkpoint && persister != null) {
+            try {
+                persister.save(stage, position.x(), position.z(), tile);
+            } catch (IOException exception) {
+                fail(exception);
+                return;
+            }
+        }
+        state.received().add(position);
         state.canvas().copyFrom(tile);
         if (state.received().size() != region.chunkLength()) {
             return;

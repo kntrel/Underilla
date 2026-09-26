@@ -147,7 +147,7 @@ public class InspectorCLI implements Callable<Integer> {
         return 0;
     }
 
-    private void callInner() {
+    private void callInner() throws java.io.IOException {
 
         if (chunkSize < 1) {
             throw new IllegalArgumentException("chunkSize must be positive");
@@ -175,7 +175,8 @@ public class InspectorCLI implements Callable<Integer> {
                     region,
                     points,
                     renderExecutor,
-                    imageSet::stage);
+                    imageSet::stage,
+                    null);
             InspectorGenerator inspectorGenerator = new InspectorGenerator(
                     inspection.instrument(generationPlan),
                     new TestWorld(

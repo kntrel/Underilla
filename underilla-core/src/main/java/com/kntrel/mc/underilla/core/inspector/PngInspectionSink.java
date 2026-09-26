@@ -24,6 +24,16 @@ public final class PngInspectionSink implements InspectionSink {
         }
     }
 
+    /** Writes the source-world slice before any generated stages and includes it in the sequence. */
+    public void publishReference(WorldSlice slice) {
+        images.stage("reference", slice, 0);
+        try {
+            writePng(images.image("reference", 0), output.resolve("0.0 reference.png"));
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Could not write inspector reference to " + output, exception);
+        }
+    }
+
     @Override
     public void publish(InspectionStage stage, WorldSlice slice) {
         images.stage(stage, slice);

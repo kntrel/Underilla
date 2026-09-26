@@ -37,7 +37,13 @@ public final class StageImageSet {
     /** Returns the rendered image for a completed inspection stage. */
     public synchronized BufferedImage image(InspectionStage stage) {
         Objects.requireNonNull(stage, "stage");
-        Frame frame = frames.get((stage.order() + 1.0f) + " " + stage.label());
+        return image(stage.label(), stage.order() + 1.0f);
+    }
+
+    /** Returns the rendered image for a completed custom stage. */
+    public synchronized BufferedImage image(String stage, float index) {
+        Objects.requireNonNull(stage, "stage");
+        Frame frame = frames.get(index + " " + stage);
         if (frame == null) {
             throw new IllegalStateException("No image has been published for " + stage);
         }

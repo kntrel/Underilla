@@ -14,6 +14,7 @@ import com.kntrel.mc.underilla.paper.impl.BukkitEntity;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
+import com.kntrel.mc.underilla.paper.io.UnderillaConfig.StringKeys;
 import org.jspecify.annotations.Nullable;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -101,7 +102,10 @@ public final class PaperGenerationPlanFactory {
         builder.blockCleanup(cleanUpSupport, cleanUpBlock, cleanUpIllegalBlock);
 
         if (config.inspectionEnabled()) {
-            builder.inspect(inspectionRegion(config), Path.of(config.inspectionOutput()));
+            builder.inspect(
+                    inspectionRegion(config),
+                    Path.of(config.inspectionOutput()),
+                    config.getString(StringKeys.FINAL_WORLD_NAME));
         }
 
         if (config.getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {
