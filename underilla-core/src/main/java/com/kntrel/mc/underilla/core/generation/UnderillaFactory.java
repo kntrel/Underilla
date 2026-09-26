@@ -10,6 +10,12 @@ import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
+import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
+import com.kntrel.mc.underilla.core.inspector.InspectionStage;
+import com.kntrel.mc.underilla.core.inspector.Inspector;
+import com.kntrel.mc.underilla.core.inspector.InspectorPersister;
+import com.kntrel.mc.underilla.core.inspector.PngInspectionSink;
+import com.kntrel.mc.underilla.core.inspector.WorldSlice;
 import com.kntrel.mc.underilla.core.patch.*;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
@@ -20,9 +26,16 @@ import com.kntrel.mc.underilla.core.reference.mask.AbsoluteWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.ReferenceHeightWorldMask;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.ArrayList;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -30,6 +43,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Entry point for composing an Underilla world-generation plan.
@@ -39,6 +54,7 @@ import java.util.function.UnaryOperator;
  */
 public final class UnderillaFactory {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(UnderillaFactory.class);
     private static final int DEFAULT_MINIMUM_Y = -64;
     private static final int DEFAULT_MAXIMUM_Y = 320;
 
@@ -79,6 +95,9 @@ public final class UnderillaFactory {
         private WorldReader referenceWorld;
         private WorldReader negativeWorld;
         private Instrumenter instrumenter;
+        private InspectionRegion inspectionRegion;
+        private Path inspectionOutput;
+        private String inspectionWorldIdentity = "unspecified";
         private Integer minimumY;
         private Integer maximumY;
         private Integer maximumCaveY;
@@ -120,6 +139,22 @@ public final class UnderillaFactory {
 
         public Builder instrumenter(Instrumenter instrumenter) {
             this.instrumenter = Objects.requireNonNull(instrumenter, "instrumenter");
+            return this;
+        }
+
+        /** Captures the selected region during generation and writes stage PNGs to {@code output}. */
+        public Builder inspect(InspectionRegion region, Path output) {
+            return inspect(region, output, inspectionWorldIdentity);
+        }
+
+        /**
+         * Captures the selected region during generation and writes stage PNGs to {@code output}.
+         * {@code worldIdentity} prevents accidentally reusing captures from another generated world.
+         */
+        public Builder inspect(InspectionRegion region, Path output, String worldIdentity) {
+            this.inspectionRegion = Objects.requireNonNull(region, "region");
+            this.inspectionOutput = Objects.requireNonNull(output, "output");
+            this.inspectionWorldIdentity = Objects.requireNonNull(worldIdentity, "worldIdentity");
             return this;
         }
 
@@ -338,9 +373,83 @@ public final class UnderillaFactory {
                     .flags(flags)
                     .altimeter(altimeter)
                     .done();
-            return configuredMinimumY > DEFAULT_MINIMUM_Y || configuredMaximumY < DEFAULT_MAXIMUM_Y
+            generationPlan = configuredMinimumY > DEFAULT_MINIMUM_Y || configuredMaximumY < DEFAULT_MAXIMUM_Y
                     ? verticallyBound(generationPlan, configuredMinimumY, configuredMaximumY)
                     : generationPlan;
+            generationPlan = inspectionRegion == null
+                    ? generationPlan
+                    : inspect(generationPlan);
+            return generationPlan;
+        }
+
+        private WorldGenerationPlan inspect(WorldGenerationPlan plan) {
+            InspectionRegion region = inspectionRegion;
+            if (region.minimumY() < minimumY || region.maximumY() > maximumY) {
+                throw new IllegalArgumentException("Inspection Y range is outside the configured vertical range");
+            }
+            int fixedChunk = Math.floorDiv(region.coordinate(), GenerationConstants.CHUNK_SIZE);
+            for (int offset = 0; offset < region.chunkLength(); offset++) {
+                int traversedChunk = Math.addExact(region.startChunk(), offset);
+                int chunkX = region.axis() == InspectionRegion.Axis.Z ? traversedChunk : fixedChunk;
+                int chunkZ = region.axis() == InspectionRegion.Axis.Z ? fixedChunk : traversedChunk;
+                if (!plan.coverage().covers(chunkX, chunkZ)) {
+                    throw new IllegalArgumentException(
+                            "Inspection region contains uncovered chunk " + chunkX + ", " + chunkZ);
+                }
+            }
+
+            Set<InspectionStage> stages = InspectionStage.all().stream()
+                    .filter(stage -> switch (stage.phase()) {
+                        case NOISE -> plan.flags().noise();
+                        case SURFACE -> plan.flags().surface();
+                        case CARVERS -> plan.flags().carvers();
+                        case FEATURES -> plan.flags().features();
+                        case LOAD -> true;
+                    })
+                    .collect(Collectors.toUnmodifiableSet());
+            ExecutorService renderer = Executors.newSingleThreadExecutor(
+                    Thread.ofVirtual().name("underilla-inspector-renderer").factory());
+            Inspector inspector;
+            try {
+                InspectorPersister persister = new InspectorPersister(
+                        inspectionOutput,
+                        inspectionWorldIdentity,
+                        inspectionSettingsFingerprint(plan),
+                        region,
+                        stages,
+                        blocks);
+                PngInspectionSink sink = new PngInspectionSink(inspectionOutput, false);
+                sink.publishReference(WorldSlice.from(referenceWorld, region));
+                inspector = new Inspector(region, stages, renderer, sink, persister);
+            } catch (IOException exception) {
+                renderer.shutdown();
+                throw new UncheckedIOException("Could not initialize inspection captures in " + inspectionOutput, exception);
+            } catch (RuntimeException exception) {
+                renderer.shutdown();
+                throw exception;
+            }
+            inspector.completion().whenComplete((_, error) -> {
+                renderer.shutdown();
+                if (error != null) {
+                    LOGGER.error("Inspection failed for {}", inspectionOutput, error);
+                }
+            });
+            return inspector.instrument(plan);
+        }
+
+        private String inspectionSettingsFingerprint(WorldGenerationPlan plan) {
+            return "v1|strategy=" + strategy
+                    + "|minimumY=" + minimumY
+                    + "|maximumY=" + maximumY
+                    + "|maximumCaveY=" + maximumCaveY
+                    + "|mergeDepth=" + mergeDepth
+                    + "|adaptiveMaximumDepth=" + adaptiveMaximumDepth
+                    + "|adaptiveMinimumHiddenDepth=" + adaptiveMinimumHiddenDepth
+                    + "|generationArea=" + generationArea
+                    + "|surfaceBiomeUseTopYOnly=" + surfaceBiomeUseTopYOnly
+                    + "|preserveGeneratedBiomesOnlyUnderSurface=" + preserveGeneratedBiomesOnlyUnderSurface
+                    + "|surfaceFill=" + surfaceFill
+                    + "|flags=" + plan.flags();
         }
 
         private static WorldGenerationPlan verticallyBound(

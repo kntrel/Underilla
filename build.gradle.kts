@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "com.kntrel.mc.underilla"
-version = "3.0.0"
+version = "3.1.0"
 description = "Generate vanilla caves in custom worlds."
 
 allprojects {

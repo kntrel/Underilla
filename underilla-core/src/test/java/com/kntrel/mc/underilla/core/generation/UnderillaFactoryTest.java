@@ -15,6 +15,9 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
+import com.kntrel.mc.underilla.core.inspector.WorldSlice;
+import com.kntrel.mc.underilla.core.inspector.WorldSliceRenderer;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.VerticalBoundChunkPatcher;
@@ -24,11 +27,15 @@ import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatchers;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.Collection;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class UnderillaFactoryTest {
 
@@ -38,6 +45,27 @@ class UnderillaFactoryTest {
     private static final TestBlock WATER = TestBlock.liquid("minecraft:water");
     private static final TestBiome PLAINS = new TestBiome("minecraft:plains");
     private static final TestBlockFactory BLOCKS = new TestBlockFactory(AIR, GENERATED, REFERENCE, WATER);
+
+    @Test
+    void inspectionWritesReferenceBeforeGeneration(@TempDir Path output) throws IOException {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+        reference.setBlock(0, 0, 0, REFERENCE);
+
+        InspectionRegion region = InspectionRegion.zSlice(0, 0, 1, 0, 4);
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(region, output)
+                .build();
+
+        Path image = output.resolve("0.0 reference.png");
+        assertTrue(Files.exists(image));
+        var rendered = javax.imageio.ImageIO.read(image.toFile());
+        var expected = WorldSliceRenderer.render(WorldSlice.from(reference, region), 2);
+        assertEquals(expected.getWidth(), rendered.getWidth());
+        assertEquals(expected.getRGB(0, 7), rendered.getRGB(0, 7));
+    }
 
     private static final WorldReader EMPTY_WORLD = new WorldReader() {
         @Override

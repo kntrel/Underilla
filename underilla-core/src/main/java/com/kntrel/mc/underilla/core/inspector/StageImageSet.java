@@ -1,7 +1,5 @@
 package com.kntrel.mc.underilla.core.inspector;
 
-import com.kntrel.mc.underilla.core.inspector.InspectorGenerator.GenerationStage;
-import com.kntrel.mc.underilla.core.inspector.InspectorGenerator.GenerationTiming;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -9,13 +7,10 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.util.Collections;
-import java.util.EnumMap;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.Comparator;
 
 /** Collects rendered world slices from selected Inspector stages and custom stages. */
 public final class StageImageSet {
@@ -26,16 +21,33 @@ public final class StageImageSet {
     private static final Color LABEL_FOREGROUND = Color.WHITE;
     private static final Font LABEL_FONT = new Font(Font.SANS_SERIF, Font.BOLD, 16);
 
-    private final Map<String, BufferedImage> images = new LinkedHashMap<>();
-    private final Map<String, Bounds> bounds = new LinkedHashMap<>();
+    private final Map<String, Frame> frames = new LinkedHashMap<>();
     private final boolean biomeOverlay;
 
-    private StageImageSet(boolean biomeOverlay) {
+    public StageImageSet(boolean biomeOverlay) {
         this.biomeOverlay = biomeOverlay;
     }
 
-    public static Builder with(InspectorGenerator generator) {
-        return new Builder(generator);
+    /** Adds a completed frame at the standard inspector sequence position. */
+    public void stage(InspectionStage point, WorldSlice slice) {
+        Objects.requireNonNull(point, "point");
+        this.stage(point.label(), slice, point.order() + 1.0f);
+    }
+
+    /** Returns the rendered image for a completed inspection stage. */
+    public synchronized BufferedImage image(InspectionStage stage) {
+        Objects.requireNonNull(stage, "stage");
+        return image(stage.label(), stage.order() + 1.0f);
+    }
+
+    /** Returns the rendered image for a completed custom stage. */
+    public synchronized BufferedImage image(String stage, float index) {
+        Objects.requireNonNull(stage, "stage");
+        Frame frame = frames.get(index + " " + stage);
+        if (frame == null) {
+            throw new IllegalStateException("No image has been published for " + stage);
+        }
+        return frame.image();
     }
 
     /**
@@ -47,21 +59,26 @@ public final class StageImageSet {
         if (stage.isBlank()) {
             throw new IllegalArgumentException("stage must not be blank");
         }
-        this.stage(index + " " + stage, slice);
+        this.stageFrame(index + " " + stage, slice, index);
     }
 
     /** Returns an unmodifiable snapshot of the images keyed by their stage labels. */
     public synchronized Map<String, BufferedImage> images() {
-        return Collections.unmodifiableMap(new LinkedHashMap<>(images));
+        Map<String, BufferedImage> ordered = new LinkedHashMap<>();
+        frames.values().stream()
+                .sorted(Comparator.comparingDouble(Frame::index).thenComparing(Frame::key))
+                .forEach(frame -> ordered.put(frame.key(), frame.image()));
+        return Collections.unmodifiableMap(ordered);
     }
 
     /**
-     * Renders all registered stage images, in registration order, as a labeled
+     * Renders all registered stage images in their declared sequence order as a labeled
      * vertical strip.
      *
      * @throws IllegalStateException if no stage images have been registered
      */
     public synchronized BufferedImage composite() {
+        Map<String, BufferedImage> images = images();
         if (images.isEmpty()) {
             throw new IllegalStateException("Cannot compose an empty stage image set");
         }
@@ -123,12 +140,13 @@ public final class StageImageSet {
         return composite;
     }
 
-    private synchronized void stage(String key, WorldSlice slice) {
+    private synchronized void stageFrame(String key, WorldSlice slice, float index) {
         Objects.requireNonNull(slice, "slice");
         Bounds sliceBounds = Bounds.of(slice);
-        Bounds oldBounds = bounds.get(key);
+        Frame previous = frames.get(key);
+        Bounds oldBounds = previous == null ? null : previous.bounds();
         Bounds imageBounds = oldBounds == null ? sliceBounds : oldBounds.union(sliceBounds);
-        BufferedImage image = images.get(key);
+        BufferedImage image = previous == null ? null : previous.image();
 
         if (image == null || !imageBounds.equals(oldBounds)) {
             BufferedImage expanded = image(imageBounds);
@@ -145,8 +163,6 @@ public final class StageImageSet {
                 }
             }
             image = expanded;
-            images.put(key, image);
-            bounds.put(key, imageBounds);
         }
 
         BufferedImage sliceImage = WorldSliceRenderer.render(slice, PIXELS_PER_BLOCK, biomeOverlay);
@@ -160,6 +176,7 @@ public final class StageImageSet {
         } finally {
             graphics.dispose();
         }
+        frames.put(key, new Frame(index, key, image, imageBounds));
     }
 
     private static BufferedImage image(Bounds bounds) {
@@ -169,73 +186,7 @@ public final class StageImageSet {
                 BufferedImage.TYPE_INT_RGB);
     }
 
-    public static final class Builder {
-
-        private final InspectorGenerator generator;
-        private final EnumMap<GenerationTiming, EnumSet<GenerationStage>> includedStages;
-        private float baseIndex;
-        private boolean biomeOverlay;
-
-        private Builder(InspectorGenerator generator) {
-            this.generator = Objects.requireNonNull(generator, "generator");
-            this.includedStages = new EnumMap<>(GenerationTiming.class);
-            for (GenerationTiming timing : GenerationTiming.values()) {
-                includedStages.put(timing, EnumSet.noneOf(GenerationStage.class));
-            }
-        }
-
-        public Builder baseIndex(float baseIndex) {
-            if (!Double.isFinite(baseIndex)) {
-                throw new IllegalArgumentException("baseIndex must be finite");
-            }
-            this.baseIndex = baseIndex;
-            return this;
-        }
-
-        /** Enables or disables the translucent biome overlay on staged images. */
-        public Builder biomeOverlay(boolean biomeOverlay) {
-            this.biomeOverlay = biomeOverlay;
-            return this;
-        }
-
-        public Builder include(GenerationTiming timing, GenerationStage stage) {
-            includedStages.get(Objects.requireNonNull(timing, "timing"))
-                    .add(Objects.requireNonNull(stage, "stage"));
-            return this;
-        }
-
-        public StageImageSet build() {
-            StageImageSet stageImageSet = new StageImageSet(biomeOverlay);
-            for (GenerationTiming timing : GenerationTiming.values()) {
-                InspectorGenerator.StageHook hook = timing == GenerationTiming.AFTER
-                        ? generator.hook().after()
-                        : generator.hook().before();
-                for (GenerationStage stage : includedStages.get(timing)) {
-                    float index = baseIndex
-                            + stage.index() * 2
-                            + (timing == GenerationTiming.AFTER ? 1 : 0);
-                    String stageName = timing.name().toLowerCase(Locale.ROOT)
-                            + " "
-                            + stage.name().toLowerCase(Locale.ROOT);
-                    subscribe(hook, stage, slice -> stageImageSet.stage(stageName, slice, index));
-                }
-            }
-            return stageImageSet;
-        }
-
-        private void subscribe(
-                InspectorGenerator.StageHook hook,
-                GenerationStage stage,
-                Consumer<WorldSlice> consumer) {
-            switch (stage) {
-                case NOISE -> hook.noise(consumer);
-                case SURFACE -> hook.surface(consumer);
-                case CAVES -> hook.caves(consumer);
-                case FEATURES -> hook.features(consumer);
-                case LOAD -> hook.load(consumer);
-            }
-        }
-    }
+    private record Frame(float index, String key, BufferedImage image, Bounds bounds) {}
 
     private record Bounds(int minimumX, int minimumY, int maximumX, int maximumY) {
 
