@@ -99,7 +99,7 @@ public final class JsonStatsRecorder implements Recorder, AutoCloseable {
     public void record(Measurement measurement) {
         Objects.requireNonNull(measurement, "measurement");
         if (closed.get()) {
-            throw new IllegalStateException("recorder is closed");
+            return;
         }
 
         accumulators
