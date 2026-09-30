@@ -25,6 +25,6 @@ tasks.register<JavaExec>("inspect") {
     description = "Render the synthetic world-generation slice without running tests."
     dependsOn(tasks.testClasses)
     classpath = sourceSets.test.get().runtimeClasspath
-    mainClass.set("com.kntrel.mc.underilla.core.inspector.Inspector")
+    mainClass.set("com.kntrel.mc.underilla.core.inspector.InspectorCLI")
     workingDir = project.projectDir
 }

@@ -88,6 +88,23 @@ class JsonStatsRecorderTest {
         }
     }
 
+    @Test
+    void ignoresMeasurementsAfterClose(@TempDir Path temporaryDirectory) throws Exception {
+        Path output = temporaryDirectory.resolve("metrics.json");
+        JsonStatsRecorder recorder = new JsonStatsRecorder(output, Duration.ofDays(1), CLOCK);
+        recorder.record(measurement(FIRST_OPERATION, "surface_patch", 10));
+        recorder.close();
+
+        String finalSnapshot = Files.readString(output);
+        recorder.record(measurement(SECOND_OPERATION, "surface_patch", 20));
+
+        assertEquals(1, recorder.snapshot()
+                .get(new MetricKey(JsonStatsRecorderTest.class.getName(), "surface_patch"))
+                .count());
+        assertFalse(recorder.flush());
+        assertEquals(finalSnapshot, Files.readString(output));
+    }
+
     private static Measurement measurement(UUID operationId, String event, long durationNanos) {
         return new Measurement(operationId, JsonStatsRecorderTest.class, event, durationNanos, CAPTURED_AT);
     }
