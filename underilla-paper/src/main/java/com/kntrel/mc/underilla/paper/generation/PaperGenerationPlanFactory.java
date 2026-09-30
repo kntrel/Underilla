@@ -105,7 +105,8 @@ public final class PaperGenerationPlanFactory {
             builder.inspect(
                     inspectionRegion(config),
                     Path.of(config.inspectionOutput()),
-                    config.getString(StringKeys.FINAL_WORLD_NAME));
+                    config.getString(StringKeys.FINAL_WORLD_NAME),
+                    config.inspectionBiomeOverlay());
         }
 
         if (config.getBoolean(BooleanKeys.CLEAN_ENTITIES_ENABLED)) {

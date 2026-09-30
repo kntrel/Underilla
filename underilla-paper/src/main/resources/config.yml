@@ -67,6 +67,8 @@ inspect:
   startChunk: 0
   # Number of consecutive chunks to inspect along the traversed axis. Must be at least 1.
   lengthChunks: 32
+  # Overlay translucent biome colors on inspection images.
+  biomeOverlay: false
   # Directory where each stage PNG and the combined sequence.png are written.
   output: ./underilla-inspect
 

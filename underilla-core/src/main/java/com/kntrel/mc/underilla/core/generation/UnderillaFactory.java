@@ -98,6 +98,7 @@ public final class UnderillaFactory {
         private InspectionRegion inspectionRegion;
         private Path inspectionOutput;
         private String inspectionWorldIdentity = "unspecified";
+        private boolean inspectionBiomeOverlay;
         private Integer minimumY;
         private Integer maximumY;
         private Integer maximumCaveY;
@@ -144,7 +145,7 @@ public final class UnderillaFactory {
 
         /** Captures the selected region during generation and writes stage PNGs to {@code output}. */
         public Builder inspect(InspectionRegion region, Path output) {
-            return inspect(region, output, inspectionWorldIdentity);
+            return inspect(region, output, inspectionWorldIdentity, false);
         }
 
         /**
@@ -152,9 +153,15 @@ public final class UnderillaFactory {
          * {@code worldIdentity} prevents accidentally reusing captures from another generated world.
          */
         public Builder inspect(InspectionRegion region, Path output, String worldIdentity) {
+            return inspect(region, output, worldIdentity, false);
+        }
+
+        /** Captures the region, optionally overlaying biome colors on the rendered images. */
+        public Builder inspect(InspectionRegion region, Path output, String worldIdentity, boolean biomeOverlay) {
             this.inspectionRegion = Objects.requireNonNull(region, "region");
             this.inspectionOutput = Objects.requireNonNull(output, "output");
             this.inspectionWorldIdentity = Objects.requireNonNull(worldIdentity, "worldIdentity");
+            this.inspectionBiomeOverlay = biomeOverlay;
             return this;
         }
 
@@ -383,9 +390,24 @@ public final class UnderillaFactory {
         }
 
         private WorldGenerationPlan inspect(WorldGenerationPlan plan) {
-            InspectionRegion region = inspectionRegion;
-            if (region.minimumY() < minimumY || region.maximumY() > maximumY) {
-                throw new IllegalArgumentException("Inspection Y range is outside the configured vertical range");
+            Optional<InspectionRegion> fitted = inspectionRegion.clamp(generationArea)
+                    .flatMap(region -> region.clamp(minimumY, maximumY));
+            if (fitted.isEmpty()) {
+                LOGGER.warn(
+                        "Inspection region has no overlap with generation area {} and Y range [{}, {}); skipping inspection",
+                        generationArea,
+                        minimumY,
+                        maximumY
+                );
+                return plan;
+            }
+            InspectionRegion region = fitted.get();
+            if (!region.equals(inspectionRegion)) {
+                LOGGER.warn(
+                        "Inspection region {} extends outside generation bounds; shrinking to {}",
+                        inspectionRegion,
+                        region
+                );
             }
             int fixedChunk = Math.floorDiv(region.coordinate(), GenerationConstants.CHUNK_SIZE);
             for (int offset = 0; offset < region.chunkLength(); offset++) {
@@ -418,7 +440,7 @@ public final class UnderillaFactory {
                         region,
                         stages,
                         blocks);
-                PngInspectionSink sink = new PngInspectionSink(inspectionOutput, false);
+                PngInspectionSink sink = new PngInspectionSink(inspectionOutput, inspectionBiomeOverlay);
                 sink.publishReference(WorldSlice.from(referenceWorld, region));
                 inspector = new Inspector(region, stages, renderer, sink, persister);
             } catch (IOException exception) {

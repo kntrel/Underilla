@@ -1,7 +1,9 @@
 package com.kntrel.mc.underilla.core.inspector;
 
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.generation.GenerationArea;
 import java.util.Objects;
+import java.util.Optional;
 
 /** A finite vertical slice collected by an inspection session. */
 public final class InspectionRegion {
@@ -87,6 +89,64 @@ public final class InspectionRegion {
 
     /** Exclusive maximum Y coordinate. */
     public int maximumY() { return maximumY; }
+
+    /** Fits the slice to the chunks covered by the horizontal generation area. */
+    public Optional<InspectionRegion> clamp(GenerationArea area) {
+        Objects.requireNonNull(area, "area");
+        boolean traversesX = axis == Axis.Z;
+        long minimumFixedChunk = Math.ceilDiv(
+                (long) (traversesX ? area.minimumZ() : area.minimumX()), GenerationConstants.CHUNK_SIZE);
+        long maximumFixedChunk = Math.ceilDiv(
+                (long) (traversesX ? area.maximumZ() : area.maximumX()), GenerationConstants.CHUNK_SIZE);
+        long minimumTraversedChunk = Math.ceilDiv(
+                (long) (traversesX ? area.minimumX() : area.minimumZ()), GenerationConstants.CHUNK_SIZE);
+        long maximumTraversedChunk = Math.ceilDiv(
+                (long) (traversesX ? area.maximumX() : area.maximumZ()), GenerationConstants.CHUNK_SIZE);
+        int fixedChunk = Math.floorDiv(coordinate, GenerationConstants.CHUNK_SIZE);
+        long fittedStart = Math.max((long) startChunk, minimumTraversedChunk);
+        long fittedEnd = Math.min((long) startChunk + chunkLength, maximumTraversedChunk);
+        if (fixedChunk < minimumFixedChunk || fixedChunk >= maximumFixedChunk || fittedStart >= fittedEnd) {
+            return Optional.empty();
+        }
+        return Optional.of(new InspectionRegion(axis, coordinate, (int) fittedStart,
+                (int) (fittedEnd - fittedStart), minimumY, maximumY));
+    }
+
+    /** Fits the slice to a maximum-exclusive vertical range. */
+    public Optional<InspectionRegion> clamp(int rangeMinimumY, int rangeMaximumY) {
+        int fittedMinimumY = Math.max(minimumY, rangeMinimumY);
+        int fittedMaximumY = Math.min(maximumY, rangeMaximumY);
+        if (fittedMinimumY >= fittedMaximumY) {
+            return Optional.empty();
+        }
+        return Optional.of(new InspectionRegion(axis, coordinate, startChunk, chunkLength,
+                fittedMinimumY, fittedMaximumY));
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        if (this == other) {
+            return true;
+        }
+        if (!(other instanceof InspectionRegion region)) {
+            return false;
+        }
+        return axis == region.axis && coordinate == region.coordinate
+                && startChunk == region.startChunk && chunkLength == region.chunkLength
+                && minimumY == region.minimumY && maximumY == region.maximumY;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(axis, coordinate, startChunk, chunkLength, minimumY, maximumY);
+    }
+
+    @Override
+    public String toString() {
+        return "InspectionRegion[axis=" + axis + ", coordinate=" + coordinate
+                + ", startChunk=" + startChunk + ", chunkLength=" + chunkLength
+                + ", minimumY=" + minimumY + ", maximumY=" + maximumY + ']';
+    }
 
     /** Returns whether a chunk contributes one tile to this region. */
     public boolean contains(int chunkX, int chunkZ) {

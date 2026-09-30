@@ -103,6 +103,8 @@ public class UnderillaConfig {
 
     public boolean inspectionEnabled() { return getBoolean(BooleanKeys.INSPECTION_ENABLED); }
 
+    public boolean inspectionBiomeOverlay() { return getBoolean(BooleanKeys.INSPECTION_BIOME_OVERLAY); }
+
     public String inspectionAxis() { return getString(StringKeys.INSPECTION_AXIS); }
 
     public int inspectionSliceCoordinate() { return getInt(IntegerKeys.INSPECTION_SLICE_COORDINATE); }
@@ -568,7 +570,8 @@ public class UnderillaConfig {
         CLEAN_ILLEGAL_BLOCKS_ENABLED("clean.ilegalBlocks.enabled", true),
         CLEAN_BLOCKS_REMOVE_UNSTABLE_BLOCKS("clean.blocks.removeUnstableBlocks", true),
         CLEAN_ENTITIES_ENABLED("clean.entities.enabled", true),
-        INSPECTION_ENABLED("inspect.enabled", false);
+        INSPECTION_ENABLED("inspect.enabled", false),
+        INSPECTION_BIOME_OVERLAY("inspect.biomeOverlay", false);
         // @formatter:on
 
         private final String path;
