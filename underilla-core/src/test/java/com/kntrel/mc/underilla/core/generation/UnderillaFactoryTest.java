@@ -1,5 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -15,6 +16,9 @@ import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
+import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
+import com.kntrel.mc.underilla.core.inspector.WorldSlice;
+import com.kntrel.mc.underilla.core.inspector.WorldSliceRenderer;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.VerticalBoundChunkPatcher;
@@ -24,11 +28,15 @@ import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.reference.ReferenceWorldPatchers;
 import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import java.util.Collection;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class UnderillaFactoryTest {
 
@@ -38,6 +46,160 @@ class UnderillaFactoryTest {
     private static final TestBlock WATER = TestBlock.liquid("minecraft:water");
     private static final TestBiome PLAINS = new TestBiome("minecraft:plains");
     private static final TestBlockFactory BLOCKS = new TestBlockFactory(AIR, GENERATED, REFERENCE, WATER);
+
+    @Test
+    void inspectionWritesReferenceBeforeGeneration(@TempDir Path output) throws IOException {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+        reference.setBlock(0, 0, 0, REFERENCE);
+
+        InspectionRegion region = InspectionRegion.zSlice(0, 0, 1, 0, 4);
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(region, output)
+                .build();
+
+        Path image = output.resolve("0.0 reference.png");
+        assertTrue(Files.exists(image));
+        var rendered = javax.imageio.ImageIO.read(image.toFile());
+        var expected = WorldSliceRenderer.render(WorldSlice.from(reference, region), 2);
+        assertEquals(expected.getWidth(), rendered.getWidth());
+        assertEquals(expected.getRGB(0, 7), rendered.getRGB(0, 7));
+    }
+
+    @Test
+    void inspectionAppliesBiomeOverlayToRenderedReference(@TempDir Path output) throws IOException {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+        reference.setBlock(0, 0, 0, REFERENCE);
+        InspectionRegion region = InspectionRegion.zSlice(0, 0, 1, 0, 4);
+
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(region, output, "overlay-test", true)
+                .build();
+
+        var rendered = javax.imageio.ImageIO.read(output.resolve("0.0 reference.png").toFile());
+        var expected = WorldSliceRenderer.render(WorldSlice.from(reference, region), 2, true);
+        assertArrayEquals(expected.getRGB(0, 0, expected.getWidth(), expected.getHeight(), null, 0, expected.getWidth()),
+                rendered.getRGB(0, 0, rendered.getWidth(), rendered.getHeight(), null, 0, rendered.getWidth()));
+    }
+
+    @Test
+    void inspectionShrinksBothEndsOfZSliceToGenerationArea(@TempDir Path output) throws IOException {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+        for (int chunkX = -1; chunkX <= 1; chunkX++) {
+            reference.addChunk(new TestChunkGrid(chunkX, 0, 0, 4, AIR, PLAINS));
+        }
+        reference.setBlock(-16, 0, 0, REFERENCE);
+        InspectionRegion requested = InspectionRegion.zSlice(0, -2, 5, 0, 4);
+        InspectionRegion fitted = InspectionRegion.zSlice(0, -1, 3, 0, 4);
+
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(-16, 0, 32, 16)
+                .inspect(requested, output)
+                .build();
+
+        var rendered = javax.imageio.ImageIO.read(output.resolve("0.0 reference.png").toFile());
+        var expected = WorldSliceRenderer.render(WorldSlice.from(reference, fitted), 2);
+        assertEquals(expected.getWidth(), rendered.getWidth());
+        assertArrayEquals(expected.getRGB(0, 0, expected.getWidth(), expected.getHeight(), null, 0, expected.getWidth()),
+                rendered.getRGB(0, 0, rendered.getWidth(), rendered.getHeight(), null, 0, rendered.getWidth()));
+    }
+
+    @Test
+    void inspectionShrinksBothEndsOfXSliceToGenerationArea(@TempDir Path output) throws IOException {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+        for (int chunkZ = -1; chunkZ <= 1; chunkZ++) {
+            reference.addChunk(new TestChunkGrid(0, chunkZ, 0, 4, AIR, PLAINS));
+        }
+        reference.setBlock(0, 0, -16, REFERENCE);
+        InspectionRegion requested = InspectionRegion.xSlice(0, -2, 5, 0, 4);
+        InspectionRegion fitted = InspectionRegion.xSlice(0, -1, 3, 0, 4);
+
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, -16, 16, 32)
+                .inspect(requested, output)
+                .build();
+
+        var rendered = javax.imageio.ImageIO.read(output.resolve("0.0 reference.png").toFile());
+        var expected = WorldSliceRenderer.render(WorldSlice.from(reference, fitted), 2);
+        assertEquals(expected.getWidth(), rendered.getWidth());
+        assertArrayEquals(expected.getRGB(0, 0, expected.getWidth(), expected.getHeight(), null, 0, expected.getWidth()),
+                rendered.getRGB(0, 0, rendered.getWidth(), rendered.getHeight(), null, 0, rendered.getWidth()));
+    }
+
+    @Test
+    void inspectionShrinksBothYBoundsToGenerationRange(@TempDir Path output) throws IOException {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS)
+                .addChunk(new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS));
+        reference.setBlock(0, 0, 0, REFERENCE);
+        reference.setBlock(0, 3, 0, REFERENCE);
+
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(InspectionRegion.zSlice(0, 0, 1, -2, 6), output)
+                .build();
+
+        var rendered = javax.imageio.ImageIO.read(output.resolve("0.0 reference.png").toFile());
+        var expected = WorldSliceRenderer.render(
+                WorldSlice.from(reference, InspectionRegion.zSlice(0, 0, 1, 0, 4)), 2);
+        assertEquals(expected.getHeight(), rendered.getHeight());
+        assertArrayEquals(expected.getRGB(0, 0, expected.getWidth(), expected.getHeight(), null, 0, expected.getWidth()),
+                rendered.getRGB(0, 0, rendered.getWidth(), rendered.getHeight(), null, 0, rendered.getWidth()));
+    }
+
+    @Test
+    void inspectionOutsideGenerationYRangeIsSkipped(@TempDir Path output) {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(InspectionRegion.zSlice(0, 0, 1, 4, 8), output)
+                .build();
+
+        assertFalse(Files.exists(output.resolve("0.0 reference.png")));
+    }
+
+    @Test
+    void inspectionOutsideGenerationAreaIsSkipped(@TempDir Path output) {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS)
+                .addChunk(new TestChunkGrid(0, 0, 0, 4, AIR, PLAINS));
+
+        WorldGenerationPlan plan = UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(InspectionRegion.zSlice(32, 0, 1, 0, 4), output)
+                .build();
+
+        assertTrue(plan.coverage().covers(0, 0));
+        assertFalse(Files.exists(output.resolve("0.0 reference.png")));
+    }
+
+    @Test
+    void inspectionBeyondTraversedGenerationBoundsIsSkipped(@TempDir Path output) {
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+
+        UnderillaFactory.none(reference)
+                .verticalRange(0, 4)
+                .blocks(BLOCKS)
+                .generationArea(0, 0, 16, 16)
+                .inspect(InspectionRegion.zSlice(0, 2, 1, 0, 4), output)
+                .build();
+
+        assertFalse(Files.exists(output.resolve("0.0 reference.png")));
+    }
 
     private static final WorldReader EMPTY_WORLD = new WorldReader() {
         @Override

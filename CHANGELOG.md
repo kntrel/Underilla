@@ -1,3 +1,10 @@
+# 3.1.0
+- The inspection utility now runs during normal Paper world generation as well as in the simulated `inspect.cmd` CLI. Inspection is disabled by default; enable it with `inspect.enabled: true` in `config.yml`.
+- Configure a vertical X or Z slice with `inspect.axis`, `sliceCoordinate`, `startChunk`, and `lengthChunks`. The slice uses the configured generation area's Y bounds and must lie within that area.
+- Inspection writes a source-world reference image, before-and-after generation-stage PNGs, and a combined `sequence.png` to `inspect.output`. Completed stages render asynchronously once their selected chunks have been captured.
+- Per-chunk inspection captures are saved under `<inspect.output>/captures` and restored after a restart, allowing incomplete stage images to finish when the remaining chunks are generated. Keep the same inspection settings and output directory when resuming.
+- The inspector, slice model, and rendering pipeline have moved into `underilla-core`; integrations can instrument a generation plan with `UnderillaFactory.Builder.inspect(...)`.
+
 # 3.0.0
 - Requires Java 25 and targets Paper 26.2. Chunky and VoidWorldGenerator are still used for pregeneration and out-of-bounds chunks; the configured setup step can download them.
 - Existing configurations need migration: replace `surfaceWorld.name` and `cavesWorld.name` with `worldPath` and `dimension` in each section. The default source layout is `<worldPath>/dimensions/minecraft/overworld/region`; use `regionPath` for a different layout. Set `surfaceWorld.entitiesPath` when entity files cannot be resolved from the world and dimension.
