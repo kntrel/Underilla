@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.config.yaml.property;
+package com.kntrel.mc.underilla.config.property;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;

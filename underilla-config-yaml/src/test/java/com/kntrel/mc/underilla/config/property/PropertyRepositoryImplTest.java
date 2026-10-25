@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.config.yaml.property;
+package com.kntrel.mc.underilla.config.property;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -13,9 +13,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import com.kntrel.mc.underilla.config.property.Property;
-import com.kntrel.mc.underilla.config.property.PropertyImpl;
-import com.kntrel.mc.underilla.config.property.PropertyRepository;
 import org.junit.jupiter.api.Test;
 
 class PropertyRepositoryImplTest {
