@@ -100,8 +100,8 @@ final class LegacyMergerPatcher {
         return new ReferenceHeightWorldMask(surfaceWorld, blocks.air(),
                         config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                         config.mergeDepth(), config.adaptiveMaxMergeDepth(),
-                        config.adaptiveMinHiddenBlocksMergeDepth(), config::isSurfaceWorldOnlyBiome,
-                        config::isIgnoredForSurfaceCalculation, new ChunkCache(config.cacheSize())
+                        config.adaptiveMinHiddenBlocksMergeDepth(), ctx -> config.isSurfaceWorldOnlyBiome(ctx.source().biome().id()),
+                        ctx -> config.isIgnoredForSurfaceCalculation(ctx.source().block().id()), new ChunkCache(config.cacheSize())
         );
     }
 }

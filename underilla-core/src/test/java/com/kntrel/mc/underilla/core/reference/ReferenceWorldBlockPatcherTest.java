@@ -1,7 +1,10 @@
 package com.kntrel.mc.underilla.core.reference;
 
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.kntrel.mc.underilla.core.api.context.BlockContext;
+import com.kntrel.mc.underilla.core.api.context.ChunkView;
+import java.util.function.Predicate;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
@@ -20,19 +23,23 @@ class ReferenceWorldBlockPatcherTest {
     private static final TestBiome PLAINS = new TestBiome("minecraft:plains");
 
     @Test
-    void replacesOnlyBlocksAcceptedByTheReferenceWorldTest() {
+    void replacesOnlyBlocksAcceptedByTheContextPredicate() {
         TestWorld referenceWorld = new TestWorld().addChunk(
                 new TestChunkGrid(-2, 3, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(-2, 3, 0, 1, GENERATED, PLAINS);
-        ReferenceWorldTest selectedColumn = (targetBlock, referenceBlock) ->
-                targetBlock.globalX() == -32
-                        && targetBlock.globalZ() == 48
-                        && referenceBlock == REFERENCE;
+        Predicate<BlockContext> selectedColumn = ctx ->
+                ctx.target().block().x() == -32 && ctx.target().block().z() == 48
+                        && ctx.source().block().x() == -32 && ctx.source().block().z() == 48
+                        && ctx.source().block().id().equals(REFERENCE.id())
+                        && ctx.source().world() == referenceWorld
+                        && ctx.target().world() == target.world()
+                        && ctx.source().biome() == PLAINS
+                        && ctx.target().biome() == PLAINS;
 
         patcher(referenceWorld, selectedColumn).patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(GENERATED, target.getBlock(1, 0, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(1, 0, 0).id());
     }
 
     @Test
@@ -41,26 +48,26 @@ class ReferenceWorldBlockPatcherTest {
                 new TestChunkGrid(0, 0, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(0, 0, -1, 1, GENERATED, PLAINS);
 
-        patcher(referenceWorld, (_, referenceBlock) -> referenceBlock.isAir()).patch(target);
+        patcher(referenceWorld, ctx -> ctx.source().block().isAir()).patch(target);
 
-        assertSame(AIR, target.getBlock(0, -1, 0));
-        assertSame(GENERATED, target.getBlock(0, 0, 0));
+        assertEquals(AIR.id(), target.getBlock(0, -1, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, 0, 0).id());
     }
 
     @Test
-    void referenceWorldTestsComposeWithoutLosingTheirType() {
+    void contextPredicatesCompose() {
         TestWorld referenceWorld = new TestWorld().addChunk(
                 new TestChunkGrid(0, 0, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
-        ReferenceWorldTest firstColumn = (targetBlock, _) -> targetBlock.x() == 0;
-        ReferenceWorldTest secondColumn = (targetBlock, _) -> targetBlock.x() == 1;
-        ReferenceWorldTest selectedColumns = firstColumn.or(secondColumn);
+        Predicate<BlockContext> firstColumn = ctx -> ctx.target().block().x() == 0;
+        Predicate<BlockContext> secondColumn = ctx -> ctx.target().block().x() == 1;
+        Predicate<BlockContext> selectedColumns = firstColumn.or(secondColumn);
 
         patcher(referenceWorld, selectedColumns).patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(REFERENCE, target.getBlock(1, 0, 0));
-        assertSame(GENERATED, target.getBlock(2, 0, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(1, 0, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(2, 0, 0).id());
     }
 
     @Test
@@ -70,13 +77,13 @@ class ReferenceWorldBlockPatcherTest {
                 .addChunk(new TestChunkGrid(1, 0, 0, 1, SECOND_REFERENCE, PLAINS));
         TestChunkGrid firstTarget = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
         TestChunkGrid secondTarget = new TestChunkGrid(1, 0, 0, 1, GENERATED, PLAINS);
-        PerBlockChunkPatcher patcher = patcher(referenceWorld, (_, _) -> true);
+        PerBlockChunkPatcher patcher = patcher(referenceWorld, _ -> true);
 
         patcher.patch(firstTarget);
         patcher.patch(secondTarget);
 
-        assertSame(REFERENCE, firstTarget.getBlock(0, 0, 0));
-        assertSame(SECOND_REFERENCE, secondTarget.getBlock(0, 0, 0));
+        assertEquals(REFERENCE.id(), firstTarget.getBlock(0, 0, 0).id());
+        assertEquals(SECOND_REFERENCE.id(), secondTarget.getBlock(0, 0, 0).id());
     }
 
     @Test
@@ -84,13 +91,13 @@ class ReferenceWorldBlockPatcherTest {
         TestWorld referenceWorld = new TestWorld().addChunk(
                 new TestChunkGrid(-2, 3, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(-2, 3, 0, 1, GENERATED, PLAINS);
-        ReferenceWorldTest masked = ReferenceWorldTests.insideMask(
+        Predicate<BlockContext> masked = ReferenceWorldTests.insideMask(
                 (x, y, z) -> x == -32 && y == 0 && z == 48);
 
         patcher(referenceWorld, masked).patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(GENERATED, target.getBlock(1, 0, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(1, 0, 0).id());
     }
 
     @Test
@@ -99,15 +106,15 @@ class ReferenceWorldBlockPatcherTest {
                 new TestChunkGrid(0, 0, 0, 1, REFERENCE, PLAINS));
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
         target.setBlock(1, 0, 0, NON_SOLID);
-        ReferenceWorldTest inMask = ReferenceWorldTests.insideMask((x, y, z) -> x == 2);
-        ReferenceWorldTest shouldWrite = inMask.or(
-                ReferenceWorldTests.survivingOutsideMask(block -> block == REFERENCE));
+        Predicate<BlockContext> inMask = ReferenceWorldTests.insideMask((x, y, z) -> x == 2);
+        Predicate<BlockContext> shouldWrite = inMask.or(ReferenceWorldTests.survivingOutsideMask(
+                ctx -> ctx.source().block().id().equals(REFERENCE.id())));
 
         patcher(referenceWorld, shouldWrite).patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(NON_SOLID, target.getBlock(1, 0, 0));
-        assertSame(REFERENCE, target.getBlock(2, 0, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(NON_SOLID.id(), target.getBlock(1, 0, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(2, 0, 0).id());
     }
 
     @Test
@@ -117,18 +124,22 @@ class ReferenceWorldBlockPatcherTest {
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 1, GENERATED, PLAINS);
 
         patcher(referenceWorld,
-                ReferenceWorldTests.survivingOutsideMask(block -> block == REFERENCE)).patch(target);
+                ReferenceWorldTests.survivingOutsideMask(ctx -> ctx.source().block().id().equals(REFERENCE.id()))).patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, 0, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, 0, 0).id());
     }
 
     private static PerBlockChunkPatcher patcher(
             TestWorld referenceWorld,
-            ReferenceWorldTest test
+            Predicate<BlockContext> test
     ) {
         return new PerBlockChunkPatcher(RoutingBlockPatcher.builder()
                 .upstream(new ReferenceWorldBlockPatcher(referenceWorld, () -> AIR))
-                .test(test)
+                .test((target, proposed) -> test.test(BlockContext.of(
+                                ChunkView.of(target.targetChunk()), referenceWorld,
+                                referenceWorld.biomeAt(target.globalX(), target.y(), target.globalZ()).orElse(null),
+                                target.attempt(proposed).block(), target.targetChunk().world(),
+                                target.targetChunk().getBiome(target.x(), target.y(), target.z()), target.candidate())))
                 .build());
     }
 }

@@ -1,7 +1,9 @@
 package com.kntrel.mc.underilla.paper.impl;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import org.bukkit.block.data.BlockData;
 
@@ -11,15 +13,20 @@ public class BukkitChunkData implements ChunkData {
     private final org.bukkit.generator.ChunkGenerator.ChunkData chunkData;
     private final int chunkX;
     private final int chunkZ;
+    private final World world;
 
 
     // CONSTRUCTORS
-    public BukkitChunkData(org.bukkit.generator.ChunkGenerator.ChunkData chunkData, int chunkX, int chunkZ) {
+    public BukkitChunkData(org.bukkit.generator.ChunkGenerator.ChunkData chunkData, int chunkX, int chunkZ, World world) {
         this.chunkData = chunkData;
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
+        this.world = world;
     }
 
+
+    @Override
+    public World world() { return world; }
 
     @Override
     public int getMinHeight() { return this.chunkData.getMinHeight(); }
@@ -31,7 +38,7 @@ public class BukkitChunkData implements ChunkData {
     @Override
     public Block getBlock(int x, int y, int z) {
         BlockData data = this.chunkData.getBlockData(x, y, z);
-        return new BukkitBlock(data);
+        return new BukkitBlock(data, chunkX * 16 + x, y, chunkZ * 16 + z);
     }
 
     @Override
@@ -44,7 +51,7 @@ public class BukkitChunkData implements ChunkData {
 
     @Override
     public void setRegion(int xMin, int yMin, int zMin, int xMax, int yMax, int zMax, Block block) {
-        if (!(block instanceof BukkitBlock bukkitBlock)) {
+        if (!(ChunkBlock.unwrap(block) instanceof BukkitBlock bukkitBlock)) {
             return;
         }
         this.chunkData.setRegion(xMin, yMin, zMin, xMax, yMax, zMax, bukkitBlock.getBlockData());
@@ -52,7 +59,7 @@ public class BukkitChunkData implements ChunkData {
 
     @Override
     public void setBlock(int x, int y, int z, Block block) {
-        if (!(block instanceof BukkitBlock bukkitBlock)) {
+        if (!(ChunkBlock.unwrap(block) instanceof BukkitBlock bukkitBlock)) {
             return;
         }
 

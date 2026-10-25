@@ -58,7 +58,7 @@ public final class UnderillaBiomeProvider extends BiomeProvider {
         }
 
         Biome vanillaBiome = getVanillaBiomeProvider(worldInfo).getBiome(worldInfo, x, y, z);
-        BukkitBiomeData biomeData = new BukkitBiomeData(vanillaBiome, x, y, z);
+        BukkitBiomeData biomeData = new BukkitBiomeData(worldInfo, vanillaBiome, x, y, z);
         generationPlan.biomePatch().patch(biomeData);
 
         Biome selectedBiome = biomeData.getBukkitBiome();

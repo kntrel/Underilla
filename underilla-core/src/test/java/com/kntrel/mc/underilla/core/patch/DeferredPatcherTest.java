@@ -2,7 +2,6 @@ package com.kntrel.mc.underilla.core.patch;
 
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.kntrel.mc.underilla.core.impl.TestBiome;
@@ -33,23 +32,23 @@ class DeferredPatcherTest {
 
         deferred.patch(chunk);
 
-        assertSame(GENERATED, chunk.getBlock(0, 1, 0));
-        assertSame(REFERENCE, chunk.getBlock(1, 1, 0));
-        assertSame(OTHER_REFERENCE, chunk.getBlock(2, 1, 0));
+        assertEquals(GENERATED.id(), chunk.getBlock(0, 1, 0).id());
+        assertEquals(REFERENCE.id(), chunk.getBlock(1, 1, 0).id());
+        assertEquals(OTHER_REFERENCE.id(), chunk.getBlock(2, 1, 0).id());
 
         restore.patch(chunk);
 
-        assertSame(REFERENCE, chunk.getBlock(0, 1, 0));
-        assertSame(REFERENCE, chunk.getBlock(1, 1, 0));
-        assertSame(OTHER_REFERENCE, chunk.getBlock(2, 1, 0));
+        assertEquals(REFERENCE.id(), chunk.getBlock(0, 1, 0).id());
+        assertEquals(REFERENCE.id(), chunk.getBlock(1, 1, 0).id());
+        assertEquals(OTHER_REFERENCE.id(), chunk.getBlock(2, 1, 0).id());
 
         chunk.setBlock(0, 1, 0, GENERATED);
         chunk.setBlock(1, 1, 0, GENERATED);
         chunk.setBlock(2, 1, 0, GENERATED);
         restore.patch(chunk);
-        assertSame(REFERENCE, chunk.getBlock(0, 1, 0));
-        assertSame(GENERATED, chunk.getBlock(1, 1, 0));
-        assertSame(GENERATED, chunk.getBlock(2, 1, 0));
+        assertEquals(REFERENCE.id(), chunk.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), chunk.getBlock(1, 1, 0).id());
+        assertEquals(GENERATED.id(), chunk.getBlock(2, 1, 0).id());
     }
 
     @Test
@@ -66,7 +65,7 @@ class DeferredPatcherTest {
         assertThrows(IllegalStateException.class, () -> deferred.patch(chunk));
         deferred.applier().patch(chunk);
 
-        assertSame(REFERENCE, chunk.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), chunk.getBlock(0, 1, 0).id());
     }
 
     @Test
@@ -95,7 +94,7 @@ class DeferredPatcherTest {
         deferred.patch(third);
 
         deferred.applier().patch(first);
-        assertSame(OTHER_REFERENCE, first.getBlock(0, 1, 0));
+        assertEquals(OTHER_REFERENCE.id(), first.getBlock(0, 1, 0).id());
         assertEquals(2, firstRuns.get());
 
         deferred.applier().patch(second);
@@ -127,12 +126,12 @@ class DeferredPatcherTest {
 
         deferred.applier().patch(first);
         assertEquals(2, runs.get());
-        assertSame(REFERENCE, first.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), first.getBlock(0, 1, 0).id());
         assertEquals("other topic", cache.get(1, 0, String.class).orElseThrow());
 
         deferred.applier().patch(second);
         assertEquals(3, runs.get());
-        assertSame(REFERENCE, second.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), second.getBlock(0, 1, 0).id());
 
         deferred.applier().patch(first);
         assertEquals(4, runs.get());

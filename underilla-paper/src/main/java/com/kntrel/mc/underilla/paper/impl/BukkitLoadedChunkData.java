@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.paper.impl;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.reader.EntityView;
@@ -17,11 +18,13 @@ import org.bukkit.block.data.BlockData;
 public final class BukkitLoadedChunkData implements ChunkData {
 
     private final Chunk chunk;
+    private final com.kntrel.mc.underilla.core.api.World metadata;
     private final World world;
     private final int absoluteX;
     private final int absoluteZ;
 
     public BukkitLoadedChunkData(Chunk chunk) {
+        this.metadata = new BukkitWorldInfo(chunk.getWorld());
         this.chunk = Objects.requireNonNull(chunk, "chunk");
         this.world = chunk.getWorld();
         this.absoluteX = chunk.getX() * Underilla.CHUNK_SIZE;
@@ -29,6 +32,9 @@ public final class BukkitLoadedChunkData implements ChunkData {
     }
 
     public Chunk chunk() { return chunk; }
+
+    @Override
+    public com.kntrel.mc.underilla.core.api.World world() { return metadata; }
 
     @Override
     public int getMaxHeight() { return world.getMaxHeight(); }
@@ -45,7 +51,7 @@ public final class BukkitLoadedChunkData implements ChunkData {
     @Override
     public Block getBlock(int x, int y, int z) {
         org.bukkit.block.Block block = chunk.getBlock(x, y, z);
-        return new BukkitBlock(block.getBlockData()) {
+        return new BukkitBlock(block.getBlockData(), absoluteX + x, y, absoluteZ + z) {
             @Override public boolean isLegal() {
                 return this.getBlockData().isSupported(block);
             }
@@ -64,7 +70,7 @@ public final class BukkitLoadedChunkData implements ChunkData {
 
     @Override
     public void setBlock(int x, int y, int z, Block block) {
-        if (block instanceof BukkitBlock bukkitBlock) {
+        if (ChunkBlock.unwrap(block) instanceof BukkitBlock bukkitBlock) {
             BlockData data = bukkitBlock.getBlockData();
             chunk.getBlock(x, y, z).setBlockData(data, false);
         }

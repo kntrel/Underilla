@@ -1,6 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.ID;
@@ -33,8 +33,8 @@ class PatchersBlockCleanupTest {
 
         patcher(Map.of("minecraft:sand", "minecraft:sandstone"), Map.of()).patch(chunk);
 
-        assertSame(SANDSTONE, chunk.getBlock(0, 1, 0));
-        assertSame(SAND, chunk.getBlock(1, 1, 0));
+        assertEquals(SANDSTONE.id(), chunk.getBlock(0, 1, 0).id());
+        assertEquals(SAND.id(), chunk.getBlock(1, 1, 0).id());
     }
 
     @Test
@@ -47,7 +47,7 @@ class PatchersBlockCleanupTest {
                 Map.of("minecraft:sand", "minecraft:glass"))
                 .patch(chunk);
 
-        assertSame(GLASS, chunk.getBlock(0, 1, 0));
+        assertEquals(GLASS.id(), chunk.getBlock(0, 1, 0).id());
     }
 
     @Test
@@ -56,7 +56,7 @@ class PatchersBlockCleanupTest {
 
         patcher(Map.of("minecraft:sand", "minecraft:sandstone"), Map.of()).patch(chunk);
 
-        assertSame(SAND, chunk.getBlock(0, -2, 0));
+        assertEquals(SAND.id(), chunk.getBlock(0, -2, 0).id());
     }
 
     @Test
@@ -70,8 +70,8 @@ class PatchersBlockCleanupTest {
                 Map.of("minecraft:dirt", "minecraft:air"))
                 .patch(chunk);
 
-        assertSame(AIR, chunk.getBlock(0, 0, 0));
-        assertSame(SANDSTONE, chunk.getBlock(0, 1, 0));
+        assertEquals(AIR.id(), chunk.getBlock(0, 0, 0).id());
+        assertEquals(SANDSTONE.id(), chunk.getBlock(0, 1, 0).id());
     }
 
     private static Patcher<ChunkData> patcher(Map<String, String> support, Map<String, String> replacements) {

@@ -26,6 +26,11 @@ public class BukkitChunkReader extends ChunkReader {
 
     // IMPLEMENTATION
     @Override
+    protected Block copyBlock(Block block, int x, int y, int z) {
+        return new BukkitBlock((BukkitBlock) block, x, y, z);
+    }
+
+    @Override
     protected Optional<Block> decodeBlockFromTag(CompoundTag tag) {
         String name = tag.getString("Name");
         if (name == null) {

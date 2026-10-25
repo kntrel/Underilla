@@ -24,4 +24,6 @@ public interface ChunkData {
     /** Returns mutable entities when this chunk represents a live world chunk. */
     default Iterable<Entity> entities() { return List.of(); }
 
+    World world();
+
 }

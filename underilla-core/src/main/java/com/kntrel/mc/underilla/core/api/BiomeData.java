@@ -3,6 +3,9 @@ package com.kntrel.mc.underilla.core.api;
 /** Mutable biome value associated with one global block position. */
 public interface BiomeData {
 
+    /** Returns the target world's metadata when provided by the adapter. */
+    default World world() { return null; }
+
     Biome get();
 
     void set(Biome biome);

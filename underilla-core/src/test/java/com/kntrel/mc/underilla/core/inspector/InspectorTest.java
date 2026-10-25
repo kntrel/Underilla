@@ -64,8 +64,8 @@ class InspectorTest {
         assertTrue(session.completion().toCompletableFuture().isDone());
         assertEquals(1, published.size());
         WorldSlice frame = published.get(point);
-        assertEquals(STONE, frame.getBlock(0, 0));
-        assertEquals(STONE, frame.getBlock(16, 0));
+        assertEquals(STONE.id(), frame.getBlock(0, 0).id());
+        assertEquals(STONE.id(), frame.getBlock(16, 0).id());
     }
 
     @Test
@@ -88,8 +88,8 @@ class InspectorTest {
         session.instrument(plan).tryAfterNoise(world.chunkData(0, 0).orElseThrow());
 
         session.completion().toCompletableFuture().join();
-        assertEquals(AIR, published.get(before).getBlock(0, 0));
-        assertEquals(STONE, published.get(after).getBlock(0, 0));
+        assertEquals(AIR.id(), published.get(before).getBlock(0, 0).id());
+        assertEquals(STONE.id(), published.get(after).getBlock(0, 0).id());
     }
 
     @Test
@@ -110,8 +110,8 @@ class InspectorTest {
         session.capture(point, world.chunkData(0, 0).orElseThrow());
 
         WorldSlice frame = published.get(point);
-        assertEquals(STONE, frame.getBlock(0, 0));
-        assertEquals(STONE, frame.getBlock(16, 0));
+        assertEquals(STONE.id(), frame.getBlock(0, 0).id());
+        assertEquals(STONE.id(), frame.getBlock(16, 0).id());
     }
 
     @Test
@@ -122,8 +122,8 @@ class InspectorTest {
 
         WorldSlice slice = WorldSlice.from(world, InspectionRegion.xSlice(5, -1, 2, 0, 4));
 
-        assertEquals(STONE, slice.getBlock(0, 2));
-        assertEquals(DIRT, slice.getBlock(16, 2));
+        assertEquals(STONE.id(), slice.getBlock(0, 2).id());
+        assertEquals(DIRT.id(), slice.getBlock(16, 2).id());
         assertThrows(IndexOutOfBoundsException.class, () -> slice.getBlock(-16, 2));
     }
 

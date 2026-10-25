@@ -58,6 +58,15 @@ class DiskWorldReaderTest {
                 new TestBlockFactory(TestBlock.air("minecraft:air")));
 
         assertEquals("minecraft:stone", reader.blockAt(0, 0, 0).orElseThrow().id().toString());
+        var first = reader.blockAt(1, 0, 2).orElseThrow();
+        var second = reader.blockAt(3, 0, 4).orElseThrow();
+        assertEquals(1, first.x());
+        assertEquals(0, first.y());
+        assertEquals(2, first.z());
+        assertEquals(3, second.x());
+        assertEquals(4, second.z());
+        assertEquals(1, first.x());
+        assertEquals(2, first.z());
     }
 
     @Test

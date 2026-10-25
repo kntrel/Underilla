@@ -5,6 +5,7 @@ import com.jkantrell.nbt.io.NamedTag;
 import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import com.kntrel.mc.underilla.core.vector.VectorIterable;
@@ -25,12 +26,14 @@ public class BukkitRegionChunkData implements ChunkData {
     private static final Logger LOGGER = LoggerFactory.getLogger(BukkitRegionChunkData.class);
     // FIELDS
     private final LimitedRegion region;
+    private final com.kntrel.mc.underilla.core.api.World world;
     private final int minHeight_, maxHeight_, chunkX_, chunkZ_, absX_, absZ_;
 
 
     // CONSTRUCTORS
     public BukkitRegionChunkData(LimitedRegion region, int chunkX, int chunkZ, int minHeight, int maxHeight) {
         this.region = region;
+        this.world = new BukkitWorldInfo(region.getWorld());
         this.minHeight_ = minHeight;
         this.maxHeight_ = maxHeight;
         this.chunkX_ = chunkX;
@@ -46,6 +49,9 @@ public class BukkitRegionChunkData implements ChunkData {
 
     // IMPLEMENTATIONS
     @Override
+    public com.kntrel.mc.underilla.core.api.World world() { return world; }
+
+    @Override
     public int getMaxHeight() { return this.maxHeight_; }
     @Override
     public int getMinHeight() { return this.minHeight_; }
@@ -56,7 +62,7 @@ public class BukkitRegionChunkData implements ChunkData {
         // TODO also save state of block if needed (for structure chests).
         // this.region.getBlockState(this.absX_ + x, y, this.absZ_ + z);
         BlockData d = this.region.getBlockData(this.absX_ + x, y, this.absZ_ + z);
-        return new BukkitBlock(d);
+        return new BukkitBlock(d, absX_ + x, y, absZ_ + z);
     }
     @Override
     public Biome getBiome(int x, int y, int z) {
@@ -69,7 +75,7 @@ public class BukkitRegionChunkData implements ChunkData {
     }
     @Override
     public void setBlock(int x, int y, int z, Block block) {
-        if (!(block instanceof BukkitBlock bukkitBlock)) {
+        if (!(ChunkBlock.unwrap(block) instanceof BukkitBlock bukkitBlock)) {
             return;
         }
         this.region.setBlockData(this.absX_ + x, y, this.absZ_ + z, bukkitBlock.getBlockData());

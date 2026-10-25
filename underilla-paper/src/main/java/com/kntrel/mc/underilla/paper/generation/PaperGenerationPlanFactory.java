@@ -77,11 +77,11 @@ public final class PaperGenerationPlanFactory {
                         config.generationAreaMinZ(),
                         config.generationAreaMaxX(),
                         config.generationAreaMaxZ())
-                .surfaceOnlyBiomes(config::isSurfaceWorldOnlyBiome)
-                .preservedGeneratedBiomes(config::shouldPreserveBiome)
+                .surfaceOnlyBiomes(ctx -> config.isSurfaceWorldOnlyBiome(ctx.source().biome().id()))
+                .preservedGeneratedBiomes(ctx -> config.shouldPreserveBiome(ctx.target().biome().id()))
                 .preserveGeneratedBiomesOnlyUnderSurface(config.preserveBiomesOnlyUnderSurface())
-                .ignoredSurfaceBlocks(config::isIgnoredForSurfaceCalculation)
-                .keptSurfaceBlocks(block -> config.shouldKeepSurfaceBlockInCaves(block.id()))
+                .ignoredSurfaceBlocks(ctx -> config.isIgnoredForSurfaceCalculation(ctx.source().block().id()))
+                .keptSurfaceBlocks(ctx -> config.shouldKeepSurfaceBlockInCaves(ctx.source().block().id()))
                 .surfaceBlockTransformer(block -> transformSurfaceBlock(block, config, blocks))
                 .surfaceBiomeUseTopYOnly(config.surfaceBiomeUseTopYOnly())
                 .carvers(config.carversEnabled())
@@ -163,7 +163,7 @@ public final class PaperGenerationPlanFactory {
             return NoodleCavesPolicy.underground();
         }
         return NoodleCavesPolicy.surface(
-                biome -> carved.contains(biome.id()) && !protectedSurface.contains(biome.id()),
+                ctx -> carved.contains(ctx.source().biome().id()) && !protectedSurface.contains(ctx.source().biome().id()),
                 restoreLiquids);
     }
 

@@ -55,7 +55,7 @@ public abstract class ChunkReader {
         }
         CompoundTag tag = this.chunk_.getBlockStateAt(x, y, z);
         CompoundTag blockEntity = this.chunk_.getBlockEntity(getGlobalX(x), y, getGlobalZ(z));
-        return this.blockFromTag(tag, blockEntity);
+        return this.blockFromTag(tag, blockEntity).map(block -> copyBlock(block, getGlobalX(x), y, getGlobalZ(z)));
     }
     public Optional<Biome> biomeAt(int x, int y, int z) {
         // Declaring variables
@@ -175,6 +175,8 @@ public abstract class ChunkReader {
 
 
     // ABSTRACT
+    /** Copies a decoded value into a block at the supplied global coordinates. */
+    protected abstract Block copyBlock(Block block, int x, int y, int z);
     protected abstract Optional<Block> decodeBlockFromTag(CompoundTag tag);
     public abstract Optional<Block> blockFromTag(CompoundTag tag, CompoundTag entityTag);
     public abstract Optional<Biome> biomeFromTag(StringTag tag);

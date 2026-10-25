@@ -6,6 +6,8 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.World;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.core.vector.LocatedBlock;
@@ -25,6 +27,7 @@ public final class TestWorld implements WorldReader {
     private final int maximumY;
     private final Block defaultBlock;
     private final Biome defaultBiome;
+    private World metadata;
 
     public TestWorld() {
         this(-64, 320, TestBlock.air("minecraft:air"), new TestBiome("minecraft:plains"));
@@ -38,6 +41,25 @@ public final class TestWorld implements WorldReader {
         this.maximumY = maximumY;
         this.defaultBlock = Objects.requireNonNull(defaultBlock, "defaultBlock");
         this.defaultBiome = Objects.requireNonNull(defaultBiome, "defaultBiome");
+        this.metadata = World.of("test-world", ID.of("minecraft:overworld"), minimumY, maximumY);
+    }
+
+    @Override
+    public String name() { return metadata.name(); }
+
+    @Override
+    public com.kntrel.mc.underilla.core.api.ID dimension() { return metadata.dimension(); }
+
+    @Override
+    public int minHeight() { return metadata.minHeight(); }
+
+    @Override
+    public int maxHeight() { return metadata.maxHeight(); }
+
+    public TestWorld withWorld(World world) {
+        this.metadata = Objects.requireNonNull(world, "world");
+        chunks.values().forEach(chunk -> chunk.withWorld(world));
+        return this;
     }
 
     public int getMinHeight() { return minimumY; }
@@ -46,6 +68,7 @@ public final class TestWorld implements WorldReader {
 
     public TestWorld addChunk(TestChunkGrid chunk) {
         Objects.requireNonNull(chunk, "chunk");
+        chunk.withWorld(metadata);
         chunks.put(new ChunkCoordinate(chunk.getChunkX(), chunk.getChunkZ()), chunk);
         return this;
     }
@@ -111,7 +134,7 @@ public final class TestWorld implements WorldReader {
             throw new IndexOutOfBoundsException("Y outside world: " + y);
         }
         return chunks.computeIfAbsent(coordinate, key -> new TestChunkGrid(
-                key.x(), key.z(), minimumY, maximumY, defaultBlock, defaultBiome));
+                key.x(), key.z(), minimumY, maximumY, defaultBlock, defaultBiome).withWorld(metadata));
     }
 
     private record ChunkCoordinate(int x, int z) {}
@@ -176,6 +199,11 @@ public final class TestWorld implements WorldReader {
                 }
             }
             return locations;
+        }
+
+        @Override
+        protected Block copyBlock(Block block, int x, int y, int z) {
+            throw new AssertionError("Grid reader does not decode blocks");
         }
 
         @Override

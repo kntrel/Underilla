@@ -2,6 +2,9 @@ package com.kntrel.mc.underilla.core.reference;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.context.ChunkView;
+import com.kntrel.mc.underilla.core.api.context.BiomeContext;
+import com.kntrel.mc.underilla.core.api.context.BlockContext;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import com.kntrel.mc.underilla.core.generation.NoodleCavesPolicy;
@@ -47,7 +50,7 @@ public final class ReferenceWorldPatchers {
             WorldMask worldMask,
             boolean surfaceFill,
             Supplier<Block> air,
-            Predicate<Block> survivingBlock,
+            Predicate<BlockContext> survivingBlock,
             Collection<Patcher<ChunkBlock>> transformations,
             NoodleCavesPolicy policy,
             boolean useTopYOnly,
@@ -92,7 +95,7 @@ public final class ReferenceWorldPatchers {
             WorldMask worldMask,
             boolean surfaceFill,
             Supplier<Block> air,
-            Predicate<Block> survivingBlock,
+            Predicate<BlockContext> survivingBlock,
             List<Patcher<ChunkBlock>> transformations
     ) {
         Patcher<ChunkData> afterCarvers = withEffectiveMask(
@@ -117,7 +120,7 @@ public final class ReferenceWorldPatchers {
             WorldMask worldMask,
             boolean surfaceFill,
             Supplier<Block> air,
-            Predicate<Block> survivingBlock,
+            Predicate<BlockContext> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             NoodleCavesPolicy.Surface policy,
             boolean useTopYOnly,
@@ -194,13 +197,14 @@ public final class ReferenceWorldPatchers {
             WorldReader negativeWorld,
             WorldMask worldMask,
             Supplier<Block> air,
-            Predicate<Block> survivingBlock,
+            Predicate<BlockContext> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
 
         PatchTimeValue<ChunkData, Optional<ChunkReader>> referenceChunkReader = Patcher.value(c -> referenceWorld.readChunk(c.getChunkX(), c.getChunkZ()));
         Patcher<ChunkBlock> reference = perBlock(
+                referenceWorld,
                 referenceChunkReader,
                 worldMask,
                 air,
@@ -218,6 +222,7 @@ public final class ReferenceWorldPatchers {
 
         PatchTimeValue<ChunkData, Optional<ChunkReader>> negativeChunkReader = Patcher.value(c -> negativeWorld.readChunk(c.getChunkX(), c.getChunkZ()));
         Patcher<ChunkBlock> negative = perBlock(
+                negativeWorld,
                 negativeChunkReader,
                 worldMask.inverted(),
                 air,
@@ -250,10 +255,11 @@ public final class ReferenceWorldPatchers {
     }
 
     private static Patcher<ChunkBlock> perBlock(
+            WorldReader sourceWorld,
             PatchTimeValue<?, Optional<ChunkReader>> chunkReader,
             WorldMask worldMask,
             Supplier<Block> air,
-            Predicate<Block> survivingBlock,
+            Predicate<BlockContext> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
@@ -264,9 +270,17 @@ public final class ReferenceWorldPatchers {
             ChunkBlock proposed = original.attempt(referenceBlock);
             transformations.forEach(transformation -> transformation.patch(proposed));
 
-            boolean insideMask = worldMask.contains(original.globalX(), original.y(), original.globalZ());
+            boolean insideMask = worldMask.contains(original.targetChunk().world(),
+                    original.globalX(), original.y(), original.globalZ());
             boolean survivesOutsideMask = survivingBlock != null
-                    && survivingBlock.test(proposed.candidate())
+                    && survivingBlock.test(BlockContext.of(
+                            ChunkView.of(proposed.targetChunk()),
+                            sourceWorld,
+                            sourceWorld.biomeAt(proposed.globalX(), proposed.y(), proposed.globalZ()).orElse(null),
+                            proposed.block(),
+                            proposed.targetChunk().world(),
+                            proposed.targetChunk().getBiome(proposed.x(), proposed.y(), proposed.z()),
+                            proposed.destinationBlock()))
                     && proposed.destinationBlock().isSolid();
             if (insideMask || survivesOutsideMask) {
                 acceptedWrite.accept(original, proposed, insideMask);
@@ -284,7 +298,12 @@ public final class ReferenceWorldPatchers {
                         block.globalX(),
                         useTopYOnly ? block.targetChunk().getMaxHeight() : block.y(),
                         block.globalZ())
-                .filter(policy.predicate())
+                .filter(biome -> policy.predicate().test(BiomeContext.of(
+                        ChunkView.of(block.targetChunk()),
+                        referenceWorld,
+                        biome,
+                        block.targetChunk().world(),
+                        block.targetChunk().getBiome(block.x(), block.y(), block.z()))))
                 .isPresent();
         if (policy.restoreLiquids()) {
             mayWriteBeforeCarvers = mayWriteBeforeCarvers.and(block -> referenceWorld

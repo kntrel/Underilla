@@ -25,6 +25,10 @@ finalWorld:
 
 # The world to copy the surface from
 surfaceWorld:
+  # World metadata is read from level.dat when available. Optional overrides:
+  # name: "Surface reference"
+  # minHeight: -64 # Required for custom dimension types whose bounds cannot be read.
+  # maxHeight: 320
   # Point to a world and select its dimension. Dimension IDs without a namespace use "minecraft".
   worldPath: "world_surface"
   dimension: "minecraft:overworld"
@@ -86,6 +90,7 @@ transferBlocksFromCavesWorld: false
 transferBiomesFromCavesWorld: false
 # Region data used as the optional caves source.
 cavesWorld:
+  # The same optional metadata overrides as surfaceWorld are supported here.
   worldPath: "world_caves"
   dimension: "minecraft:overworld"
   # A non-empty regionPath overrides worldPath and dimension.

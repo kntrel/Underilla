@@ -21,8 +21,11 @@ final class InspectorGenerator extends Generator {
 
     InspectorGenerator(WorldGenerationPlan plan, TestWorld world, long seed, int chunkSize) {
         super(world, seed, chunkSize, 1);
+        world.withWorld(com.kntrel.mc.underilla.core.api.World.of("inspector",
+                com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"),
+                world.getMinHeight(), world.getMaxHeight()));
         this.plan = Objects.requireNonNull(plan, "plan");
-        this.biomeProvider = new InspectorBiomeProvider(plan.biomePatch(), super.getBiomeProvider());
+        this.biomeProvider = new InspectorBiomeProvider(plan.biomePatch(), super.getBiomeProvider(), world);
     }
 
     @Override

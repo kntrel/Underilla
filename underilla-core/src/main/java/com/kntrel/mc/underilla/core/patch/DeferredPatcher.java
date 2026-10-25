@@ -66,6 +66,9 @@ public final class DeferredPatcher implements Patcher<ChunkData> {
             BiPredicate<Vector<Integer>, ChunkData> shouldDefer
     ) implements ChunkData {
 
+        @Override
+        public com.kntrel.mc.underilla.core.api.World world() { return delegate.world(); }
+
         private ChunkDataProxy {
             Objects.requireNonNull(delegate, "delegate");
             Objects.requireNonNull(shouldDefer, "shouldDefer");

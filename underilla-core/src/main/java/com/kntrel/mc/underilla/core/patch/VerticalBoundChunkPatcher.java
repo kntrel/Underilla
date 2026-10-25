@@ -45,6 +45,9 @@ public final class VerticalBoundChunkPatcher implements Patcher<ChunkData> {
             int maximumY
     ) implements ChunkData {
 
+        @Override
+        public com.kntrel.mc.underilla.core.api.World world() { return delegate.world(); }
+
         private VerticalBoundChunkData {
             Objects.requireNonNull(delegate, "delegate");
         }

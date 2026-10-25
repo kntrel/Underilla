@@ -89,7 +89,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
     @Override
     public void generateNoise(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
         chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ, () -> {
-            if (!generationPlan.tryAfterNoise(new BukkitChunkData(chunkData, chunkX, chunkZ)) && outOfTheSurfaceWorldGenerator != null) {
+            if (!generationPlan.tryAfterNoise(new BukkitChunkData(chunkData, chunkX, chunkZ, new BukkitWorldInfo(worldInfo))) && outOfTheSurfaceWorldGenerator != null) {
                 outOfTheSurfaceWorldGenerator.generateNoise(worldInfo, random, chunkX, chunkZ, chunkData);
             }
         });
@@ -98,7 +98,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
     @Override
     public void generateSurface(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
         chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ, () -> {
-                if (!generationPlan.tryAfterSurface(new BukkitChunkData(chunkData, chunkX, chunkZ)) && outOfTheSurfaceWorldGenerator != null) {
+                if (!generationPlan.tryAfterSurface(new BukkitChunkData(chunkData, chunkX, chunkZ, new BukkitWorldInfo(worldInfo))) && outOfTheSurfaceWorldGenerator != null) {
                     outOfTheSurfaceWorldGenerator.generateSurface(worldInfo, random, chunkX, chunkZ, chunkData);
                 }
             }
@@ -108,7 +108,7 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
     @Override
     public void generateCaves(@NotNull WorldInfo worldInfo, @NotNull Random random, int chunkX, int chunkZ, @NotNull ChunkData chunkData) {
         chunkProfiler.run(worldInfo.getUID(), chunkX, chunkZ, () -> {
-                if (!generationPlan.tryAfterCarvers(new BukkitChunkData(chunkData, chunkX, chunkZ)) && outOfTheSurfaceWorldGenerator != null) {
+                if (!generationPlan.tryAfterCarvers(new BukkitChunkData(chunkData, chunkX, chunkZ, new BukkitWorldInfo(worldInfo))) && outOfTheSurfaceWorldGenerator != null) {
                     outOfTheSurfaceWorldGenerator.generateCaves(worldInfo, random, chunkX, chunkZ, chunkData);
                 }
             }

@@ -24,11 +24,11 @@ class VerticalBoundChunkPatcherTest {
 
         new VerticalBoundChunkPatcher(blocks, -1, 2).patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, -2, 0));
-        assertSame(REFERENCE, target.getBlock(0, -1, 0));
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(REFERENCE, target.getBlock(0, 1, 0));
-        assertSame(GENERATED, target.getBlock(0, 2, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, -2, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, -1, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, 2, 0).id());
     }
 
     @Test
@@ -56,7 +56,7 @@ class VerticalBoundChunkPatcherTest {
     void rejectsReadsOutsideTheAdvertisedRange() {
         TestChunkGrid target = new TestChunkGrid(0, 0, -2, 3, GENERATED, PLAINS);
         Patcher<ChunkData> read = chunk -> {
-            assertSame(GENERATED, chunk.getBlock(0, -1, 0));
+            assertEquals(GENERATED.id(), chunk.getBlock(0, -1, 0).id());
             assertSame(PLAINS, chunk.getBiome(0, 1, 0));
             assertThrows(IndexOutOfBoundsException.class, () -> chunk.getBlock(0, -2, 0));
             assertThrows(IndexOutOfBoundsException.class, () -> chunk.getBiome(0, 2, 0));
@@ -81,9 +81,9 @@ class VerticalBoundChunkPatcherTest {
 
         new VerticalBoundChunkPatcher(write, -1, 2).patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, -2, 0));
-        assertSame(REFERENCE, target.getBlock(0, 1, 0));
-        assertSame(GENERATED, target.getBlock(0, 2, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, -2, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, 2, 0).id());
     }
 
     @Test

@@ -9,6 +9,15 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Waterlogged;
 
 public class BukkitBlock implements Block {
+    private int x;
+    private int y;
+    private int z;
+
+    @Override public int x() { return x; }
+    @Override public int y() { return y; }
+    @Override public int z() { return z; }
+
+
     private static final Set<ID> LIQUID_BLOCKS = Set.of(
             ID.of("water"), ID.of("lava"), ID.of("bubble_column"), ID.of("seagrass"),
             ID.of("tall_seagrass"), ID.of("kelp"), ID.of("kelp_plant"));
@@ -23,6 +32,18 @@ public class BukkitBlock implements Block {
         this.spawnedType = Optional.empty();
     }
 
+
+    public BukkitBlock(BlockData blockData, int x, int y, int z) {
+        this(blockData);
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+
+    public BukkitBlock(BukkitBlock original, int x, int y, int z) {
+        this(original.blockData_.clone(), x, y, z);
+        this.spawnedType = original.spawnedType;
+    }
 
     // GETTERS
     public BlockData getBlockData() { return this.blockData_; }
@@ -41,6 +62,9 @@ public class BukkitBlock implements Block {
     public BukkitBlock clone() {
         BukkitBlock block = new BukkitBlock(this.blockData_.clone());
         block.spawnedType = this.spawnedType;
+        block.x = x;
+        block.y = y;
+        block.z = z;
         return block;
     }
 

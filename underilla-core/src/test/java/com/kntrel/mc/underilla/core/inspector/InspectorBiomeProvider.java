@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.core.inspector;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.simulation.biome.BiomeProvider;
 import java.util.Objects;
@@ -11,15 +12,17 @@ final class InspectorBiomeProvider implements BiomeProvider {
 
     private final Patcher<BiomeData> biomePatcher;
     private final BiomeProvider vanillaProvider;
+    private final World world;
 
-    InspectorBiomeProvider(Patcher<BiomeData> biomePatcher, BiomeProvider vanillaProvider) {
+    InspectorBiomeProvider(Patcher<BiomeData> biomePatcher, BiomeProvider vanillaProvider, World world) {
         this.biomePatcher = Objects.requireNonNull(biomePatcher, "biomePatcher");
         this.vanillaProvider = Objects.requireNonNull(vanillaProvider, "vanillaProvider");
+        this.world = Objects.requireNonNull(world, "world");
     }
 
     @Override
     public Biome getAt(int x, int y, int z) {
-        MutableBiomeData biome = new MutableBiomeData(vanillaProvider.getAt(x, y, z), x, y, z);
+        MutableBiomeData biome = new MutableBiomeData(vanillaProvider.getAt(x, y, z), x, y, z, world);
         biomePatcher.patch(biome);
         return biome.get();
     }
@@ -30,13 +33,18 @@ final class InspectorBiomeProvider implements BiomeProvider {
         private final int x;
         private final int y;
         private final int z;
+        private final World world;
 
-        private MutableBiomeData(Biome biome, int x, int y, int z) {
+        private MutableBiomeData(Biome biome, int x, int y, int z, World world) {
             this.biome = Objects.requireNonNull(biome, "biome");
             this.x = x;
             this.y = y;
             this.z = z;
+            this.world = world;
         }
+
+        @Override
+        public World world() { return world; }
 
         @Override
         public Biome get() { return biome; }

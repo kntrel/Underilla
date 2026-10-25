@@ -85,6 +85,19 @@ public class ChunkBlock {
         return block;
     }
 
+    /** Returns the underlying value of a candidate proxy for platform writes. */
+    public static Block unwrap(Block block) {
+        while (true) {
+            if (block instanceof TrackingBlock tracking) {
+                block = tracking.value();
+            } else if (block instanceof AttemptChunkBlock.AttemptTrackingBlock tracking) {
+                block = tracking.value();
+            } else {
+                return block;
+            }
+        }
+    }
+
     /** Creates an isolated, copy-on-write attempt initialized with a proposed block. */
     public ChunkBlock attempt(Block proposedBlock) {
         return new AttemptChunkBlock(this, proposedBlock);
@@ -106,10 +119,15 @@ public class ChunkBlock {
 
     /** Delegates block reads and tracks the compact {@link Block} mutation API. */
     private final class TrackingBlock implements Block {
+        private Block value() { return block; }
+
+        @Override public int x() { return globalX(); }
+        @Override public int y() { return ChunkBlock.this.y(); }
+        @Override public int z() { return globalZ(); }
 
         @Override
         public Block clone() {
-            return block.clone();
+            return new ChunkBlock(targetChunk, x, y, z, block.clone()).block();
         }
 
         @Override
@@ -183,9 +201,17 @@ public class ChunkBlock {
         public Block destinationBlock() { return parent.candidate(); }
 
         private final class AttemptTrackingBlock implements Block {
+            private Block value() { return candidate; }
+
+            @Override public int x() { return globalX(); }
+            @Override public int y() { return AttemptChunkBlock.this.y(); }
+            @Override public int z() { return globalZ(); }
 
             @Override
-            public Block clone() { return candidate.clone(); }
+            public Block clone() {
+                return new ChunkBlock(targetChunk(), AttemptChunkBlock.this.x(), y(),
+                        AttemptChunkBlock.this.z(), candidate.clone()).block();
+            }
 
             @Override
             public boolean isAir() { return candidate.isAir(); }

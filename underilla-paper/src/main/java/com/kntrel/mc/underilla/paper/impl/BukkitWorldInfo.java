@@ -1,8 +1,10 @@
 package com.kntrel.mc.underilla.paper.impl;
 
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.api.WorldInfo;
+import com.kntrel.mc.underilla.core.api.ID;
 
-public class BukkitWorldInfo implements WorldInfo {
+public class BukkitWorldInfo implements WorldInfo, World {
 
     // FIELDS
     private final org.bukkit.generator.WorldInfo worldInfo_;
@@ -11,6 +13,20 @@ public class BukkitWorldInfo implements WorldInfo {
     // CONSTRUCTORS
     public BukkitWorldInfo(org.bukkit.generator.WorldInfo base) { this.worldInfo_ = base; }
 
+    @Override
+    public String name() { return worldInfo_.getName(); }
+
+    @Override
+    public ID dimension() {
+        return ID.of(worldInfo_.getKey().toString());
+    }
+
+
+    @Override
+    public int minHeight() { return worldInfo_.getMinHeight(); }
+
+    @Override
+    public int maxHeight() { return worldInfo_.getMaxHeight(); }
 
     @Override
     public long getSeed() { return this.worldInfo_.getSeed(); }

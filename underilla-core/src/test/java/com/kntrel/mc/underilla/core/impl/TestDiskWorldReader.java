@@ -1,6 +1,8 @@
 package com.kntrel.mc.underilla.core.impl;
 
 import com.jkantrell.mca.Chunk;
+import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
@@ -20,7 +22,8 @@ public final class TestDiskWorldReader extends DiskWorldReader {
 
     public TestDiskWorldReader(File regionDirectory, File entityRegionDirectory, int cacheSize, TestBlockFactory blocks)
             throws NoSuchFieldException {
-        super(regionDirectory, entityRegionDirectory, cacheSize);
+        super(regionDirectory, entityRegionDirectory, cacheSize,
+                World.of("test-world", ID.of("minecraft:overworld"), -64, 320));
         this.blocks = Objects.requireNonNull(blocks, "blocks");
     }
 

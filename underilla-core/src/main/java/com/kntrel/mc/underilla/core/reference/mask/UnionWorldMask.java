@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.core.reference.mask;
 
 import java.util.List;
+import com.kntrel.mc.underilla.core.api.World;
 
 /** Selects positions contained by any of its component masks. */
 public final class UnionWorldMask implements WorldMask {
@@ -13,8 +14,13 @@ public final class UnionWorldMask implements WorldMask {
 
     @Override
     public boolean contains(int globalX, int y, int globalZ) {
+        return contains(null, globalX, y, globalZ);
+    }
+
+    @Override
+    public boolean contains(World targetWorld, int globalX, int y, int globalZ) {
         for (WorldMask mask : masks) {
-            if (mask.contains(globalX, y, globalZ)) {
+            if (mask.contains(targetWorld, globalX, y, globalZ)) {
                 return true;
             }
         }

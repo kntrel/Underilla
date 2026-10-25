@@ -6,21 +6,26 @@ import com.kntrel.mc.underilla.core.reader.DiskWorldReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import java.io.File;
 import java.util.List;
+import com.kntrel.mc.underilla.core.api.World;
 
 public class BukkitWorldReader extends DiskWorldReader {
 
     // CONSTRUCTORS
     public BukkitWorldReader(String regionPath, int regionCacheSize) throws NoSuchFieldException {
-        super(regionPath, regionCacheSize);
+        this(new File(regionPath), null, regionCacheSize);
     }
     public BukkitWorldReader(String regionPath, String entityRegionPath, int regionCacheSize) throws NoSuchFieldException {
-        super(regionPath, entityRegionPath, regionCacheSize);
+        this(new File(regionPath), entityRegionPath == null ? null : new File(entityRegionPath), regionCacheSize);
     }
     public BukkitWorldReader(File regionDirectory, int regionCacheSize) throws NoSuchFieldException {
-        super(regionDirectory, regionCacheSize);
+        this(regionDirectory, null, regionCacheSize);
     }
     public BukkitWorldReader(File regionDirectory, File entityRegionDirectory, int regionCacheSize) throws NoSuchFieldException {
-        super(regionDirectory, entityRegionDirectory, regionCacheSize);
+        this(regionDirectory, entityRegionDirectory, regionCacheSize, null);
+    }
+
+    public BukkitWorldReader(File regionDirectory, File entityRegionDirectory, int regionCacheSize, World world) throws NoSuchFieldException {
+        super(regionDirectory, entityRegionDirectory, regionCacheSize, world);
     }
 
 

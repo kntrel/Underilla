@@ -3,11 +3,18 @@ package com.kntrel.mc.underilla.core.generation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.World;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
+import com.kntrel.mc.underilla.core.impl.TestBiome;
+import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
+import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Optional;
@@ -40,6 +47,57 @@ class ReferenceHeightWorldMaskTest {
     }
 
     @Test
+    void worldMetadataSurvivesMaskCompositionAndTargetChangesInvalidateCachedBoundaries() {
+        Block air = TestBlock.air("minecraft:air");
+        Block stone = TestBlock.solid("minecraft:stone");
+        Biome biome = new TestBiome("example:source");
+        World sourceWorld = World.of("reference", ID.of("minecraft:overworld"), 0, 16);
+        World nether = World.of("nether", ID.of("minecraft:the_nether"), 0, 256);
+        World overworld = World.of("overworld", ID.of("minecraft:overworld"), -64, 320);
+        TestChunkGrid source = new TestChunkGrid(0, 0, 0, 9, air, biome).fillLayer(5, stone);
+        TestWorld reader = new TestWorld().addChunk(source).withWorld(sourceWorld);
+        WorldMask mask = new ReferenceHeightWorldMask(reader, air, 0, 8, 8, 0, 0, 0,
+                ctx -> {
+                    assertSame(reader, ctx.source().world());
+                    return ctx.target().world().dimension().equals(ID.of("minecraft:the_nether"));
+                }, _ -> false, new ChunkCache(1));
+        WorldMask composed = new com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask(
+                mask.inverted(), (_, _, _) -> false);
+
+        assertFalse(composed.contains(nether, 0, 1, 0));
+        assertTrue(composed.contains(overworld, 0, 1, 0));
+        assertFalse(composed.contains(nether, 0, 1, 0));
+    }
+
+    @Test
+    void sourceBoundaryRulesCanReadTheSourceBlockBiomeAndChunk() {
+        Block air = TestBlock.air("minecraft:air");
+        Block stone = TestBlock.solid("minecraft:stone");
+        Block ignored = TestBlock.solid("example:ignored");
+        Biome biome = new TestBiome("example:source");
+        TestChunkGrid source = new TestChunkGrid(-1, -2, 0, 9, air, biome);
+        source.fillLayer(3, stone);
+        source.fillLayer(5, ignored);
+        TestWorld world = new TestWorld().addChunk(source);
+        WorldMask mask = new ReferenceHeightWorldMask(world, air, 0, 8, 8, 0, 0, 0,
+                ctx -> {
+                    assertSame(biome, ctx.source().biome());
+                    assertNull(ctx.target().biome());
+                    return false;
+                },
+                ctx -> {
+                    assertSame(biome, ctx.source().biome());
+                    assertEquals(-1, ctx.chunk().x());
+                    assertEquals(-2, ctx.chunk().z());
+                    assertNull(ctx.target().block());
+                    return ctx.source().block().id().equals(ignored.id());
+                }, new ChunkCache(1));
+
+        assertFalse(mask.contains(-1, 3, -17));
+        assertTrue(mask.contains(-1, 4, -17));
+    }
+
+    @Test
     void otherTopicsPromoteAndEvictTheBoundaryTopicWithTheirChunk() {
         CountingWorld world = new CountingWorld();
         ChunkCache cache = new ChunkCache(2);
@@ -62,6 +120,11 @@ class ReferenceHeightWorldMaskTest {
     }
 
     private static final class CountingWorld implements WorldReader {
+        @Override public String name() { return "test-world"; }
+        @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+        @Override public int minHeight() { return -64; }
+        @Override public int maxHeight() { return 320; }
+
         private final Block air = TestBlock.air("minecraft:air");
         private final Block stone = TestBlock.solid("minecraft:stone");
         private final AtomicInteger reads = new AtomicInteger();

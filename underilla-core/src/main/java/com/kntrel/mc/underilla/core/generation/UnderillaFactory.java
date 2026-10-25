@@ -2,12 +2,13 @@ package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.BlockFactory;
-import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.context.BiomeContext;
+import com.kntrel.mc.underilla.core.api.context.BlockContext;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
@@ -36,12 +37,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
-import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.function.ToIntFunction;
 import java.util.function.UnaryOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -108,10 +107,10 @@ public final class UnderillaFactory {
         private int chunkCacheSize = 64;
         private BlockFactory blocks;
         private GenerationArea generationArea = GenerationArea.everywhere();
-        private Predicate<ID> surfaceOnlyBiome = _ -> false;
-        private Predicate<ID> preservedGeneratedBiome = _ -> false;
-        private Predicate<ID> ignoredSurfaceBlock = _ -> false;
-        private Predicate<Block> keptSurfaceBlock;
+        private Predicate<BiomeContext> surfaceOnlyBiome = _ -> false;
+        private Predicate<BiomeContext> preservedGeneratedBiome = _ -> false;
+        private Predicate<BlockContext> ignoredSurfaceBlock = _ -> false;
+        private Predicate<BlockContext> keptSurfaceBlock;
         private UnaryOperator<Block> surfaceBlockTransformer;
         private Function<ID, Optional<ID>> cleanupSupportReplacement;
         private Function<ID, Optional<ID>> cleanupBlockReplacement;
@@ -204,12 +203,14 @@ public final class UnderillaFactory {
             return this;
         }
 
-        public Builder surfaceOnlyBiomes(Predicate<ID> surfaceOnlyBiome) {
+        /** The target biome is available during biome replacement, but not reference-boundary scans. */
+        public Builder surfaceOnlyBiomes(Predicate<BiomeContext> surfaceOnlyBiome) {
             this.surfaceOnlyBiome = Objects.requireNonNull(surfaceOnlyBiome, "surfaceOnlyBiome");
             return this;
         }
 
-        public Builder preservedGeneratedBiomes(Predicate<ID> preservedGeneratedBiome) {
+        /** Both sampled biomes and source/target chunk coordinates are available. */
+        public Builder preservedGeneratedBiomes(Predicate<BiomeContext> preservedGeneratedBiome) {
             this.preservedGeneratedBiome = Objects.requireNonNull(
                     preservedGeneratedBiome, "preservedGeneratedBiome");
             return this;
@@ -220,12 +221,14 @@ public final class UnderillaFactory {
             return this;
         }
 
-        public Builder ignoredSurfaceBlocks(Predicate<ID> ignoredSurfaceBlock) {
+        /** Evaluated against source data only while calculating cached reference boundaries. */
+        public Builder ignoredSurfaceBlocks(Predicate<BlockContext> ignoredSurfaceBlock) {
             this.ignoredSurfaceBlock = Objects.requireNonNull(ignoredSurfaceBlock, "ignoredSurfaceBlock");
             return this;
         }
 
-        public Builder keptSurfaceBlocks(Predicate<Block> keptSurfaceBlock) {
+        /** The source block is the transformed proposal, and the target block is its destination. */
+        public Builder keptSurfaceBlocks(Predicate<BlockContext> keptSurfaceBlock) {
             this.keptSurfaceBlock = Objects.requireNonNull(keptSurfaceBlock, "keptSurfaceBlock");
             return this;
         }
@@ -310,7 +313,16 @@ public final class UnderillaFactory {
             WorldMask worldMask = worldMask(configuredMinimumY, configuredMaximumY, configuredMaximumCaveY,
                     configuredAir.get(), chunkCache);
 
-            Patcher<BiomeData> biomePatcher = biomePatcher(worldMask, configuredMaximumY);
+            Patcher<BiomeData> biomePatcher = Patchers.referenceWorldBiomePatcher(
+                    referenceWorld,
+                    generationArea,
+                    configuredMaximumY,
+                    surfaceBiomeUseTopYOnly,
+                    worldMask,
+                    surfaceOnlyBiome,
+                    preservedGeneratedBiome,
+                    preserveGeneratedBiomesOnlyUnderSurface
+            );
             TerrainPhases terrain = terrain(
                     noodleCavesPolicy,
                     referenceWorld,
@@ -500,32 +512,6 @@ public final class UnderillaFactory {
             return new VerticalBoundChunkPatcher(patcher, minimumY, maximumY);
         }
 
-        private Patcher<BiomeData> biomePatcher(WorldMask worldMask, int maximumY) {
-            Predicate<BiomeData> included = biome -> generationArea.contains(biome.getX(), biome.getZ());
-            ToIntFunction<BiomeData> referenceY = surfaceBiomeUseTopYOnly
-                    ? _ -> maximumY
-                    : BiomeData::getY;
-            BiPredicate<BiomeData, Biome> shouldReplace = (biome, referenceBiome) ->
-                    surfaceOnlyBiome.test(referenceBiome.id())
-                    || !preservedGeneratedBiome.test(biome.get().id())
-                    || preserveGeneratedBiomesOnlyUnderSurface && biomeCellIntersectsMask(biome, worldMask);
-            return Patchers.referenceWorldBiomePatcher(referenceWorld, included, referenceY, shouldReplace);
-        }
-
-        private static boolean biomeCellIntersectsMask(BiomeData biome, WorldMask worldMask) {
-            int cellSize = GenerationConstants.BIOME_CELL_SIZE;
-            int cellX = biome.getBiomeX() * cellSize;
-            int cellZ = biome.getBiomeZ() * cellSize;
-            for (int x = cellX; x < cellX + cellSize; x++) {
-                for (int z = cellZ; z < cellZ + cellSize; z++) {
-                    if (worldMask.contains(x, biome.getY(), z)) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-
         private static TerrainPhases terrain(
                 NoodleCavesPolicy policy,
                 WorldReader referenceWorld,
@@ -533,7 +519,7 @@ public final class UnderillaFactory {
                 WorldMask worldMask,
                 boolean surfaceFill,
                 Supplier<Block> air,
-                Predicate<Block> survivingBlock,
+                Predicate<BlockContext> survivingBlock,
                 UnaryOperator<Block> blockTransformer,
                 boolean useTopYOnly,
                 ChunkCache chunkCache

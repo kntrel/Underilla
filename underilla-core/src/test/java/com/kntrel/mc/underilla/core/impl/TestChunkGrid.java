@@ -5,6 +5,8 @@ import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
+import com.kntrel.mc.underilla.core.api.World;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.reader.EntityView;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +28,7 @@ public final class TestChunkGrid implements ChunkData {
     private final Biome[][][] biomes;
     private final List<EntityView> entities = new ArrayList<>();
     private final List<Entity> liveEntities = new ArrayList<>();
+    private World world;
 
     public TestChunkGrid(int chunkX, int chunkZ, int minimumY, int maximumY, Block defaultBlock, Biome defaultBiome) {
         if (maximumY <= minimumY) {
@@ -35,6 +38,7 @@ public final class TestChunkGrid implements ChunkData {
         this.chunkZ = chunkZ;
         this.minimumY = minimumY;
         this.maximumY = maximumY;
+        this.world = World.of("test-target", ID.of("minecraft:overworld"), minimumY, maximumY);
         this.blocks = new Block[GenerationConstants.CHUNK_SIZE][maximumY - minimumY][GenerationConstants.CHUNK_SIZE];
         int biomeSize = GenerationConstants.BIOME_CELL_SIZE;
         this.biomes = new Biome
@@ -52,6 +56,14 @@ public final class TestChunkGrid implements ChunkData {
                 Arrays.fill(yRow, block);
             }
         }
+        return this;
+    }
+
+    @Override
+    public World world() { return world; }
+
+    public TestChunkGrid withWorld(World world) {
+        this.world = Objects.requireNonNull(world, "world");
         return this;
     }
 
@@ -136,7 +148,8 @@ public final class TestChunkGrid implements ChunkData {
     @Override
     public Block getBlock(int x, int y, int z) {
         requirePosition(x, y, z);
-        return blocks[x][y - minimumY][z];
+        return new TestBlock((TestBlock) com.kntrel.mc.underilla.core.patch.ChunkBlock.unwrap(blocks[x][y - minimumY][z]),
+                chunkX * GenerationConstants.CHUNK_SIZE + x, y, chunkZ * GenerationConstants.CHUNK_SIZE + z);
     }
 
     @Override

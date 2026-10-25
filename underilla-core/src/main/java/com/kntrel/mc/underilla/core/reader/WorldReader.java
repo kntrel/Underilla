@@ -4,6 +4,7 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.vector.Vector;
 import java.util.Optional;
 
@@ -14,7 +15,7 @@ import java.util.Optional;
  * implementations may read region files, while tests can provide an in-memory
  * implementation.</p>
  */
-public interface WorldReader {
+public interface WorldReader extends World {
 
     Optional<Block> blockAt(int x, int y, int z);
 

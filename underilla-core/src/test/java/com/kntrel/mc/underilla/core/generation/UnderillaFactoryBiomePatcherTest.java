@@ -1,15 +1,22 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.BiomeData;
+import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.World;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
 import com.kntrel.mc.underilla.core.impl.TestWorld;
 import com.kntrel.mc.underilla.core.patch.Patcher;
+import com.kntrel.mc.underilla.core.reader.ChunkReader;
+import com.kntrel.mc.underilla.core.reader.WorldReader;
+import java.util.Optional;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -69,7 +76,7 @@ class UnderillaFactoryBiomePatcherTest {
                 40,
                 32,
                 builder -> builder
-                        .preservedGeneratedBiomes(DEEP_DARK.id()::equals)
+                        .preservedGeneratedBiomes(ctx -> DEEP_DARK.id().equals(ctx.target().biome().id()))
                         .preserveGeneratedBiomesOnlyUnderSurface(true)
         );
 
@@ -89,13 +96,119 @@ class UnderillaFactoryBiomePatcherTest {
                 4,
                 4,
                 builder -> builder
-                        .surfaceOnlyBiomes(SURFACE_ONLY.id()::equals)
-                        .preservedGeneratedBiomes(DEEP_DARK.id()::equals)
+                        .surfaceOnlyBiomes(ctx -> SURFACE_ONLY.id().equals(ctx.source().biome().id()))
+                        .preservedGeneratedBiomes(ctx -> DEEP_DARK.id().equals(ctx.target().biome().id()))
         );
 
         patcher.patch(target);
 
         assertSame(SURFACE_ONLY, target.get());
+    }
+
+    @Test
+    void biomePatcherComposesContextPoliciesWithSurfaceOverridesTakingPrecedence() {
+        MutableBiomeData target = new MutableBiomeData(DEEP_DARK, 0, 0, 0);
+        Patcher<BiomeData> patcher = Patchers.referenceWorldBiomePatcher(
+                referenceWorld(REFERENCE, 0, 4), GenerationArea.everywhere(), 4, false,
+                (_, _, _) -> { throw new AssertionError("Surface overrides must not consult the mask"); },
+                ctx -> ctx.source().biome() == REFERENCE && ctx.target().biome() == DEEP_DARK,
+                _ -> { throw new AssertionError("Surface overrides must take precedence over preservation"); },
+                true);
+
+        patcher.patch(target);
+
+        assertSame(REFERENCE, target.get());
+    }
+
+    @Test
+    void biomePoliciesReceiveTheDistinctSourceAndTargetWorldMetadata() {
+        World source = World.of("source", ID.of("minecraft:the_nether"), 0, 256);
+        World destination = World.of("destination", ID.of("minecraft:overworld"), -64, 320);
+        MutableBiomeData target = new MutableBiomeData(DEEP_DARK, 0, 1, 0, destination);
+        Patcher<BiomeData> patcher = patcher(
+                referenceWorld(REFERENCE, 0, 4).withWorld(source), 0, 4, 4,
+                builder -> builder.preservedGeneratedBiomes(ctx -> {
+                    assertEquals(source.name(), ctx.source().world().name());
+                    assertEquals(source.dimension(), ctx.source().world().dimension());
+                    assertSame(destination, ctx.target().world());
+                    assertEquals(-64, ctx.target().world().minHeight());
+                    return ctx.source().world().dimension().equals(ID.of("minecraft:the_nether"))
+                            && ctx.target().world().name().equals("destination");
+                }));
+
+        patcher.patch(target);
+
+        assertSame(DEEP_DARK, target.get());
+    }
+
+    @Test
+    void biomePatcherSuppliesSharedChunkViewWithoutLoadingChunks() {
+        WorldReader referenceWorld = new WorldReader() {
+            @Override public String name() { return "test-world"; }
+            @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+            @Override public int minHeight() { return -64; }
+            @Override public int maxHeight() { return 320; }
+
+            @Override
+            public Optional<Block> blockAt(int x, int y, int z) {
+                throw new AssertionError("Biome selection must not read blocks");
+            }
+
+            @Override
+            public Optional<Biome> biomeAt(int x, int y, int z) {
+                return Optional.of(REFERENCE);
+            }
+
+            @Override
+            public Optional<ChunkReader> readChunk(int x, int z) {
+                throw new AssertionError("Coordinate views must not load chunks");
+            }
+        };
+        MutableBiomeData target = new MutableBiomeData(DEEP_DARK, -1, 1, -17);
+        Patcher<BiomeData> patcher = Patchers.referenceWorldBiomePatcher(
+                referenceWorld, GenerationArea.everywhere(), 4, false, (_, _, _) -> false,
+                ctx -> {
+                    assertEquals(-1, ctx.chunk().x());
+                    assertEquals(-2, ctx.chunk().z());
+                    return ctx.source().biome() == REFERENCE && ctx.target().biome() == DEEP_DARK;
+                },
+                _ -> true, false);
+
+        patcher.patch(target);
+
+        assertSame(REFERENCE, target.get());
+    }
+
+    @Test
+    void biomePatcherChecksTheGenerationAreaBeforeEvaluatingContextPolicies() {
+        MutableBiomeData target = new MutableBiomeData(PLAINS, 8, 0, 0);
+        Patcher<BiomeData> patcher = Patchers.referenceWorldBiomePatcher(
+                referenceWorld(REFERENCE, 0, 4), new GenerationArea(0, 0, 8, 8), 4, false,
+                (_, _, _) -> { throw new AssertionError("Outside positions must not consult the mask"); },
+                _ -> { throw new AssertionError("Outside positions must not evaluate source rules"); },
+                _ -> { throw new AssertionError("Outside positions must not evaluate target rules"); },
+                true);
+
+        patcher.patch(target);
+
+        assertSame(PLAINS, target.get());
+    }
+
+    @Test
+    void preservationCanCompareBothBiomesAndChunkCoordinatesAtNegativePositions() {
+        TestChunkGrid reference = new TestChunkGrid(-1, -2, 0, 4, AIR, REFERENCE);
+        MutableBiomeData target = new MutableBiomeData(DEEP_DARK, -1, 1, -17);
+        Patcher<BiomeData> patcher = patcher(
+                new TestWorld().addChunk(reference), 0, 4, 4,
+                builder -> builder.preservedGeneratedBiomes(ctx -> {
+                    assertEquals(-1, ctx.chunk().x());
+                    assertEquals(-2, ctx.chunk().z());
+                    return ctx.source().biome() == REFERENCE && ctx.target().biome() == DEEP_DARK;
+                }));
+
+        patcher.patch(target);
+
+        assertSame(DEEP_DARK, target.get());
     }
 
     @Test
@@ -108,7 +221,11 @@ class UnderillaFactoryBiomePatcherTest {
                 0,
                 4,
                 4,
-                builder -> builder.surfaceBiomeUseTopYOnly(true)
+                builder -> builder.surfaceBiomeUseTopYOnly(true).surfaceOnlyBiomes(ctx -> {
+                    assertSame(REFERENCE, ctx.source().biome());
+                    assertSame(PLAINS, ctx.target().biome());
+                    return false;
+                })
         );
 
         patcher.patch(target);
@@ -144,13 +261,22 @@ class UnderillaFactoryBiomePatcherTest {
         private final int x;
         private final int y;
         private final int z;
+        private final World world;
 
         private MutableBiomeData(Biome biome, int x, int y, int z) {
+            this(biome, x, y, z, World.of("test-target", ID.of("minecraft:overworld"), -64, 320));
+        }
+
+        private MutableBiomeData(Biome biome, int x, int y, int z, World world) {
             this.biome = biome;
             this.x = x;
             this.y = y;
             this.z = z;
+            this.world = world;
         }
+
+        @Override
+        public World world() { return world; }
 
         @Override
         public Biome get() { return biome; }

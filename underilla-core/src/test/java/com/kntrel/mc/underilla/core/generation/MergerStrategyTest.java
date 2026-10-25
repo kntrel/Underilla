@@ -2,7 +2,6 @@ package com.kntrel.mc.underilla.core.generation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jkantrell.nbt.tag.CompoundTag;
@@ -65,10 +64,10 @@ class PatcherStrategyTest {
 
         patcher.patch(destination);
 
-        assertSame(GENERATED, destination.getBlock(0, 2, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 3, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 4, 0));
-        assertSame(AIR, destination.getBlock(0, 5, 0));
+        assertEquals(GENERATED.id(), destination.getBlock(0, 2, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 3, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 4, 0).id());
+        assertEquals(AIR.id(), destination.getBlock(0, 5, 0).id());
         assertFalse(worldMask.contains(100, 2, -100));
         assertTrue(worldMask.contains(100, 3, -100));
     }
@@ -130,9 +129,9 @@ class PatcherStrategyTest {
 
         referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), config).patch(destination);
 
-        assertSame(GENERATED, destination.getBlock(0, 5, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 6, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 10, 0));
+        assertEquals(GENERATED.id(), destination.getBlock(0, 5, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 6, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 10, 0).id());
     }
 
     @Test
@@ -159,7 +158,7 @@ class PatcherStrategyTest {
 
         patcher.patch(destination);
 
-        assertSame(AIR, destination.getBlock(0, 5, 0));
+        assertEquals(AIR.id(), destination.getBlock(0, 5, 0).id());
     }
 
     @Test
@@ -183,9 +182,9 @@ class PatcherStrategyTest {
 
         patcher.patch(destination);
 
-        assertSame(GENERATED, destination.getBlock(0, 0, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 1, 0));
-        assertSame(GENERATED, destination.getBlock(0, 2, 0));
+        assertEquals(GENERATED.id(), destination.getBlock(0, 0, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), destination.getBlock(0, 2, 0).id());
     }
 
     @Test
@@ -209,10 +208,10 @@ class PatcherStrategyTest {
 
         referenceWorldPatcher(referenceWorld, surfaceWorldMask(referenceWorld, config), config).patch(destination);
 
-        assertSame(GENERATED, destination.getBlock(0, 4, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 5, 0));
-        assertSame(REFERENCE, destination.getBlock(0, 6, 0));
-        assertSame(AIR, destination.getBlock(0, 7, 0));
+        assertEquals(GENERATED.id(), destination.getBlock(0, 4, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 5, 0).id());
+        assertEquals(REFERENCE.id(), destination.getBlock(0, 6, 0).id());
+        assertEquals(AIR.id(), destination.getBlock(0, 7, 0).id());
     }
 
     private static BlockFactory blockFactory() {
@@ -246,7 +245,7 @@ class PatcherStrategyTest {
         return new ReferenceHeightWorldMask(surfaceWorld, AIR,
                 config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                 config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
-                config::isSurfaceWorldOnlyBiome, config::isIgnoredForSurfaceCalculation, new ChunkCache(2));
+                ctx -> config.isSurfaceWorldOnlyBiome(ctx.source().biome().id()), ctx -> config.isIgnoredForSurfaceCalculation(ctx.source().block().id()), new ChunkCache(2));
     }
 
     private static final class TestConfig {
@@ -281,6 +280,15 @@ class PatcherStrategyTest {
     }
 
     private static final class TestBlock implements Block {
+        private int x;
+        private int y;
+        private int z;
+
+        @Override public int x() { return x; }
+        @Override public int y() { return y; }
+        @Override public int z() { return z; }
+
+
         private final ID id;
         private final boolean solid;
         private final boolean liquid;
@@ -294,7 +302,11 @@ class PatcherStrategyTest {
 
         @Override
         public TestBlock clone() {
-            return new TestBlock(id.toString(), solid, liquid, air);
+            TestBlock copy = new TestBlock(id.toString(), solid, liquid, air);
+            copy.x = x;
+            copy.y = y;
+            copy.z = z;
+            return copy;
         }
 
         @Override
@@ -381,6 +393,11 @@ class PatcherStrategyTest {
         }
 
         @Override
+        protected Block copyBlock(Block block, int x, int y, int z) {
+            throw new AssertionError("Fake reader does not decode blocks");
+        }
+
+        @Override
         protected Optional<Block> decodeBlockFromTag(CompoundTag tag) { return Optional.empty(); }
 
         @Override
@@ -391,6 +408,11 @@ class PatcherStrategyTest {
     }
 
     private static final class FakeWorldReader implements WorldReader {
+        @Override public String name() { return "test-world"; }
+        @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+        @Override public int minHeight() { return -64; }
+        @Override public int maxHeight() { return 320; }
+
         private final Map<Position, Block> blocks = new HashMap<>();
         private final Map<Position, Biome> biomes = new HashMap<>();
         private final Map<Position, ChunkReader> chunks = new HashMap<>();

@@ -1,6 +1,6 @@
 package com.kntrel.mc.underilla.core.generation;
 
-import com.kntrel.mc.underilla.core.api.Biome;
+import com.kntrel.mc.underilla.core.api.context.BiomeContext;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -26,7 +26,7 @@ public sealed interface NoodleCavesPolicy permits NoodleCavesPolicy.Underground,
      * @param predicate determines the biomes in which noodle caves may cut through terrain
      * @param restoreLiquids whether copied liquids remain after noodle carving
      */
-    record Surface(Predicate<Biome> predicate, boolean restoreLiquids) implements NoodleCavesPolicy {
+    record Surface(Predicate<BiomeContext> predicate, boolean restoreLiquids) implements NoodleCavesPolicy {
 
         public Surface {
             Objects.requireNonNull(predicate, "predicate");
@@ -37,7 +37,7 @@ public sealed interface NoodleCavesPolicy permits NoodleCavesPolicy.Underground,
         return Underground.INSTANCE;
     }
 
-    static Surface surface(Predicate<Biome> predicate, boolean restoreLiquids) {
+    static Surface surface(Predicate<BiomeContext> predicate, boolean restoreLiquids) {
         return new Surface(predicate, restoreLiquids);
     }
 }

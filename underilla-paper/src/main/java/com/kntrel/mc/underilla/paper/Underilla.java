@@ -127,8 +127,13 @@ public final class Underilla extends JavaPlugin {
             }
         }
         try {
+            if (!surfaceRegionDirectory.isDirectory()) {
+                throw new NoSuchFieldException("Surface region directory does not exist: " + surfaceRegionDirectory);
+            }
             this.worldSurfaceReader = new BukkitWorldReader(surfaceRegionDirectory, surfaceEntitiesDirectory,
-                    getUnderillaConfig().regionFileCacheSize());
+                    getUnderillaConfig().regionFileCacheSize(),
+                    com.kntrel.mc.underilla.paper.io.ReferenceWorldMetadata.read(
+                            getConfig(), "surfaceWorld", surfaceRegionDirectory.toPath()));
             LOGGER.info("Surface region directory '{}' found.", surfaceRegionDirectory);
         } catch (NoSuchFieldException e) {
             LOGGER.warn("No surface region directory at '{}' found", surfaceRegionDirectory, e);
@@ -139,8 +144,13 @@ public final class Underilla extends JavaPlugin {
             try {
                 LOGGER.info("Loading caves world");
                 File cavesRegionDirectory = getUnderillaConfig().getCavesRegionPath().toFile();
+                if (!cavesRegionDirectory.isDirectory()) {
+                    throw new NoSuchFieldException("Caves region directory does not exist: " + cavesRegionDirectory);
+                }
                 this.worldCavesReader = new BukkitWorldReader(
-                        cavesRegionDirectory, getUnderillaConfig().regionFileCacheSize());
+                        cavesRegionDirectory, null, getUnderillaConfig().regionFileCacheSize(),
+                        com.kntrel.mc.underilla.paper.io.ReferenceWorldMetadata.read(
+                                getConfig(), "cavesWorld", cavesRegionDirectory.toPath()));
             } catch (NoSuchFieldException e) {
                 LOGGER.warn("No caves region directory at '{}' found", getUnderillaConfig().getCavesRegionPath(), e);
             }

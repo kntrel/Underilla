@@ -6,6 +6,15 @@ import java.util.Objects;
 
 /** In-memory block implementation for generation tests. */
 public final class TestBlock implements Block {
+    private int x;
+    private int y;
+    private int z;
+
+    @Override public int x() { return x; }
+    @Override public int y() { return y; }
+    @Override public int z() { return z; }
+
+
 
     private final ID id;
     private final boolean solid;
@@ -20,6 +29,14 @@ public final class TestBlock implements Block {
         this.liquid = liquid;
         this.air = air;
         this.waterloggable = waterloggable;
+    }
+
+    public TestBlock(TestBlock original, int x, int y, int z) {
+        this(original.id.toString(), original.solid, original.liquid, original.air, original.waterloggable);
+        this.waterlogged = original.waterlogged;
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
 
     public static TestBlock air(String name) {
@@ -46,6 +63,9 @@ public final class TestBlock implements Block {
     public TestBlock clone() {
         TestBlock block = new TestBlock(id.toString(), solid, liquid, air, waterloggable);
         block.waterlogged = waterlogged;
+        block.x = x;
+        block.y = y;
+        block.z = z;
         return block;
     }
 

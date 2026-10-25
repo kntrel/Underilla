@@ -27,6 +27,11 @@ public final class TestChunkReader extends ChunkReader {
     }
 
     @Override
+    protected Block copyBlock(Block block, int x, int y, int z) {
+        return new TestBlock((TestBlock) block, x, y, z);
+    }
+
+    @Override
     protected Optional<Block> decodeBlockFromTag(CompoundTag tag) {
         if (tag == null) {
             return Optional.empty();

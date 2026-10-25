@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.kntrel.mc.underilla.core.generation.WorldGenerationPlan;
+import com.kntrel.mc.underilla.core.api.ID;
 import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.paper.profiling.ChunkGenerationProfiler;
 import java.util.ArrayList;
@@ -35,7 +36,13 @@ class UnderillaChunkGeneratorTest {
     void mapsPaperGenerationCallbacksToPlanPhases() {
         List<String> phases = new ArrayList<>();
         WorldGenerationPlan plan = WorldGenerationPlan.build()
-                .afterNoise(_ -> phases.add("noise"))
+                .afterNoise(chunk -> {
+                    assertEquals("world", chunk.world().name());
+                    assertEquals(ID.of(WORLD_INFO.getKey().toString()), chunk.world().dimension());
+                    assertEquals(-64, chunk.world().minHeight());
+                    assertEquals(320, chunk.world().maxHeight());
+                    phases.add("noise");
+                })
                 .afterSurface(_ -> phases.add("surface"))
                 .afterCarvers(_ -> phases.add("carvers"))
                 .altimeter((world, x, z, heightMap) -> 42)

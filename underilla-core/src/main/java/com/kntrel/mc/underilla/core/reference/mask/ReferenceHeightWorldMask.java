@@ -1,12 +1,18 @@
 package com.kntrel.mc.underilla.core.reference.mask;
 
 import com.kntrel.mc.underilla.core.api.Block;
+import com.kntrel.mc.underilla.core.api.Biome;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.context.ChunkView;
+import com.kntrel.mc.underilla.core.api.context.BiomeContext;
+import com.kntrel.mc.underilla.core.api.context.BlockContext;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import java.util.Objects;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -28,8 +34,8 @@ public final class ReferenceHeightWorldMask implements WorldMask {
     private final int mergeDepth;
     private final int adaptiveMaximumDepth;
     private final int adaptiveMinimumHiddenDepth;
-    private final Predicate<ID> surfaceWorldOnlyBiome;
-    private final Predicate<ID> ignoredSurfaceBlock;
+    private final Predicate<BiomeContext> surfaceWorldOnlyBiome;
+    private final Predicate<BlockContext> ignoredSurfaceBlock;
 
     public ReferenceHeightWorldMask(
             WorldReader surfaceWorld,
@@ -40,8 +46,8 @@ public final class ReferenceHeightWorldMask implements WorldMask {
             int mergeDepth,
             int adaptiveMaximumDepth,
             int adaptiveMinimumHiddenDepth,
-            Predicate<ID> surfaceWorldOnlyBiome,
-            Predicate<ID> ignoredSurfaceBlock,
+            Predicate<BiomeContext> surfaceWorldOnlyBiome,
+            Predicate<BlockContext> ignoredSurfaceBlock,
             ChunkCache cache
     ) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
@@ -59,6 +65,11 @@ public final class ReferenceHeightWorldMask implements WorldMask {
 
     @Override
     public boolean contains(int globalX, int y, int globalZ) {
+        return contains(null, globalX, y, globalZ);
+    }
+
+    @Override
+    public boolean contains(World targetWorld, int globalX, int y, int globalZ) {
         int size = GenerationConstants.CHUNK_SIZE;
         ColumnBoundaries chunk = boundaries.getOrCompute(
                 Math.floorDiv(globalX, size),
@@ -66,9 +77,15 @@ public final class ReferenceHeightWorldMask implements WorldMask {
                 ColumnBoundaries::new
         );
         int column = Math.floorMod(globalZ, size) * size + Math.floorMod(globalX, size);
+        WorldKey target = targetWorld == null ? null : new WorldKey(targetWorld.name(), targetWorld.dimension(),
+                targetWorld.minHeight(), targetWorld.maxHeight());
         synchronized (chunk) {
+            if (!Objects.equals(chunk.target, target)) {
+                Arrays.fill(chunk.known, false);
+                chunk.target = target;
+            }
             if (!chunk.known[column]) {
-                chunk.heights[column] = boundaryAt(globalX, globalZ);
+                chunk.heights[column] = boundaryAt(targetWorld, globalX, globalZ);
                 chunk.known[column] = true;
             }
             return y > chunk.heights[column];
@@ -76,23 +93,29 @@ public final class ReferenceHeightWorldMask implements WorldMask {
     }
 
     private static final class ColumnBoundaries {
+        private WorldKey target;
         private final int[] heights = new int[GenerationConstants.CHUNK_SIZE * GenerationConstants.CHUNK_SIZE];
         private final boolean[] known = new boolean[heights.length];
     }
 
-    private int boundaryAt(int globalX, int globalZ) {
+    private record WorldKey(String name, ID dimension, int minimumY, int maximumY) {}
+
+    private int boundaryAt(World targetWorld, int globalX, int globalZ) {
         int clampedHardSurfaceBoundary = Math.max(minimumY, Math.min(hardSurfaceBoundary, maximumY));
         if (clampedHardSurfaceBoundary <= minimumY) {
             return minimumY;
         }
 
-        ID biome = surfaceWorld.getBiomeID(globalX, maximumY, globalZ);
-        if (surfaceWorldOnlyBiome.test(biome)) {
+        Optional<Biome> biome = surfaceWorld.biomeAt(globalX, maximumY, globalZ);
+        ChunkView chunk = ChunkView.of(Math.floorDiv(globalX, GenerationConstants.CHUNK_SIZE),
+                Math.floorDiv(globalZ, GenerationConstants.CHUNK_SIZE));
+        if (biome.isPresent() && surfaceWorldOnlyBiome.test(BiomeContext.of(
+                chunk, surfaceWorld, biome.get(), targetWorld, null))) {
             return minimumY;
         }
 
         int lowerBlock = clampedHardSurfaceBoundary + mergeDepth;
-        while (!isSurfaceBlock(surfaceWorld.blockAt(globalX, lowerBlock, globalZ).orElse(air))
+        while (!isSurfaceBlock(targetWorld, globalX, lowerBlock, globalZ)
                 && lowerBlock > minimumY) {
             lowerBlock--;
         }
@@ -113,8 +136,16 @@ public final class ReferenceHeightWorldMask implements WorldMask {
         return lowerBlock - finalDepth;
     }
 
-    private boolean isSurfaceBlock(Block block) {
-        return block.isSolid() && !ignoredSurfaceBlock.test(block.id());
+    private boolean isSurfaceBlock(World targetWorld, int x, int y, int z) {
+        Block block = surfaceWorld.blockAt(x, y, z).orElse(air);
+        ChunkView chunk = ChunkView.of(Math.floorDiv(x, GenerationConstants.CHUNK_SIZE),
+                Math.floorDiv(z, GenerationConstants.CHUNK_SIZE));
+        return block.isSolid() && !ignoredSurfaceBlock.test(
+                BlockContext.of(
+                        chunk,
+                        surfaceWorld,
+                        surfaceWorld.biomeAt(x, y, z).orElse(null), block,
+                        targetWorld, null, null));
     }
 
     private static boolean haveNonSolidNeighbour(WorldReader world, int x, int y, int z) {

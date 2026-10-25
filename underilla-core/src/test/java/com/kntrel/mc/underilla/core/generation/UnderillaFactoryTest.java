@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.*;
+import com.kntrel.mc.underilla.core.api.context.BiomeContext;
+import com.kntrel.mc.underilla.core.api.context.ChunkView;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
@@ -202,6 +204,11 @@ class UnderillaFactoryTest {
     }
 
     private static final WorldReader EMPTY_WORLD = new WorldReader() {
+        @Override public String name() { return "test-world"; }
+        @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+        @Override public int minHeight() { return -64; }
+        @Override public int maxHeight() { return 320; }
+
         @Override
         public Optional<com.kntrel.mc.underilla.core.api.Block> blockAt(int x, int y, int z) {
             return Optional.empty();
@@ -239,12 +246,12 @@ class UnderillaFactoryTest {
 
         plan.afterCarvers().patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, -2, 0));
-        assertSame(GENERATED, target.getBlock(0, -1, 0));
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(REFERENCE, target.getBlock(0, 2, 0));
-        assertSame(GENERATED, target.getBlock(0, 3, 0));
-        assertSame(GENERATED, target.getBlock(0, 4, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, -2, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, -1, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 2, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, 3, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, 4, 0).id());
     }
 
     @Test
@@ -281,9 +288,9 @@ class UnderillaFactoryTest {
 
         patcher.patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
-        assertSame(REFERENCE, target.getBlock(0, 1, 0));
-        assertSame(GENERATED, target.getBlock(1, 1, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(1, 1, 0).id());
     }
 
     @Test
@@ -297,14 +304,14 @@ class UnderillaFactoryTest {
                 referenceWorld,
                 (_, _, _) -> false,
                 () -> AIR,
-                block -> block == WATER,
+                block -> block.id().equals(WATER.id()),
                 java.util.List.of(transformReference)
         );
 
         patcher.patch(target);
 
-        assertSame(WATER, target.getBlock(0, 0, 0));
-        assertSame(AIR, target.getBlock(1, 0, 0));
+        assertEquals(WATER.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(AIR.id(), target.getBlock(1, 0, 0).id());
     }
 
     @Test
@@ -322,7 +329,7 @@ class UnderillaFactoryTest {
 
         patcher.patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 0, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 0, 0).id());
     }
 
     @Test
@@ -371,8 +378,8 @@ class UnderillaFactoryTest {
         enabled.afterCarvers().patch(enabledTarget);
         disabled.afterCarvers().patch(disabledTarget);
 
-        assertSame(REFERENCE, enabledTarget.getBlock(0, 3, 0));
-        assertSame(AIR, disabledTarget.getBlock(0, 3, 0));
+        assertEquals(REFERENCE.id(), enabledTarget.getBlock(0, 3, 0).id());
+        assertEquals(AIR.id(), disabledTarget.getBlock(0, 3, 0).id());
     }
 
     @Test
@@ -394,7 +401,7 @@ class UnderillaFactoryTest {
 
         plan.afterCarvers().patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, 2, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, 2, 0).id());
     }
 
     @Test
@@ -402,7 +409,8 @@ class UnderillaFactoryTest {
         assertSame(NoodleCavesPolicy.underground(), NoodleCavesPolicy.underground());
 
         NoodleCavesPolicy.Surface policy = NoodleCavesPolicy.surface(biome -> true, true);
-        assertTrue(policy.predicate().test(() -> com.kntrel.mc.underilla.core.api.ID.of("plains")));
+        assertTrue(policy.predicate().test(BiomeContext.of(
+                ChunkView.of(0, 0), PLAINS, null)));
         assertTrue(policy.restoreLiquids());
     }
 
@@ -417,34 +425,59 @@ class UnderillaFactoryTest {
                 .build();
         TestChunkGrid undergroundTarget = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
         underground.afterSurface().patch(undergroundTarget);
-        assertSame(GENERATED, undergroundTarget.getBlock(0, 1, 0));
+        assertEquals(GENERATED.id(), undergroundTarget.getBlock(0, 1, 0).id());
         underground.afterCarvers().patch(undergroundTarget);
-        assertSame(REFERENCE, undergroundTarget.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), undergroundTarget.getBlock(0, 1, 0).id());
 
         WorldGenerationPlan protectedSurface = configured(UnderillaFactory.absolute(referenceWorld))
                 .noodleCaves(NoodleCavesPolicy.surface(biome -> false, false))
                 .build();
         TestChunkGrid protectedTarget = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
         protectedSurface.afterSurface().patch(protectedTarget);
-        assertSame(GENERATED, protectedTarget.getBlock(0, 1, 0));
+        assertEquals(GENERATED.id(), protectedTarget.getBlock(0, 1, 0).id());
         protectedSurface.afterCarvers().patch(protectedTarget);
-        assertSame(REFERENCE, protectedTarget.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), protectedTarget.getBlock(0, 1, 0).id());
 
         WorldGenerationPlan cutSurface = configured(UnderillaFactory.absolute(referenceWorld))
                 .noodleCaves(NoodleCavesPolicy.surface(biome -> true, false))
                 .build();
         TestChunkGrid cutTarget = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
         cutSurface.afterSurface().patch(cutTarget);
-        assertSame(REFERENCE, cutTarget.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), cutTarget.getBlock(0, 1, 0).id());
 
         WorldGenerationPlan restoredLiquids = configured(UnderillaFactory.absolute(referenceWorld))
                 .noodleCaves(NoodleCavesPolicy.surface(biome -> true, true))
                 .build();
         TestChunkGrid liquidsTarget = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
         restoredLiquids.afterSurface().patch(liquidsTarget);
-        assertSame(GENERATED, liquidsTarget.getBlock(1, 1, 0));
+        assertEquals(GENERATED.id(), liquidsTarget.getBlock(1, 1, 0).id());
         restoredLiquids.afterCarvers().patch(liquidsTarget);
-        assertSame(WATER, liquidsTarget.getBlock(1, 1, 0));
+        assertEquals(WATER.id(), liquidsTarget.getBlock(1, 1, 0).id());
+    }
+
+    @Test
+    void noodleCavesCanBeSelectedUsingBothWorldsBiomesAndChunks() {
+        TestBiome cave = new TestBiome("example:cave");
+        TestChunkGrid reference = new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS);
+        TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
+        target.setBiome(0, 1, 0, cave);
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(new TestWorld().addChunk(reference)))
+                .surfaceFill(false)
+                .noodleCaves(NoodleCavesPolicy.surface(ctx -> {
+                    assertEquals(target.getChunkX(), ctx.chunk().x());
+                    assertEquals(target.getChunkZ(), ctx.chunk().z());
+                    return ctx.source().biome() == PLAINS && ctx.target().biome() == cave;
+                }, false))
+                .build();
+
+        plan.afterSurface().patch(target);
+
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(4, 1, 0).id());
+
+        plan.afterCarvers().patch(target);
+
+        assertEquals(REFERENCE.id(), target.getBlock(4, 1, 0).id());
     }
 
     @Test
@@ -461,19 +494,19 @@ class UnderillaFactoryTest {
 
         plan.afterSurface().patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, 0, 0));
-        assertSame(AIR, target.getBlock(0, 1, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(AIR.id(), target.getBlock(0, 1, 0).id());
 
         plan.afterCarvers().patch(target);
 
-        assertSame(GENERATED, target.getBlock(0, 0, 0));
-        assertSame(REFERENCE, target.getBlock(0, 1, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, 0, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
     }
 
     @Test
     void survivingBlocksOutsideTheMaskAreWrittenBeforeCarversRegardlessOfDeferredCacheResidency() {
-        assertSame(AIR, carvedSurvivingBlock(128));
-        assertSame(AIR, carvedSurvivingBlock(1));
+        assertEquals(AIR.id(), carvedSurvivingBlock(128).id());
+        assertEquals(AIR.id(), carvedSurvivingBlock(1).id());
     }
 
     @Test
@@ -489,12 +522,12 @@ class UnderillaFactoryTest {
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
 
         plan.afterSurface().patch(target);
-        assertSame(GENERATED, target.getBlock(0, 1, 0));
+        assertEquals(GENERATED.id(), target.getBlock(0, 1, 0).id());
         plan.afterSurface().patch(new TestChunkGrid(1, 0, 0, 4, GENERATED, PLAINS));
         target.setBlock(0, 1, 0, AIR);
         plan.afterCarvers().patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
     }
 
     @Test
@@ -517,7 +550,7 @@ class UnderillaFactoryTest {
         assertThrows(IllegalStateException.class, () -> plan.afterSurface().patch(target));
         plan.afterCarvers().patch(target);
 
-        assertSame(REFERENCE, target.getBlock(0, 1, 0));
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
     }
 
     private static Block carvedSurvivingBlock(int cacheSize) {
@@ -530,13 +563,13 @@ class UnderillaFactoryTest {
         WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
                 .surfaceFill(false)
                 .chunkCacheSize(cacheSize)
-                .keptSurfaceBlocks(block -> block == ore)
+                .keptSurfaceBlocks(ctx -> ctx.source().block().id().equals(ore.id()))
                 .noodleCaves(NoodleCavesPolicy.surface(_ -> false, false))
                 .build();
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
 
         plan.afterSurface().patch(target);
-        assertSame(ore, target.getBlock(0, 0, 0));
+        assertEquals(ore.id(), target.getBlock(0, 0, 0).id());
         plan.afterSurface().patch(new TestChunkGrid(1, 0, 0, 4, GENERATED, PLAINS));
         target.setBlock(0, 0, 0, AIR);
         plan.afterCarvers().patch(target);
@@ -550,15 +583,69 @@ class UnderillaFactoryTest {
         TestWorld referenceWorld = new TestWorld().addChunk(referenceChunk);
         WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
                 .maximumCaveY(2)
-                .surfaceBlockTransformer(block -> block == REFERENCE ? WATER : block)
-                .keptSurfaceBlocks(block -> block == WATER)
+                .surfaceBlockTransformer(block -> block.id().equals(REFERENCE.id()) ? WATER : block)
+                .keptSurfaceBlocks(ctx -> ctx.source().block().id().equals(WATER.id()))
                 .build();
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
 
         plan.afterCarvers().patch(target);
 
-        assertSame(WATER, target.getBlock(0, 1, 0));
-        assertSame(WATER, target.getBlock(0, 3, 0));
+        assertEquals(WATER.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(WATER.id(), target.getBlock(0, 3, 0).id());
+    }
+
+    @Test
+    void blockSurvivalCanCompareSourceAndTargetBlocksBiomesAndChunks() {
+        TestBiome cave = new TestBiome("example:cave");
+        TestChunkGrid reference = new TestChunkGrid(-1, -2, 0, 4, REFERENCE, PLAINS);
+        TestChunkGrid target = new TestChunkGrid(-1, -2, 0, 4, GENERATED, cave);
+        target.setBlock(1, 1, 0, REFERENCE);
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(new TestWorld().addChunk(reference)))
+                .maximumCaveY(4)
+                .surfaceFill(false)
+                .surfaceBlockTransformer(_ -> WATER)
+                .keptSurfaceBlocks(ctx -> {
+                    assertEquals(target.getChunkX(), ctx.chunk().x());
+                    assertEquals(target.getChunkZ(), ctx.chunk().z());
+                    assertEquals(ctx.target().block().x(), ctx.source().block().x());
+                    assertEquals(ctx.target().block().y(), ctx.source().block().y());
+                    assertEquals(ctx.target().block().z(), ctx.source().block().z());
+                    assertEquals(-16 + Math.floorMod(ctx.target().block().x(), 16), ctx.source().block().x());
+                    assertEquals(-32 + Math.floorMod(ctx.target().block().z(), 16), ctx.source().block().z());
+                    return ctx.source().block().id().equals(WATER.id()) && ctx.target().block().id().equals(GENERATED.id())
+                            && ctx.source().biome() == PLAINS && ctx.target().biome() == cave;
+                })
+                .build();
+
+        plan.afterCarvers().patch(target);
+
+        assertEquals(WATER.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(REFERENCE.id(), target.getBlock(1, 1, 0).id());
+        assertEquals(REFERENCE.id(), reference.getBlock(0, 1, 0).id());
+    }
+
+    @Test
+    void blockPoliciesRetainWorldMetadataThroughVerticalBounds() {
+        World source = World.of("reference", ID.of("minecraft:the_nether"), 0, 256);
+        World destination = World.of("generated", ID.of("minecraft:overworld"), -4, 8);
+        TestChunkGrid reference = new TestChunkGrid(0, 0, 0, 4, REFERENCE, PLAINS);
+        TestChunkGrid target = new TestChunkGrid(0, 0, -4, 8, GENERATED, PLAINS).withWorld(destination);
+        WorldGenerationPlan plan = configured(UnderillaFactory.absolute(
+                        new TestWorld().addChunk(reference).withWorld(source)))
+                .maximumCaveY(4)
+                .surfaceFill(false)
+                .keptSurfaceBlocks(ctx -> {
+                    assertEquals(source.name(), ctx.source().world().name());
+                    assertEquals(source.dimension(), ctx.source().world().dimension());
+                    assertSame(destination, ctx.target().world());
+                    return ctx.target().world().minHeight() == -4 && ctx.target().world().maxHeight() == 8;
+                })
+                .build();
+
+        plan.afterCarvers().patch(target);
+
+        assertEquals(REFERENCE.id(), target.getBlock(0, 1, 0).id());
+        assertEquals(GENERATED.id(), target.getBlock(0, -1, 0).id());
     }
 
     @Test
@@ -631,7 +718,7 @@ class UnderillaFactoryTest {
 
         assertTrue(plan.tryAfterFeatures(target));
 
-        assertSame(sandstone, target.getBlock(0, 1, 0));
+        assertEquals(sandstone.id(), target.getBlock(0, 1, 0).id());
     }
 
     @Test
@@ -680,7 +767,7 @@ class UnderillaFactoryTest {
                 worldMask,
                 false,
                 air,
-                survivingBlock,
+                survivingBlock == null ? null : ctx -> survivingBlock.test(ctx.source().block()),
                 transformations,
                 NoodleCavesPolicy.underground(),
                 false,

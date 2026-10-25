@@ -7,6 +7,7 @@ import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import java.io.File;
@@ -38,6 +39,7 @@ public abstract class DiskWorldReader implements WorldReader {
     private final TopicChunkCache<ChunkReaders> chunkReaders;
     private final DiskWorldReader source;
     private final RLUCacheTriple<Biome> biomeCache;
+    private final World world;
 
     protected DiskWorldReader(String regionPath, int regionCacheSize) throws NoSuchFieldException {
         this(new File(regionPath), null, regionCacheSize);
@@ -52,6 +54,10 @@ public abstract class DiskWorldReader implements WorldReader {
     }
 
     protected DiskWorldReader(File regionDirectory, File entityDirectory, int regionCacheSize) throws NoSuchFieldException {
+        this(regionDirectory, entityDirectory, regionCacheSize, null);
+    }
+
+    protected DiskWorldReader(File regionDirectory, File entityDirectory, int regionCacheSize, World world) throws NoSuchFieldException {
         if (!(regionDirectory.exists() && regionDirectory.isDirectory())) {
             throw new NoSuchFieldException("Region directory '" + regionDirectory.getPath() + "' does not exist.");
         }
@@ -59,6 +65,7 @@ public abstract class DiskWorldReader implements WorldReader {
             throw new NoSuchFieldException("Entity region directory '" + entityDirectory.getPath() + "' does not exist.");
         }
         this.regions = regionDirectory;
+        this.world = world;
         this.entitites = entityDirectory;
         this.regionCache = new RLUCache<>(regionCacheSize);
         int biomeCacheSize = regionCacheSize * 64 * GenerationConstants.BIOME_CELL_SIZE
@@ -69,6 +76,7 @@ public abstract class DiskWorldReader implements WorldReader {
     }
 
     private DiskWorldReader(DiskWorldReader reader, ChunkCache cache) {
+        this.world = reader.world;
         this.regions = reader.regions;
         this.entitites = reader.entitites;
         this.regionCache = reader.regionCache;
@@ -76,6 +84,18 @@ public abstract class DiskWorldReader implements WorldReader {
         this.source = reader.source;
         this.chunkReaders = Objects.requireNonNull(cache, "cache").topicView(ChunkReaders.class);
     }
+
+    @Override
+    public String name() { return world.name(); }
+
+    @Override
+    public ID dimension() { return world.dimension(); }
+
+    @Override
+    public int minHeight() { return world.minHeight(); }
+
+    @Override
+    public int maxHeight() { return world.maxHeight(); }
 
     /**
      * Creates a plan-local view using the supplied cache for chunk readers. Region and biome
