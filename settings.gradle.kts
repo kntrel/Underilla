@@ -4,4 +4,4 @@ plugins {
 }
 
 rootProject.name = "Underilla"
-include("underilla-core", "underilla-paper")
+include("underilla-core", "underilla-config-yaml", "underilla-paper")

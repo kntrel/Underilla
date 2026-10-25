@@ -30,11 +30,11 @@ subprojects {
 }
 
 tasks.named("assemble") {
-    dependsOn(":underilla-core:assemble", ":underilla-paper:assemble")
+    dependsOn(":underilla-core:assemble", ":underilla-config-yaml:assemble", ":underilla-paper:assemble")
 }
 
 tasks.named("check") {
-    dependsOn(":underilla-core:check", ":underilla-paper:check")
+    dependsOn(":underilla-core:check", ":underilla-config-yaml:check", ":underilla-paper:check")
 }
 
 tasks.register("echoVersion") {
