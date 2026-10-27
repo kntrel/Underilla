@@ -123,9 +123,9 @@ merge:
       - block tagged @minecraft:doors
       - block tagged @minecraft:trapdoors
       - block tagged @minecraft:ice
-      - block.id matches 'minecraft:(.*)_wood'
-      - block.id matches 'minecraft:(.*)_stem'
-      - block.id matches 'minecraft:(.*)_hyphae'
+      - block match 'minecraft:(.*)_wood'
+      - block match 'minecraft:(.*)_stem'
+      - block match 'minecraft:(.*)_hyphae'
 
   # Keep matching source blocks outside the normal merge selection.
   # Scope: source/target.block, source/target.biome, source/target.world, and chunk.
@@ -201,11 +201,11 @@ cleanup:
     # Replace the bottom block of unsupported columns to support sand/gravel.
     # Scope for each if: block, biome, world, and chunk, supplied from the target.
     support-blocks:
-      - if: block.id == @minecraft:sand
+      - if: block == @minecraft:sand
         with: minecraft:sandstone
-      - if: block.id == @minecraft:red_sand
+      - if: block == @minecraft:red_sand
         with: minecraft:red_sandstone
-      - if: block.id == @minecraft:gravel
+      - if: block == @minecraft:gravel
         with: minecraft:andesite
 
     # Applied after support-block corrections. Use minecraft:air to remove blocks.
