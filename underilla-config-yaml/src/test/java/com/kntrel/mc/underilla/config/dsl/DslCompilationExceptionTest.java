@@ -21,6 +21,27 @@ class DslCompilationExceptionTest {
     private static final Compiler<Void> STANDARD = Compiler.of(Grammar.with(Void.class).standard().done());
 
     @Test
+    void unresolvedOperandMessagesShowTheFullOperandAndUnderlineItsSourceSpan() {
+        var failure = assertThrows(UnresolvedOperandException.class,
+                () -> STANDARD.compile("1 + mystery", Integer.class));
+        assertEquals("mystery", failure.operand());
+        assertEquals("Unrecognized operand at 4: mystery\n1 + mystery\n    ^~~~~~~", failure.getMessage());
+    }
+
+    @Test
+    void diagnosticsPointToTheRelevantLineExpandTabsAndMarkEndOfInput() {
+        String source = "1 +\r\n\tmystery";
+        var failure = assertThrows(UnresolvedOperandException.class, () -> STANDARD.compile(source, Integer.class));
+        assertEquals(source.indexOf("mystery"), failure.cursor());
+        assertTrue(failure.getMessage().endsWith("\n    mystery\n    ^~~~~~~"), failure.getMessage());
+        var eof = assertThrows(UnexpectedTokenException.class, () -> STANDARD.compile("(1", Integer.class));
+        assertTrue(eof.getMessage().contains("end of input at 2; expected ); delimiter opened at 0"), eof.getMessage());
+        assertTrue(eof.getMessage().endsWith("\n(1\n  ^"), eof.getMessage());
+        var empty = assertThrows(UnexpectedTokenException.class, () -> STANDARD.compile("", Integer.class));
+        assertTrue(empty.getMessage().endsWith("\n\n^"), empty.getMessage());
+    }
+
+    @Test
     void checkedContractIsDeclaredByBothCompileOverloads() throws Exception {
         assertEquals(Exception.class, DslCompilationException.class.getSuperclass());
         assertEquals(List.of(DslCompilationException.class), List.of(
@@ -66,6 +87,9 @@ class DslCompilationExceptionTest {
         assertFalse(operator.candidates().isEmpty());
         assertEquals(operator.expectedTypes(), operator.candidates().stream().map(DefinitionSignature::operandTypes).toList());
         assertTrue(operator.candidates().stream().allMatch(definition -> definition.kind() == DefinitionSignature.Kind.OPERATOR));
+        assertTrue(operator.getMessage().contains("operator '+' at 1: found (java.lang.Integer, java.lang.String)"));
+        assertTrue(operator.getMessage().contains("expected ("));
+        assertTrue(operator.getMessage().endsWith("\n1+'ice'\n ^"));
         var transformation = assertThrows(IncompatibleTypesException.class, () -> STANDARD.compile("not 1", Object.class));
         assertEquals(List.of(List.of(TypeToken.of(Boolean.class))), transformation.expectedTypes());
     }
@@ -84,6 +108,8 @@ class DslCompilationExceptionTest {
         var operator = assertThrows(AmbiguousOperatorException.class, () -> operators.compile("1+2", Object.class));
         assertEquals(1, operator.cursor());
         assertTrue(operator.candidates().size() >= 2);
+        assertTrue(operator.getMessage().contains("Ambiguous operator at 1: '+' for (java.lang.Integer, java.lang.Integer)"));
+        assertTrue(operator.getMessage().contains("matching definitions: operator (java.lang.Integer, java.lang.Integer) -> java.lang.Integer"));
         var transformation = Transformation.of(Integer.class, Integer.class, Pattern.keyword("twice"), value -> value * 2);
         var transformations = Compiler.of(Grammar.with(Void.class).standard()
                 .transformation(transformation).transformation(transformation).done());
@@ -99,6 +125,8 @@ class DslCompilationExceptionTest {
         assertInstanceOf(NumberFormatException.class, overflow.getCause());
         assertEquals(DefinitionSignature.Kind.LITERAL, overflow.definition().kind());
         assertEquals(10, overflow.end());
+        assertTrue(overflow.getMessage().contains("operand '2147483648' at 0 as literal () -> java.lang.Integer"));
+        assertTrue(overflow.getMessage().contains("NumberFormatException"));
         var cause = new IllegalStateException("broken runtime binding");
         RuntimeValue<Void> runtime = new RuntimeValue<>() {
             @Override public Pattern pattern() { return Pattern.literal("ref"); }
@@ -115,5 +143,7 @@ class DslCompilationExceptionTest {
         assertSame(broken, pattern.definition().pattern());
         assertEquals("x", pattern.expression());
         assertEquals(0, pattern.cursor());
+        assertTrue(pattern.getMessage().contains("Pattern matching failed at 0 for literal () -> java.lang.Integer"));
+        assertTrue(pattern.getMessage().contains("IllegalStateException: broken runtime binding"));
     }
 }

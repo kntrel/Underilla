@@ -9,8 +9,13 @@ public final class OperandBindingException extends DslCompilationException {
     private static final long serialVersionUID = 1L;
     private final DefinitionSignature definition;
     public OperandBindingException(String expression, int cursor, int end, DefinitionSignature definition, Throwable cause) {
-        super("Failed to bind operand", expression, cursor, end, Objects.requireNonNull(cause, "cause"));
+        super(expression, cursor, end, Objects.requireNonNull(cause, "cause"));
         this.definition = Objects.requireNonNull(definition, "definition");
     }
     public DefinitionSignature definition() { return definition; }
+    @Override
+    public String getMessage() {
+        return diagnostic("Failed to bind operand '" + offendingText() + "' at " + cursor()
+                + " as " + Diagnostics.signature(definition) + ": " + Diagnostics.cause(getCause()));
+    }
 }

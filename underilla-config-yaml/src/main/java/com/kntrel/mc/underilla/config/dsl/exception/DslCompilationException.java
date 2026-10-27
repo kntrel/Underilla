@@ -9,14 +9,26 @@ public abstract class DslCompilationException extends Exception {
     private final int cursor;
     private final int end;
 
-    protected DslCompilationException(String message, String expression, int cursor, int end, Throwable cause) {
-        super(message, cause);
+    protected DslCompilationException(String expression, int cursor, int end, Throwable cause) {
+        super(null, cause);
         this.expression = Objects.requireNonNull(expression, "expression");
         if (cursor < 0 || end < cursor || end > expression.length()) {
             throw new IllegalArgumentException("Invalid expression span");
         }
         this.cursor = cursor;
         this.end = end;
+    }
+
+    /** Describes this failure with the relevant source line and a caret; never logs. */
+    @Override
+    public abstract String getMessage();
+
+    protected final String diagnostic(String description) {
+        return Diagnostics.render(description, expression, cursor, end);
+    }
+
+    protected final String offendingText() {
+        return Diagnostics.token(expression, cursor, end);
     }
 
     public final String expression() { return expression; }

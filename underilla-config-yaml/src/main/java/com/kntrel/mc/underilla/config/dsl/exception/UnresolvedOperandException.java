@@ -4,7 +4,11 @@ package com.kntrel.mc.underilla.config.dsl.exception;
 public final class UnresolvedOperandException extends DslCompilationException {
     private static final long serialVersionUID = 1L;
     public UnresolvedOperandException(String expression, int cursor, int end) {
-        super("Unrecognized operand", expression, cursor, end, null);
+        super(expression, cursor, end, null);
     }
     public String operand() { return expression().substring(cursor(), end()); }
+    @Override
+    public String getMessage() {
+        return diagnostic("Unrecognized operand at " + cursor() + ": " + offendingText());
+    }
 }

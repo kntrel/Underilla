@@ -10,7 +10,7 @@ public final class UnexpectedTokenException extends DslCompilationException {
     private final Integer openingCursor;
 
     public UnexpectedTokenException(String expression, int cursor, int end, List<String> expectedTokens, Integer openingCursor) {
-        super("Unexpected input; expected " + String.join(" or ", expectedTokens), expression, cursor, end, null);
+        super(expression, cursor, end, null);
         this.expectedTokens = List.copyOf(expectedTokens);
         this.openingCursor = openingCursor;
         if (openingCursor != null && (openingCursor < 0 || openingCursor >= cursor)) {
@@ -23,4 +23,11 @@ public final class UnexpectedTokenException extends DslCompilationException {
     public boolean endOfInput() { return cursor() == expression().length(); }
     public List<String> expectedTokens() { return expectedTokens; }
     public OptionalInt openingCursor() { return openingCursor == null ? OptionalInt.empty() : OptionalInt.of(openingCursor); }
+    @Override
+    public String getMessage() {
+        String actual = endOfInput() ? "end of input" : "token '" + offendingText() + "'";
+        String opening = openingCursor == null ? "" : "; delimiter opened at " + openingCursor;
+        return diagnostic("Unexpected " + actual + " at " + cursor() + "; expected "
+                + String.join(" or ", expectedTokens) + opening);
+    }
 }

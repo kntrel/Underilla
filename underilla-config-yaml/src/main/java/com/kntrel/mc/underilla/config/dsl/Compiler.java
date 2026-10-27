@@ -230,8 +230,8 @@ public final class Compiler<C> {
                 int precedence = match.definitions().getFirst().precedence();
                 for (OperatorDefinition<?, ?, ?> definition : match.definitions()) {
                     if (definition.precedence() != precedence) {
-                        throw new InvalidGrammarException("Operator overloads must agree on precedence", source,
-                                cursor, cursor + match.length(), signatures(match.definitions()));
+                        throw new InvalidGrammarException(source, cursor, cursor + match.length(), signatures(match.definitions()),
+                                match.definitions().stream().map(OperatorDefinition::precedence).toList());
                     }
                 }
                 if (precedence < minPrecedence) {
@@ -284,7 +284,10 @@ public final class Compiler<C> {
                 }
             }
             if (match == null) {
-                throw new UnresolvedOperandException(source, start, start + 1);
+                int end = start + 1;
+                while (end < source.length() && !Character.isWhitespace(source.charAt(end))
+                        && "()[],+*%=!<>&|".indexOf(source.charAt(end)) < 0) end++;
+                throw new UnresolvedOperandException(source, start, end);
             }
             if (match.definitions().size() != 1) {
                 throw new AmbiguousOperandException(source, start, start + match.length(), signatures(match.definitions()));
@@ -357,7 +360,7 @@ public final class Compiler<C> {
                     .filter(candidate -> compatible.stream().noneMatch(other -> moreSpecific(other, candidate)))
                     .toList();
             if (best.size() != 1) {
-                throw new AmbiguousOperatorException(source, start, end, signatures(best));
+                throw new AmbiguousOperatorException(source, start, end, List.of(left.type(), right.type()), signatures(best));
             }
             return bindOperation(best.getFirst(), left, right);
         }
@@ -381,7 +384,7 @@ public final class Compiler<C> {
                         candidates.stream().map(DefinitionSignature::operandTypes).toList(), candidates);
             }
             if (best.size() != 1) {
-                throw new AmbiguousTransformationException(source, start, start + match.length(), signatures(best));
+                throw new AmbiguousTransformationException(source, start, start + match.length(), List.of(subject.type()), signatures(best));
             }
             return bindTransformation(best.getFirst(), start, subject);
         }
@@ -403,8 +406,7 @@ public final class Compiler<C> {
                     throw new PatternEvaluationException(source, cursor, cursor, signature(definition), exception);
                 }
                 if (length > remaining.length()) {
-                    throw new InvalidGrammarException("Pattern returned a match longer than the remaining source", source,
-                            cursor, source.length(), List.of(signature(definition)));
+                    throw new InvalidGrammarException(source, cursor, source.length(), signature(definition), length);
                 }
                 if (length > 0 && length >= longest) {
                     if (length > longest) {
