@@ -95,7 +95,7 @@ class ContextRuntimeValueTest {
     @Test
     void chainsCombineWithPrefixAndBinaryOperationsAndWhitespace() throws Exception {
         var compiler = compiler(BlockContext.class, REGISTRY);
-        assertTrue(compiler.compile("not block.air and block.x == -1", Boolean.class).apply(context(-1, true)));
+        assertTrue(compiler.compile("not block.air and block.x = -1", Boolean.class).apply(context(-1, true)));
         assertEquals(15, compiler.compile("(block.localX)", Integer.class).apply(context(-1, true)));
         assertEquals(20, compiler.compile("block\n . \n y", Integer.class).apply(context(0, true)));
         assertThrows(DslCompilationException.class, () -> compiler.compile("(block).x", Integer.class));
@@ -104,7 +104,7 @@ class ContextRuntimeValueTest {
     @Test
     void eachSegmentUsesTheDeclaredTypeReturnedByThePreviousProperty() throws Exception {
         var compiler = compiler(DualBlockContext.class, REGISTRY);
-        var expression = compiler.compile("source.block.x < target.block.x and source.world.seed == 41", Boolean.class);
+        var expression = compiler.compile("source.block.x < target.block.x and source.world.seed = 41", Boolean.class);
         assertTrue(expression.apply(DualBlockContext.of(context(-1, true), context(1, true))));
         assertFalse(expression.apply(DualBlockContext.of(context(2, true), context(1, true))));
         assertThrows(DslCompilationException.class, () -> compiler.compile("source.world.x", Integer.class));

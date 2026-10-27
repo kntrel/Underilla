@@ -15,6 +15,16 @@ class GrammarStdTest {
     private final Compiler<Void> compiler = Compiler.of(Grammar.with(Void.class).standard().done());
 
     @Test
+    void equalityUsesSingleEqualsAndRejectsDoubleEquals() throws Exception {
+        for (String expression : new String[] {"1=1.0", "'stone'='stone'", "true=true"}) {
+            assertTrue(compiler.compile(expression, Boolean.class).apply(null), expression);
+        }
+        for (String expression : new String[] {"1==1", "'stone' == 'stone'", "true==true"}) {
+            assertThrows(DslCompilationException.class, () -> compiler.compile(expression, Boolean.class), expression);
+        }
+    }
+
+    @Test
     void parsesNumericLiteralsAndPromotesArithmeticWithDeclaredResultTypes() throws Exception {
         assertEquals(7, compiler.compile("1+2*3", Integer.class).apply(null));
         assertEquals(5, compiler.compile("10-3-2", Integer.class).apply(null));
@@ -97,7 +107,7 @@ class GrammarStdTest {
         assertEquals(16777216f, compiler.compile("16777217L+0f", Float.class).apply(null));
         assertEquals(16777217.0, compiler.compile("16777216f+1.0", Double.class).apply(null));
         assertEquals(Float.POSITIVE_INFINITY, compiler.compile("1f/0f", Float.class).apply(null));
-        assertFalse(compiler.compile("(0f/0f)==(0f/0f)", Boolean.class).apply(null));
+        assertFalse(compiler.compile("(0f/0f)=(0f/0f)", Boolean.class).apply(null));
         assertTrue(compiler.compile("(1f/0f)>1f", Boolean.class).apply(null));
     }
 
@@ -114,19 +124,19 @@ class GrammarStdTest {
         assertEquals(5, numeric.compile("b+s", int.class).apply(values));
         assertEquals(4.5f, numeric.compile("s+f", float.class).apply(values));
         assertEquals(4.5, numeric.compile("b+f+1.0", double.class).apply(values));
-        assertTrue(numeric.compile("b<s and f<3f and b==2b", Boolean.class).apply(values));
+        assertTrue(numeric.compile("b<s and f<3f and b=2b", Boolean.class).apply(values));
     }
 
     @Test
     void comparesNumbersWithoutLosingIntegralPrecisionAndSupportsEquality() throws Exception {
         assertTrue(compiler.compile("9007199254740993L > 9007199254740992L", Boolean.class).apply(null));
-        assertFalse(compiler.compile("9007199254740993L == 9007199254740992L", Boolean.class).apply(null));
-        assertTrue(compiler.compile("1 == 1.0", Boolean.class).apply(null));
+        assertFalse(compiler.compile("9007199254740993L = 9007199254740992L", Boolean.class).apply(null));
+        assertTrue(compiler.compile("1 = 1.0", Boolean.class).apply(null));
         assertTrue(compiler.compile("1 = 1L", Boolean.class).apply(null));
         assertFalse(compiler.compile("1 != 1.0", Boolean.class).apply(null));
         assertTrue(compiler.compile("2 >= 2 and 2 <= 3 and 1 < 2", Boolean.class).apply(null));
         assertTrue(compiler.compile("'a' < 'b' and 'a' != 'b'", Boolean.class).apply(null));
-        assertTrue(compiler.compile("'a' == 'a' and true != false", Boolean.class).apply(null));
+        assertTrue(compiler.compile("'a' = 'a' and true != false", Boolean.class).apply(null));
     }
 
     @Test
@@ -135,12 +145,12 @@ class GrammarStdTest {
                 .runtime(RuntimeValue.of(Double.class, Pattern.literal("x"), value -> value)).done();
         Compiler<Double> numeric = Compiler.of(grammar);
 
-        assertFalse(numeric.compile("x==x", Boolean.class).apply(Double.NaN));
+        assertFalse(numeric.compile("x=x", Boolean.class).apply(Double.NaN));
         assertTrue(numeric.compile("x!=x", Boolean.class).apply(Double.NaN));
         for (String operator : new String[] {"<", "<=", ">", ">="}) {
             assertFalse(numeric.compile("x" + operator + "1.0", Boolean.class).apply(Double.NaN));
         }
-        assertTrue(numeric.compile("x==x", Boolean.class).apply(Double.POSITIVE_INFINITY));
+        assertTrue(numeric.compile("x=x", Boolean.class).apply(Double.POSITIVE_INFINITY));
         assertTrue(numeric.compile("x>1.0", Boolean.class).apply(Double.POSITIVE_INFINITY));
         assertTrue(numeric.compile("x<1.0", Boolean.class).apply(Double.NEGATIVE_INFINITY));
     }

@@ -51,7 +51,7 @@ worlds:
     # Replace source blocks while copying, before final cleanup.
     # Scope for each if: block, biome, world, and chunk, supplied from the source.
     # Example:
-    #   - if: block.id == @minecraft:sand
+    #   - if: block.id = @minecraft:sand
     #     with: minecraft:sandstone
     replace-blocks: []
 
@@ -130,7 +130,7 @@ merge:
   # Keep matching source blocks outside the normal merge selection.
   # Scope: source/target.block, source/target.biome, source/target.world, and chunk.
   # block/biome/world alias the source values; target.block is the destination value.
-  # Example: block.id == @minecraft:diamond_ore and biome.id != @minecraft:desert
+  # Example: block.id = @minecraft:diamond_ore and biome.id != @minecraft:desert
   keep-source-if: >-
     false
 
@@ -236,7 +236,7 @@ cleanup:
     # Scope: entity, world, and chunk, supplied from the target.
     # Source values, biomes, and block data are unavailable.
     # Example: entity.id matches 'minecraft:.*_minecart'
-    remove-if: entity.id == @minecraft:item # Dropped items.
+    remove-if: entity.id = @minecraft:item # Dropped items.
 
 # Performance ------------------------------------------------------------------
 performance:

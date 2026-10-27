@@ -89,7 +89,7 @@ class YamlConfigLoaderTest {
     void compilerAttachmentsAreImmutableAndOnlyRunDuringLoading() {
         var calls = new AtomicInteger();
         var compiler = Compiler.of(Grammar.with(EntityContext.class).runtime(Boolean.class, slice -> {
-            assertEquals("entity.id == @minecraft:item", slice.toString());
+            assertEquals("entity.id = @minecraft:item", slice.toString());
             calls.incrementAndGet();
             return slice.length();
         }, entity -> entity.entity().id().equals(ID.of("minecraft:item"))).done());
@@ -345,7 +345,7 @@ class YamlConfigLoaderTest {
                 worlds:
                   source:
                     replace-blocks:
-                      - if: block.id == @minecraft:sand
+                      - if: block.id = @minecraft:sand
                         with: sandstone
                       - if: [false, true]
                         with: minecraft:dirt
@@ -353,7 +353,7 @@ class YamlConfigLoaderTest {
                   surface:
                     passthrough-block-if: []
                   keep-source-if: >-
-                    block.id == @minecraft:stone
+                    block.id = @minecraft:stone
                     and target.block.id != @minecraft:air
                 biomes:
                   target:

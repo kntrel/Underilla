@@ -70,7 +70,7 @@ final class GrammarStd {
             result.add(Operation.of(String.class, String.class, Boolean.class, Pattern.literal(token), 40,
                     (a, b) -> comparison.test(a.compareTo(b))));
         }
-        for (String token : List.of("=", "==", "!=")) {
+        for (String token : List.of("=", "!=")) {
             BiFunction<Object, Object, Boolean> equality = token.equals("!=")
                     ? (a, b) -> !Objects.equals(a, b) : Objects::equals;
             result.add(Operation.of(Object.class, Object.class, Boolean.class, Pattern.literal(token), 30,
@@ -169,7 +169,7 @@ final class GrammarStd {
             case "<=" -> comparison -> comparison <= 0;
             case ">" -> comparison -> comparison > 0;
             case ">=" -> comparison -> comparison >= 0;
-            case "=", "==" -> comparison -> comparison == 0;
+            case "=" -> comparison -> comparison == 0;
             case "!=" -> comparison -> comparison != 0;
             default -> throw new AssertionError(token);
         };

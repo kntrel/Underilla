@@ -24,7 +24,7 @@ class IdLiteralTest {
 
     @Test
     void cooperatesWithOperatorsAndCollections() throws Exception {
-        assertTrue(compiler.compile("@minecraft:stone==@minecraft:stone", Boolean.class).apply(null));
+        assertTrue(compiler.compile("@minecraft:stone=@minecraft:stone", Boolean.class).apply(null));
         assertTrue(compiler.compile("@minecraft:stone in [@minecraft:dirt, @minecraft:stone]", Boolean.class).apply(null));
         assertEquals(16, new IdLiteral().pattern().match(Slice.of("@minecraft:stone and true")));
     }

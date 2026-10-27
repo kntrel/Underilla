@@ -86,7 +86,7 @@ class TaggedOperationTest {
         assertFalse(compiler.compile("candidate tagged selection", Boolean.class).apply(mixed));
         assertTrue(compiler.compile("candidate tagged @minecraft:caves or false and false", Boolean.class).apply(context));
         assertFalse(compiler.compile("candidate tagged @minecraft:caves and false", Boolean.class).apply(context));
-        assertTrue(compiler.compile("candidate tagged\nany selection == true", Boolean.class).apply(mixed));
+        assertTrue(compiler.compile("candidate tagged\nany selection = true", Boolean.class).apply(mixed));
     }
 
     @Test

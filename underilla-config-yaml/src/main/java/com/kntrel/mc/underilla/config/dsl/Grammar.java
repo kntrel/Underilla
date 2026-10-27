@@ -165,7 +165,7 @@ public final class Grammar<C> {
         }
 
         /**
-         * Adds standard literals, arithmetic, comparisons, equality, membership, boolean
+         * Adds standard literals, arithmetic, comparisons, equality ({@code =} and {@code !=}), membership, boolean
          * operations, and boolean negation ({@code not} or {@code !}). Repeated calls add the defaults only once.
          * Custom definitions are retained; conflicting definitions remain compilation errors.
          *
