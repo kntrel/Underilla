@@ -21,6 +21,35 @@ class NodeTest {
     private static final TypeToken<Boolean> BOOLEAN = TypeToken.of(Boolean.class);
 
     @Test
+    void vectorsSnapshotChildrenPreserveSpansAndStopAtTheFirstFailure() {
+        List<Node<Context, ? extends Number>> elements = new ArrayList<>();
+        List<String> events = new ArrayList<>();
+        IllegalStateException failure = new IllegalStateException("failed element");
+        elements.add(new Node.Runtime<>(INTEGER, 1, 2, context -> {
+            events.add("first");
+            return context.x();
+        }));
+        elements.add(new Node.Runtime<>(INTEGER, 3, 4, context -> {
+            events.add("second");
+            throw failure;
+        }));
+        elements.add(new Node.Runtime<>(INTEGER, 5, 6, context -> {
+            events.add("third");
+            return context.x();
+        }));
+        var vector = new Node.Vector<>(TypeToken.of(Number.class).listType(), 0, 7, elements);
+        elements.clear();
+        var spanned = vector.withSpan(10, 17);
+        assertEquals(3, spanned.elements().size());
+        assertEquals(vector.type(), spanned.type());
+        assertEquals(10, spanned.start());
+        assertEquals(17, spanned.end());
+        assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> spanned.evaluate(new Context(1, Set.of()))));
+        assertEquals(List.of("first", "second"), events);
+    }
+
+    @Test
     void literalsReturnTheirStoredValueIndependentlyOfContext() {
         Object value = new Object();
         Node<Context, Object> literal = new Node.Literal<>(TypeToken.of(Object.class), 0, 0, value);

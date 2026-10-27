@@ -21,6 +21,87 @@ final class Types {
 
     private Types() {}
 
+    /** A hole created only for the element type of an empty vector. */
+    enum Unknown implements Type {
+        INSTANCE;
+        @Override public String getTypeName() { return "Unknown"; }
+    }
+
+    private static boolean hasUnknown(Type type) {
+        return type == Unknown.INSTANCE || type instanceof ParameterizedType parameterized
+                && Arrays.stream(parameterized.getActualTypeArguments()).anyMatch(Types::hasUnknown);
+    }
+
+    /** Resolves list holes only; ordinary declared types retain invariant assignability. */
+    static Type specializeList(Type source, Type expected) {
+        if (!hasUnknown(source)) return source;
+        if (source == Unknown.INSTANCE) return expected;
+        if (expected instanceof WildcardType wildcard) {
+            expected = wildcard.getLowerBounds().length > 0
+                    ? wildcard.getLowerBounds()[0] : wildcard.getUpperBounds()[0];
+        }
+        if (!(source instanceof ParameterizedType list) || list.getRawType() != List.class) return source;
+        Type element = Object.class;
+        if (expected instanceof ParameterizedType target
+                && target.getRawType() instanceof Class<?> raw && raw.isAssignableFrom(List.class)) {
+            element = target.getActualTypeArguments()[0];
+        }
+        return listOf(specializeList(list.getActualTypeArguments()[0], element));
+    }
+
+    static Type listOf(Type element) {
+        return new Parameterized(List.class, null, List.of(element));
+    }
+
+    static Type commonParent(List<Type> types) {
+        List<Type> normalized = types.stream().filter(type -> type != Unknown.INSTANCE).map(type -> {
+            if (type instanceof Class<?> clazz) return (Type) boxed(clazz);
+            if (type instanceof WildcardType wildcard) return wildcard.getUpperBounds()[0];
+            if (type instanceof TypeVariable<?> variable) return variable.getBounds()[0];
+            return type;
+        }).toList();
+        if (normalized.isEmpty()) return Unknown.INSTANCE;
+        Type first = normalized.getFirst();
+        if (normalized.stream().allMatch(first::equals)) return first;
+        Class<?> candidate = rawClass(first);
+        while (candidate != null) {
+            Class<?> parent = candidate;
+            if (parent.isInterface() && normalized.stream().anyMatch(type -> rawClass(type) != parent)) {
+                return Object.class;
+            }
+            if (normalized.stream().allMatch(type -> isAssignable(parent, type))) {
+                List<Type> views = normalized.stream().map(type -> asSupertype(type, parent)).toList();
+                if (views.stream().allMatch(type -> type instanceof ParameterizedType)) {
+                    ParameterizedType base = (ParameterizedType) views.getFirst();
+                    if (views.stream().allMatch(type -> Objects.equals(base.getOwnerType(),
+                            ((ParameterizedType) type).getOwnerType()))) {
+                        java.util.ArrayList<Type> arguments = new java.util.ArrayList<>();
+                        for (int i = 0; i < base.getActualTypeArguments().length; i++) {
+                            int index = i;
+                            List<Type> values = views.stream()
+                                    .map(type -> ((ParameterizedType) type).getActualTypeArguments()[index])
+                                    .filter(type -> type != Unknown.INSTANCE).toList();
+                            if (values.isEmpty()) {
+                                arguments.add(Unknown.INSTANCE);
+                            } else if (values.stream().allMatch(values.getFirst()::equals)) {
+                                arguments.add(values.getFirst());
+                            } else {
+                                Type common = commonParent(values);
+                                arguments.add(values.stream().allMatch(value -> specializeList(value, common).equals(common))
+                                        ? common : new Wildcard(List.of(common), List.of()));
+                            }
+                        }
+                        return new Parameterized(parent, base.getOwnerType(), arguments);
+                    }
+                }
+                // Never erase generic arguments to an unchecked raw common type.
+                if (parent.getTypeParameters().length == 0) return parent;
+            }
+            candidate = candidate.getSuperclass();
+        }
+        return Object.class;
+    }
+
     static boolean isAssignable(Type target, Type source) {
         if (target.equals(source)) {
             return true;
@@ -173,6 +254,11 @@ final class Types {
     }
 
     private record Parameterized(Class<?> raw, Type owner, List<Type> arguments) implements ParameterizedType {
+        @Override public String getTypeName() {
+            return (owner == null ? raw.getTypeName() : owner.getTypeName() + "$" + raw.getSimpleName())
+                    + "<" + String.join(", ", arguments.stream().map(Type::getTypeName).toList()) + ">";
+        }
+        @Override public String toString() { return getTypeName(); }
         @Override public Type[] getActualTypeArguments() { return arguments.toArray(Type[]::new); }
         @Override public Type getRawType() { return raw; }
         @Override public Type getOwnerType() { return owner; }
@@ -193,6 +279,11 @@ final class Types {
     }
 
     private record Wildcard(List<Type> upper, List<Type> lower) implements WildcardType {
+        @Override public String getTypeName() {
+            if (!lower.isEmpty()) return "? super " + lower.getFirst().getTypeName();
+            return upper.equals(List.of(Object.class)) ? "?" : "? extends " + upper.getFirst().getTypeName();
+        }
+        @Override public String toString() { return getTypeName(); }
         @Override public Type[] getUpperBounds() { return upper.toArray(Type[]::new); }
         @Override public Type[] getLowerBounds() { return lower.toArray(Type[]::new); }
         @Override public boolean equals(Object other) {

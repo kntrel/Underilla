@@ -18,6 +18,35 @@ import org.junit.jupiter.api.Test;
 class TypeTokenTest {
 
     @Test
+    void infersBoxedCommonParentsAndConstructsParameterizedLists() {
+        assertEquals(TypeToken.of(Number.class), TypeToken.commonParent(List.of(
+                TypeToken.of(int.class), TypeToken.of(double.class), TypeToken.of(float.class))));
+        assertEquals(TypeToken.of(Object.class), TypeToken.commonParent(List.of(
+                TypeToken.of(Integer.class), TypeToken.of(String.class))));
+        assertEquals(new TypeToken<List<Integer>>() {}, TypeToken.of(Integer.class).listType());
+        assertEquals("java.util.List<java.lang.Integer>", TypeToken.of(Integer.class).listType().toString());
+        TypeToken<?> empty = TypeToken.commonParent(List.of()).listType();
+        assertEquals(new TypeToken<List<String>>() {}, empty.specializeList(new TypeToken<List<String>>() {}));
+        assertFalse(new TypeToken<List<String>>() {}.isAssignableFrom(empty));
+        assertFalse(TypeToken.of(String.class).isAssignableFrom(TypeToken.of(Void.class)));
+        assertFalse(new TypeToken<List<String>>() {}.isAssignableFrom(new TypeToken<List<Void>>() {}));
+    }
+
+    @Test
+    void preservesGenericArgumentsAndDoesNotDependOnElementOrder() {
+        TypeToken<?> integers = new TypeToken<List<Integer>>() {};
+        TypeToken<?> doubles = new TypeToken<List<Double>>() {};
+        TypeToken<?> parent = new TypeToken<List<? extends Number>>() {};
+        assertEquals(parent, TypeToken.commonParent(List.of(integers, doubles)));
+        assertEquals(parent, TypeToken.commonParent(List.of(doubles, integers)));
+        assertEquals(integers, TypeToken.commonParent(List.of(integers, integers)));
+        assertEquals(TypeToken.of(Object.class), TypeToken.commonParent(List.of(
+                new TypeToken<java.util.ArrayList<Integer>>() {}, integers)));
+        assertEquals(TypeToken.of(Object.class), TypeToken.commonParent(List.of(
+                integers, new TypeToken<java.util.ArrayList<Integer>>() {})));
+    }
+
+    @Test
     void classReferencesAndCapturedClassReferencesRepresentTheSameType() {
         TypeToken<String> explicit = TypeToken.of(String.class);
         TypeToken<String> captured = new TypeToken<String>() {};

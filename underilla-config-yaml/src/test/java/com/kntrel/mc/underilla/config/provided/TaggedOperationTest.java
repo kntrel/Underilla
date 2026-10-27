@@ -90,6 +90,23 @@ class TaggedOperationTest {
     }
 
     @Test
+    void compilerAcceptsTagListsForAnyAllAndDefaultOverloads() {
+        var compiler = compiler();
+        var context = new Context(CANDIDATE, List.of());
+        assertTrue(compiler.compile("candidate tagged any [@minecraft:caves, @example:warm]",
+                Boolean.class).apply(context));
+        assertFalse(compiler.compile("candidate tagged all [@minecraft:caves, @example:warm]",
+                Boolean.class).apply(context));
+        assertTrue(compiler.compile("candidate tagged [@minecraft:caves, @example:cold]",
+                Boolean.class).apply(context));
+        assertFalse(compiler.compile("candidate tagged any []", Boolean.class).apply(context));
+        assertTrue(compiler.compile("candidate tagged all []", Boolean.class).apply(context));
+        assertTrue(compiler.compile("candidate tagged []", Boolean.class).apply(context));
+        assertThrows(CompilationException.class, () -> compiler.compile(
+                "candidate tagged any [@minecraft:caves, 'cold']", Boolean.class));
+    }
+
+    @Test
     void compilerRejectsWrongOperandAndCollectionElementTypes() {
         var compiler = compiler();
         assertThrows(CompilationException.class, () -> compiler.compile("text tagged selection", Boolean.class));

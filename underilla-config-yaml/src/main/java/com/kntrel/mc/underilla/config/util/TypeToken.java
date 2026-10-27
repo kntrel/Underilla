@@ -3,6 +3,7 @@ package com.kntrel.mc.underilla.config.util;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.Objects;
+import java.util.List;
 
 /**
  * Retains a Java type, including generic arguments. Use {@link #of(Class)} for a class or a
@@ -23,12 +24,39 @@ public abstract class TypeToken<T> {
         this.type = parameterized.getActualTypeArguments()[0];
     }
 
-    private TypeToken(Class<T> type) {
+    private TypeToken(Type type) {
         this.type = Objects.requireNonNull(type, "type");
     }
 
     public static <T> TypeToken<T> of(Class<T> type) {
         return new TypeToken<T>(type) {};
+    }
+
+    /** Creates a list type retaining this token as its element type. */
+    public final TypeToken<List<T>> listType() {
+        return new TypeToken<List<T>>(Types.listOf(type)) {};
+    }
+
+    /**
+     * Finds the nearest common superclass after boxing primitives. Identical interfaces
+     * are retained; differing generic arguments are represented by upper-bounded wildcards.
+     * An empty input produces an internal unresolved element type, resolved by a list's consumer.
+     */
+    public static TypeToken<?> commonParent(List<? extends TypeToken<?>> types) {
+        return new TypeToken<Object>(Types.commonParent(types.stream().map(TypeToken::type).toList())) {};
+    }
+
+    /** Resolves empty-list element holes using a consumer's expected type. */
+    public final TypeToken<?> specializeList(TypeToken<?> expected) {
+        return new TypeToken<Object>(Types.specializeList(type, expected.type)) {};
+    }
+
+    /** Returns the element type of a parameterized List token. */
+    public final TypeToken<?> listElementType() {
+        if (!(type instanceof ParameterizedType list) || list.getRawType() != List.class) {
+            throw new IllegalStateException("Expected a parameterized List type: " + this);
+        }
+        return new TypeToken<Object>(list.getActualTypeArguments()[0]) {};
     }
 
     public final Type type() {

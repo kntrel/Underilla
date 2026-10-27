@@ -24,6 +24,133 @@ class CompilerTest {
     private static final Grammar<Void> ARITHMETIC = Grammar.with(Void.class).standard().done();
 
     @Test
+    void emptyListsInferTheirTypeFromTheExpectedResult() {
+        Compiler<Void> compiler = new Compiler<>(ARITHMETIC);
+        assertEquals(List.of(), compiler.compile("[]", new TypeToken<List<String>>() {}).apply(null));
+        assertEquals(List.of(), compiler.compile("[ ]", new TypeToken<java.util.Collection<Integer>>() {}).apply(null));
+        assertEquals(List.of(), compiler.compile("[]", new TypeToken<Iterable<? extends Number>>() {}).apply(null));
+        assertEquals(List.of(), compiler.compile("[]", new TypeToken<List<? super Integer>>() {}).apply(null));
+        assertEquals(List.of(), compiler.compile("[]", Object.class).apply(null));
+        assertEquals(List.of(), compiler.compile("[]", List.class).apply(null));
+        assertFalse(compiler.compile("1 in []", Boolean.class).apply(null));
+        assertThrows(CompilationException.class, () -> compiler.compile("[]", String.class));
+        assertThrows(CompilationException.class, () -> compiler.compile("[]", new TypeToken<Set<String>>() {}));
+        assertThrows(UnsupportedOperationException.class,
+                () -> compiler.compile("[]", new TypeToken<List<String>>() {}).apply(null).add("ice"));
+    }
+
+    @Test
+    void nestedEmptyListsInferFromSiblingsAndConsumersWithoutWideningConcreteLists() {
+        Compiler<Void> compiler = new Compiler<>(ARITHMETIC);
+        TypeToken<List<List<Integer>>> integers = new TypeToken<>() {};
+        assertEquals(List.of(List.of(), List.of(1, 2)), compiler.compile("[[], [1, 2]]", integers).apply(null));
+        assertEquals(List.of(List.of(1, 2), List.of()), compiler.compile("[[1, 2], []]", integers).apply(null));
+        assertEquals(List.of(List.of(), List.of()), compiler.compile("[[], []]", integers).apply(null));
+        assertEquals(List.of(List.of(List.of()), List.of(List.of(1))), compiler.compile("[[[]], [[1]]]",
+                new TypeToken<List<List<List<Integer>>>>() {}).apply(null));
+        assertEquals(List.of(List.of()), compiler.compile("[[]]",
+                new TypeToken<List<List<? extends Number>>>() {}).apply(null));
+        assertEquals(List.of(List.of(), List.of(1), List.of(2.5)), compiler.compile("[[], [1], [2.5]]",
+                new TypeToken<List<List<? extends Number>>>() {}).apply(null));
+        assertThrows(CompilationException.class, () -> compiler.compile("[[], [1]]",
+                new TypeToken<List<List<Number>>>() {}));
+    }
+
+    @Test
+    void emptyListsRespectOperatorAndTransformationOverloadAmbiguity() {
+        TypeToken<List<String>> strings = new TypeToken<>() {};
+        TypeToken<List<Integer>> integers = new TypeToken<>() {};
+        Operation<Boolean, List<String>, Integer> stringCount = Operation.of(TypeToken.of(Boolean.class), strings,
+                TypeToken.of(Integer.class), Pattern.keyword("count"), (flag, values) -> values.size());
+        Operation<Boolean, List<Integer>, Integer> integerCount = Operation.of(TypeToken.of(Boolean.class), integers,
+                TypeToken.of(Integer.class), Pattern.keyword("count"), (flag, values) -> values.size());
+        Compiler<Void> single = Compiler.of(Grammar.with(Void.class).standard().operation(stringCount)
+                .transformation(Transformation.of(strings, TypeToken.of(Integer.class), Pattern.keyword("size"), List::size)).done());
+        assertEquals(0, single.compile("true count []", Integer.class).apply(null));
+        assertEquals(0, single.compile("size []", Integer.class).apply(null));
+        Compiler<Void> ambiguous = Compiler.of(Grammar.with(Void.class).standard()
+                .operation(stringCount).operation(integerCount)
+                .transformation(Transformation.of(strings, TypeToken.of(Integer.class), Pattern.keyword("size"), List::size))
+                .transformation(Transformation.of(integers, TypeToken.of(Integer.class), Pattern.keyword("size"), List::size)).done());
+        assertTrue(assertThrows(CompilationException.class,
+                () -> ambiguous.compile("true count []", Integer.class)).getMessage().contains("Ambiguous operator"));
+        assertTrue(assertThrows(CompilationException.class,
+                () -> ambiguous.compile("size []", Integer.class)).getMessage().contains("Ambiguous transformation"));
+        assertEquals(1, ambiguous.compile("true count [1]", Integer.class).apply(null));
+        assertEquals(1, ambiguous.compile("size ['ice']", Integer.class).apply(null));
+    }
+
+    @Test
+    void listsInferTheirCommonDeclaredTypeWithoutNumericConversion() {
+        Compiler<Void> compiler = new Compiler<>(ARITHMETIC);
+        assertEquals(List.of(24, 75.3, 0.8f), compiler.compile("[24, 75.3, 0.8f]",
+                new TypeToken<List<Number>>() {}).apply(null));
+        assertEquals(List.of(24, 75), compiler.compile("[24, 75]",
+                new TypeToken<List<Integer>>() {}).apply(null));
+        assertEquals(List.of(24, "ice"), compiler.compile("[24, 'ice']",
+                new TypeToken<List<Object>>() {}).apply(null));
+        assertThrows(CompilationException.class, () -> compiler.compile("[24, 75.3]",
+                new TypeToken<List<Double>>() {}));
+        assertThrows(CompilationException.class, () -> compiler.compile("[24, 75]",
+                new TypeToken<List<Number>>() {}));
+        assertTrue(compiler.compile("24 in [24, 75]", Boolean.class).apply(null));
+    }
+
+    @Test
+    void listsSupportExpressionsNestingAndQuotedDelimiters() {
+        Compiler<Void> compiler = new Compiler<>(ARITHMETIC);
+        assertEquals(List.of(7, 20), compiler.compile("([1 + 2 * 3, (2 + 3) * 4])",
+                new TypeToken<List<Integer>>() {}).apply(null));
+        assertEquals(List.of(List.of(1), List.of(2)), compiler.compile("[[1], [2]]",
+                new TypeToken<List<List<Integer>>>() {}).apply(null));
+        assertEquals(List.of(List.of(1), List.of(2.5)), compiler.compile("[[1], [2.5]]",
+                new TypeToken<List<List<? extends Number>>>() {}).apply(null));
+        assertEquals(List.of(",]", "["), compiler.compile("[',]', '[']",
+                new TypeToken<List<String>>() {}).apply(null));
+    }
+
+    @Test
+    void listsUseDeclaredRuntimeTypesAndEvaluateInOrderOnEachCall() {
+        List<String> events = new ArrayList<>();
+        Compiler<Context> compiler = new Compiler<>(ARITHMETIC.withRuntimeValues(List.of(
+                RuntimeValue.of(Number.class, Pattern.keyword("x"), ctx -> {
+                    events.add("x");
+                    return ctx.x();
+                }),
+                RuntimeValue.of(Integer.class, Pattern.keyword("next"), ctx -> {
+                    events.add("next");
+                    return ctx.x() + 1;
+                }))));
+        Function<Context, List<Number>> expression = compiler.compile("[x, next, 2]",
+                new TypeToken<List<Number>>() {});
+        assertTrue(events.isEmpty());
+        List<Number> first = expression.apply(new Context(3, Set.of()));
+        assertEquals(List.of(3, 4, 2), first);
+        assertEquals(List.of(8, 9, 2), expression.apply(new Context(8, Set.of())));
+        assertEquals(List.of("x", "next", "x", "next"), events);
+        assertThrows(UnsupportedOperationException.class, () -> first.add(5));
+    }
+
+    @Test
+    void malformedListsReportTheOffendingSourceSpan() {
+        Compiler<Void> compiler = new Compiler<>(ARITHMETIC);
+        for (String source : List.of("[1,]", "[,1]", "[1,,2]", "[1 2]", "[1", "[", "[[1]")) {
+            CompilationException error = assertThrows(CompilationException.class,
+                    () -> compiler.compile(source, Object.class), source);
+            assertEquals(source, error.source());
+            assertTrue(error.start() >= 0 && error.end() <= source.length(), source);
+        }
+        CompilationException missingComma = assertThrows(CompilationException.class,
+                () -> compiler.compile("[1 2]", Object.class));
+        assertEquals(3, missingComma.start());
+        assertEquals(4, missingComma.end());
+        CompilationException wrongType = assertThrows(CompilationException.class,
+                () -> compiler.compile("([1])", String.class));
+        assertEquals(0, wrongType.start());
+        assertEquals(5, wrongType.end());
+    }
+
+    @Test
     void respectsPrecedenceGroupingLeftAssociativityAndWhitespace() {
         Compiler<Void> compiler = new Compiler<>(ARITHMETIC);
 

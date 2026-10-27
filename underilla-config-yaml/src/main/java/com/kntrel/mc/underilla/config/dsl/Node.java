@@ -2,6 +2,9 @@ package com.kntrel.mc.underilla.config.dsl;
 
 import com.kntrel.mc.underilla.config.util.TypeToken;
 import java.util.Objects;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -24,6 +27,28 @@ sealed interface Node<C, T> {
     private static void checkSpan(int start, int end) {
         if (start < 0 || end < start) {
             throw new IllegalArgumentException("Invalid source span [" + start + ", " + end + ")");
+        }
+    }
+
+    /** Evaluates each element once, in source order, using the same context. */
+    record Vector<C, T>(TypeToken<List<T>> type, int start, int end, List<? extends Node<C, ? extends T>> elements) implements Node<C, List<T>> {
+
+        public Vector {
+            Objects.requireNonNull(type, "type");
+            checkSpan(start, end);
+            elements = List.copyOf(elements);
+        }
+
+        @Override
+        public Vector<C, T> withSpan(int start, int end) {
+            return new Vector<>(type, start, end, elements);
+        }
+
+        @Override
+        public List<T> evaluate(C context) {
+            List<T> values = new ArrayList<>(elements.size());
+            for (Node<C, ? extends T> element : elements) values.add(element.evaluate(context));
+            return Collections.unmodifiableList(values);
         }
     }
 

@@ -23,7 +23,11 @@ import java.util.function.Function;
  *
  * <p>Each compilation has independent parser state. Definition metadata is captured at
  * construction; supplied patterns, parsers, and computations retain their own thread-safety
- * semantics. Parentheses at token boundaries are reserved for grouping.
+ * semantics. Parentheses at token boundaries are reserved for grouping; square brackets
+ * and commas delimit list expressions. Nonempty lists infer their element type from the
+ * nearest common superclass of their declared element types, boxing primitives first.
+ * Empty list element types are inferred from siblings or the selected consumer, defaulting
+ * to Object when the consumer provides no element type. Generic assignability stays invariant.
  */
 public final class Compiler<C> {
 
@@ -68,11 +72,12 @@ public final class Compiler<C> {
             throw session.error("Unexpected input; expected an operator or end of expression",
                     session.cursor, session.cursor + 1, null);
         }
-        if (!expectedType.isAssignableFrom(root.type())) {
+        Node<C, ?> resolved = specialize(root, expectedType);
+        if (resolved == null) {
             throw session.error("Expected result type " + expectedType + " but found " + root.type(),
                     root.start(), root.end(), null);
         }
-        Node<C, T> node = castNode(root);
+        Node<C, T> node = castNode(resolved);
         return node::evaluate;
     }
 
@@ -125,6 +130,29 @@ public final class Compiler<C> {
         return (Node<C, T>) node;
     }
 
+    /** Returns a specialized copy, or null when this consumer cannot accept the expression. */
+    private Node<C, ?> specialize(Node<C, ?> node, TypeToken<?> expected) {
+        if (!(node instanceof Node.Vector<?, ?>)) {
+            return expected.isAssignableFrom(node.type()) ? node : null;
+        }
+        // The input node already fixes the context type to C.
+        @SuppressWarnings("unchecked")
+        Node.Vector<C, ?> vector = (Node.Vector<C, ?>) node;
+        TypeToken<?> resolved = vector.type().specializeList(expected);
+        if (!expected.isAssignableFrom(resolved)) return null;
+        return specializeVector(vector, resolved.listElementType());
+    }
+
+    private <T> Node<C, List<T>> specializeVector(Node.Vector<C, ?> vector, TypeToken<T> elementType) {
+        List<Node<C, T>> elements = new ArrayList<>();
+        for (Node<C, ?> element : vector.elements()) {
+            Node<C, ?> resolved = specialize(element, elementType);
+            if (resolved == null) return null;
+            elements.add(castNode(resolved));
+        }
+        return new Node.Vector<>(elementType.listType(), vector.start(), vector.end(), elements);
+    }
+
     @FunctionalInterface
     private interface OperandBinder<C> {
         Node<C, ?> bind(String source, int start, int end);
@@ -155,7 +183,11 @@ public final class Compiler<C> {
             Node<C, ?> left = operand();
             while (true) {
                 skipWhitespace();
-                if (cursor == source.length() || source.charAt(cursor) == ')') {
+                if (       cursor == source.length()
+                        || source.charAt(cursor) == ')'
+                        || source.charAt(cursor) == ']'
+                        || source.charAt(cursor) == ','
+                ) {
                     return left;
                 }
                 Match<OperatorDefinition<?, ?, ?>> match = match(operators, OperatorDefinition::pattern);
@@ -165,8 +197,7 @@ public final class Compiler<C> {
                 int precedence = match.definitions().getFirst().precedence();
                 for (OperatorDefinition<?, ?, ?> definition : match.definitions()) {
                     if (definition.precedence() != precedence) {
-                        throw error("Operator overloads must agree on precedence",
-                                cursor, cursor + match.length(), null);
+                        throw error("Operator overloads must agree on precedence", cursor, cursor + match.length(), null);
                     }
                 }
                 if (precedence < minPrecedence) {
@@ -183,8 +214,15 @@ public final class Compiler<C> {
         private Node<C, ?> operand() {
             skipWhitespace();
             int start = cursor;
-            if (cursor == source.length() || source.charAt(cursor) == ')') {
+            if (       cursor == source.length()
+                    || source.charAt(cursor) == ')'
+                    || source.charAt(cursor) == ']'
+                    || source.charAt(cursor) == ','
+            ) {
                 throw error("Expected an operand", cursor, Math.min(cursor + 1, source.length()), null);
+            }
+            if (source.charAt(cursor) == '[') {
+                return vector();
             }
             if (source.charAt(cursor) == '(') {
                 cursor++;
@@ -219,6 +257,39 @@ public final class Compiler<C> {
             return bindOperand(match.definitions().getFirst(), start, cursor);
         }
 
+        private Node<C, ?> vector() {
+            int start = cursor++;
+            skipWhitespace();
+            if (cursor < source.length() && source.charAt(cursor) == ']') {
+                cursor++;
+                return bindVector(TypeToken.commonParent(List.of()), start, cursor, List.of());
+            }
+            List<Node<C, ?>> elements = new ArrayList<>();
+            while (true) {
+                elements.add(expression(Long.MIN_VALUE));
+                skipWhitespace();
+                if (cursor < source.length() && source.charAt(cursor) == ']') {
+                    cursor++;
+                    return bindVector(
+                            TypeToken.commonParent(elements.stream().map(Node::type).toList()),
+                            start,
+                            cursor,
+                            elements
+                    );
+                }
+                if (cursor == source.length() || source.charAt(cursor) != ',') {
+                    throw error("Expected ',' or ']' in list opened at " + start, cursor, Math.min(cursor + 1, source.length()), null);
+                }
+                cursor++;
+            }
+        }
+
+        private <T> Node<C, List<T>> bindVector(TypeToken<T> elementType, int start, int end,
+                List<Node<C, ?>> elements) {
+            List<Node<C, T>> typed = elements.stream().map(element -> Compiler.<C, T>castNode(element)).toList();
+            return new Node.Vector<>(elementType.listType(), start, end, typed);
+        }
+
         private Node<C, ?> bindOperand(OperandDefinition<C> definition, int start, int end) {
             try {
                 return definition.binder().bind(source, start, end);
@@ -227,12 +298,16 @@ public final class Compiler<C> {
             }
         }
 
-        private Node<C, ?> operation(Match<OperatorDefinition<?, ?, ?>> match, int start,
-                Node<C, ?> left, Node<C, ?> right) {
+        private Node<C, ?> operation(
+                Match<OperatorDefinition<?, ?, ?>> match,
+                int start,
+                Node<C, ?> left,
+                Node<C, ?> right
+        ) {
             List<OperatorDefinition<?, ?, ?>> compatible = new ArrayList<>();
             int end = start + match.length();
             for (OperatorDefinition<?, ?, ?> definition : match.definitions()) {
-                if (definition.aType().isAssignableFrom(left.type()) && definition.bType().isAssignableFrom(right.type())) {
+                if (specialize(left, definition.aType()) != null && specialize(right, definition.bType()) != null) {
                     compatible.add(definition);
                 }
             }
@@ -252,14 +327,14 @@ public final class Compiler<C> {
 
         private <A, B, R> Node<C, R> bindOperation(OperatorDefinition<A, B, R> definition,
                 Node<C, ?> left, Node<C, ?> right) {
-            Node<C, A> lhs = castNode(left);
-            Node<C, B> rhs = castNode(right);
+            Node<C, A> lhs = castNode(specialize(left, definition.aType()));
+            Node<C, B> rhs = castNode(specialize(right, definition.bType()));
             return new Node.Operation<>(definition.type(), left.start(), right.end(), lhs, rhs, definition.compute());
         }
 
         private Node<C, ?> transformation(Match<TransformationDefinition<?, ?>> match, int start, Node<C, ?> subject) {
             List<TransformationDefinition<?, ?>> compatible = match.definitions().stream()
-                    .filter(definition -> definition.inputType().isAssignableFrom(subject.type())).toList();
+                    .filter(definition -> specialize(subject, definition.inputType()) != null).toList();
             List<TransformationDefinition<?, ?>> best = compatible.stream().filter(candidate -> compatible.stream()
                     .noneMatch(other -> candidate.inputType().isAssignableFrom(other.inputType())
                             && !other.inputType().isAssignableFrom(candidate.inputType()))).toList();
@@ -273,7 +348,7 @@ public final class Compiler<C> {
         }
 
         private <A, R> Node<C, R> bindTransformation(TransformationDefinition<A, R> definition, int start, Node<C, ?> subject) {
-            Node<C, A> input = castNode(subject);
+            Node<C, A> input = castNode(specialize(subject, definition.inputType()));
             return new Node.Transformation<>(definition.type(), start, subject.end(), input, definition.compute());
         }
 
