@@ -121,7 +121,7 @@ class TaggedOperationTest {
                 .operation(new TaggedOperation())
                 .operation(new TaggedAnyOperation())
                 .operation(new TaggedAllOperation())
-                .literal(ID.class, Pattern.regex("@[a-z0-9._-]+:[a-z0-9/._-]+"), text -> ID.of(text.substring(1)))
+                .literal(new IdLiteral())
                 .runtime(Taggable.class, Pattern.keyword("candidate"), Context::candidate)
                 .runtime(new TypeToken<List<ID>>() {}, Pattern.keyword("selection"), Context::selection)
                 .runtime(new TypeToken<List<String>>() {}, Pattern.keyword("words"), _ -> List.of("caves"))

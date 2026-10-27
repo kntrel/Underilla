@@ -55,7 +55,7 @@ class MatchOperationTest {
                 .operation(new MatchOperation())
                 .operation(new IdentityMatchOperation())
                 .operation(new IdentifiableMatchOperation())
-                .literal(ID.class, Pattern.regex("@[a-z0-9._-]+:[a-z0-9/._-]+"), text -> ID.of(text.substring(1)))
+                .literal(new IdLiteral())
                 .runtime(Identifiable.class, Pattern.keyword("candidate"), context -> context)
                 .done());
         Identifiable candidate = () -> STONE;

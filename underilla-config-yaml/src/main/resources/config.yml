@@ -201,11 +201,11 @@ cleanup:
     # Replace the bottom block of unsupported columns to support sand/gravel.
     # Scope for each if: block, biome, world, and chunk, supplied from the target.
     support-blocks:
-      - if: block == @minecraft:sand
+      - if: block = @minecraft:sand
         with: minecraft:sandstone
-      - if: block == @minecraft:red_sand
+      - if: block = @minecraft:red_sand
         with: minecraft:red_sandstone
-      - if: block == @minecraft:gravel
+      - if: block = @minecraft:gravel
         with: minecraft:andesite
 
     # Applied after support-block corrections. Use minecraft:air to remove blocks.
@@ -223,11 +223,11 @@ cleanup:
     # Unmatched invalid blocks become air.
     # Scope for each if: block, biome, world, and chunk, supplied from the target.
     replace-blocks:
-      - if: block.id == @minecraft:grass_block
+      - if: block = @minecraft:grass_block
         with: minecraft:dirt
-      - if: block.id == @minecraft:podzol
+      - if: block = @minecraft:podzol
         with: minecraft:dirt
-      - if: block.id == @minecraft:dirt_path
+      - if: block = @minecraft:dirt_path
         with: minecraft:dirt
 
   entities:
