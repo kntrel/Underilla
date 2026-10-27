@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.kntrel.mc.underilla.config.dsl.CompilationException;
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
 import com.kntrel.mc.underilla.config.dsl.Compiler;
 import com.kntrel.mc.underilla.config.dsl.Grammar;
 import com.kntrel.mc.underilla.config.dsl.Pattern;
@@ -24,7 +24,7 @@ class TaggedOperationTest {
     private static final Taggable CANDIDATE = () -> Set.of(CAVES, COLD);
 
     @Test
-    void singleTagChecksMembership() {
+    void singleTagChecksMembership() throws Exception {
         var operation = new TaggedOperation();
         assertTrue(operation.apply(CANDIDATE, CAVES));
         assertFalse(operation.apply(CANDIDATE, WARM));
@@ -32,7 +32,7 @@ class TaggedOperationTest {
     }
 
     @Test
-    void anyTagChecksOverlapAndAnEmptySelectionMatchesNothing() {
+    void anyTagChecksOverlapAndAnEmptySelectionMatchesNothing() throws Exception {
         var operation = new TaggedAnyOperation();
         assertTrue(operation.apply(CANDIDATE, List.of(COLD, WARM)));
         assertFalse(operation.apply(CANDIDATE, List.of(WARM)));
@@ -41,7 +41,7 @@ class TaggedOperationTest {
     }
 
     @Test
-    void allTagsRequiresTheRhsToBeASubsetAndAnEmptySelectionMatches() {
+    void allTagsRequiresTheRhsToBeASubsetAndAnEmptySelectionMatches() throws Exception {
         var operation = new TaggedAllOperation();
         assertTrue(operation.apply(CANDIDATE, List.of(COLD)));
         assertTrue(operation.apply(CANDIDATE, Set.of(COLD, CAVES)));
@@ -52,7 +52,7 @@ class TaggedOperationTest {
     }
 
     @Test
-    void patternsRespectKeywordBoundariesAndPermitWhitespaceBetweenWords() {
+    void patternsRespectKeywordBoundariesAndPermitWhitespaceBetweenWords() throws Exception {
         var single = new TaggedOperation().pattern();
         var any = new TaggedAnyOperation().pattern();
         var all = new TaggedAllOperation().pattern();
@@ -73,7 +73,7 @@ class TaggedOperationTest {
     }
 
     @Test
-    void compilerSelectsSingleIdAndCollectionOverloadsAndHonorsBooleanPrecedence() {
+    void compilerSelectsSingleIdAndCollectionOverloadsAndHonorsBooleanPrecedence() throws Exception {
         var compiler = compiler();
         var context = new Context(CANDIDATE, List.of(CAVES, COLD));
         assertTrue(compiler.compile("candidate tagged @minecraft:caves", Boolean.class).apply(context));
@@ -90,7 +90,7 @@ class TaggedOperationTest {
     }
 
     @Test
-    void compilerAcceptsTagListsForAnyAllAndDefaultOverloads() {
+    void compilerAcceptsTagListsForAnyAllAndDefaultOverloads() throws Exception {
         var compiler = compiler();
         var context = new Context(CANDIDATE, List.of());
         assertTrue(compiler.compile("candidate tagged any [@minecraft:caves, @example:warm]",
@@ -102,18 +102,18 @@ class TaggedOperationTest {
         assertFalse(compiler.compile("candidate tagged any []", Boolean.class).apply(context));
         assertTrue(compiler.compile("candidate tagged all []", Boolean.class).apply(context));
         assertTrue(compiler.compile("candidate tagged []", Boolean.class).apply(context));
-        assertThrows(CompilationException.class, () -> compiler.compile(
+        assertThrows(DslCompilationException.class, () -> compiler.compile(
                 "candidate tagged any [@minecraft:caves, 'cold']", Boolean.class));
     }
 
     @Test
-    void compilerRejectsWrongOperandAndCollectionElementTypes() {
+    void compilerRejectsWrongOperandAndCollectionElementTypes() throws Exception {
         var compiler = compiler();
-        assertThrows(CompilationException.class, () -> compiler.compile("text tagged selection", Boolean.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("candidate tagged words", Boolean.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("candidate tagged any words", Boolean.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("candidate tagged all @minecraft:caves", Boolean.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("candidate tagged any @minecraft:caves", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("text tagged selection", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("candidate tagged words", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("candidate tagged any words", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("candidate tagged all @minecraft:caves", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("candidate tagged any @minecraft:caves", Boolean.class));
     }
 
     private static Compiler<Context> compiler() {

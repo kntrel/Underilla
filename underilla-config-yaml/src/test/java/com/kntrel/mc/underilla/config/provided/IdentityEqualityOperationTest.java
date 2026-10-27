@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.kntrel.mc.underilla.config.dsl.CompilationException;
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
 import com.kntrel.mc.underilla.config.dsl.Compiler;
 import com.kntrel.mc.underilla.config.dsl.Grammar;
 import com.kntrel.mc.underilla.config.dsl.Pattern;
@@ -17,7 +17,7 @@ class IdentityEqualityOperationTest {
     private static final ID DIRT = ID.of("minecraft:dirt");
 
     @Test
-    void comparesIdsAndNegatesInequality() {
+    void comparesIdsAndNegatesInequality() throws Exception {
         Identifiable candidate = () -> STONE;
         var equality = new IdentityEqualityOperation();
         var inequality = new IdentityEqualityOperation(true);
@@ -28,7 +28,7 @@ class IdentityEqualityOperationTest {
     }
 
     @Test
-    void compilerPrefersIdentityOverGenericEqualityAndUsesEqualityPrecedence() {
+    void compilerPrefersIdentityOverGenericEqualityAndUsesEqualityPrecedence() throws Exception {
         var compiler = compiler(true);
         Identifiable candidate = () -> STONE;
         assertTrue(compiler.compile("candidate = @minecraft:stone", Boolean.class).apply(candidate));
@@ -42,10 +42,10 @@ class IdentityEqualityOperationTest {
     }
 
     @Test
-    void operationRequiresIdentifiableOnTheLeftAndIdOnTheRight() {
+    void operationRequiresIdentifiableOnTheLeftAndIdOnTheRight() throws Exception {
         var compiler = compiler(false);
-        assertThrows(CompilationException.class, () -> compiler.compile("@minecraft:stone = candidate", Boolean.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("candidate != candidate", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("@minecraft:stone = candidate", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("candidate != candidate", Boolean.class));
     }
 
     private static Compiler<Identifiable> compiler(boolean standard) {

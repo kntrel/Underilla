@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.kntrel.mc.underilla.config.context.BlockContext;
 import com.kntrel.mc.underilla.config.context.DualBlockContext;
-import com.kntrel.mc.underilla.config.dsl.CompilationException;
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
 import com.kntrel.mc.underilla.config.dsl.Compiler;
 import com.kntrel.mc.underilla.config.dsl.Grammar;
 import com.kntrel.mc.underilla.config.dsl.Pattern;
@@ -55,7 +55,7 @@ class ContextRuntimeValueTest {
     }
 
     @Test
-    void patternMatchesTheWholeChainAndStopsBeforeAnOperatorOrTrailingWhitespace() {
+    void patternMatchesTheWholeChainAndStopsBeforeAnOperatorOrTrailingWhitespace() throws Exception {
         var value = new ContextRuntimeValue<>(DualBlockContext.class, REGISTRY);
         for (String path : List.of("source", "source.block.x", "source . block . x", "source\n.\tblock . x")) {
             assertEquals(path.length(), value.pattern().match(Slice.of(path)));
@@ -69,7 +69,7 @@ class ContextRuntimeValueTest {
     }
 
     @Test
-    void bindingFindsTheTerminalTypeWithoutEvaluatingTheContext() {
+    void bindingFindsTheTerminalTypeWithoutEvaluatingTheContext() throws Exception {
         var value = new ContextRuntimeValue<>(BlockContext.class, REGISTRY);
         assertEquals(TypeToken.of(Block.class), value.bind("block").type());
         assertEquals(TypeToken.of(int.class), value.bind("block.x").type());
@@ -82,36 +82,36 @@ class ContextRuntimeValueTest {
     }
 
     @Test
-    void compiledGettersUseTheContextSuppliedForEachEvaluation() {
+    void compiledGettersUseTheContextSuppliedForEachEvaluation() throws Exception {
         var compiler = compiler(BlockContext.class, REGISTRY);
         var predicate = compiler.compile("block.x+1 >= 4 and block.solid", Boolean.class);
         assertTrue(predicate.apply(context(3, true)));
         assertFalse(predicate.apply(context(2, true)));
         assertFalse(predicate.apply(context(3, false)));
         assertEquals(42L, compiler.compile("world.seed+1", Long.class).apply(context(0, true)));
-        assertThrows(CompilationException.class, () -> compiler.compile("block.x", String.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("block.x", String.class));
     }
 
     @Test
-    void chainsCombineWithPrefixAndBinaryOperationsAndWhitespace() {
+    void chainsCombineWithPrefixAndBinaryOperationsAndWhitespace() throws Exception {
         var compiler = compiler(BlockContext.class, REGISTRY);
         assertTrue(compiler.compile("not block.air and block.x == -1", Boolean.class).apply(context(-1, true)));
         assertEquals(15, compiler.compile("(block.localX)", Integer.class).apply(context(-1, true)));
         assertEquals(20, compiler.compile("block\n . \n y", Integer.class).apply(context(0, true)));
-        assertThrows(CompilationException.class, () -> compiler.compile("(block).x", Integer.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("(block).x", Integer.class));
     }
 
     @Test
-    void eachSegmentUsesTheDeclaredTypeReturnedByThePreviousProperty() {
+    void eachSegmentUsesTheDeclaredTypeReturnedByThePreviousProperty() throws Exception {
         var compiler = compiler(DualBlockContext.class, REGISTRY);
         var expression = compiler.compile("source.block.x < target.block.x and source.world.seed == 41", Boolean.class);
         assertTrue(expression.apply(DualBlockContext.of(context(-1, true), context(1, true))));
         assertFalse(expression.apply(DualBlockContext.of(context(2, true), context(1, true))));
-        assertThrows(CompilationException.class, () -> compiler.compile("source.world.x", Integer.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("source.world.x", Integer.class));
     }
 
     @Test
-    void gettersRunOnlyAtEvaluationAndInvalidChainsRetainTheirSourceSpan() {
+    void gettersRunOnlyAtEvaluationAndInvalidChainsRetainTheirSourceSpan() throws Exception {
         var calls = new AtomicInteger();
         var definitions = new ArrayList<Property<?, ?>>(Properties.of(Block.class));
         definitions.add(Property.from("block", BlockContext.class, Block.class, context -> {
@@ -123,17 +123,17 @@ class ContextRuntimeValueTest {
         assertEquals(0, calls.get());
         assertEquals(3, expression.apply(context(3, true)));
         assertEquals(1, calls.get());
-        var failure = assertThrows(CompilationException.class, () -> compiler.compile("block.unknown", Integer.class));
+        var failure = assertThrows(DslCompilationException.class, () -> compiler.compile("block.unknown", Integer.class));
         assertEquals(0, failure.start());
         assertEquals(13, failure.end());
         assertNotNull(failure.getCause());
     }
 
     @Test
-    void rejectsMalformedPathsAndDoesNotInventAliases() {
+    void rejectsMalformedPathsAndDoesNotInventAliases() throws Exception {
         var compiler = compiler(BlockContext.class, REGISTRY);
         for (String invalid : List.of("source.block.x", "block.x.y", "block.", "block..x", "block.1x", "block. \n")) {
-            assertThrows(CompilationException.class, () -> compiler.compile(invalid, Integer.class), invalid);
+            assertThrows(DslCompilationException.class, () -> compiler.compile(invalid, Integer.class), invalid);
         }
         var value = new ContextRuntimeValue<>(BlockContext.class, REGISTRY);
         assertThrows(IllegalArgumentException.class, () -> value.bind("block.x trailing"));
@@ -154,14 +154,14 @@ class ContextRuntimeValueTest {
     }
 
     @Test
-    void contextDefinitionsUseTheNormalRuntimeValueRegistrationAndRebinding() {
+    void contextDefinitionsUseTheNormalRuntimeValueRegistrationAndRebinding() throws Exception {
         Grammar<BlockContext> grammar = Grammar.with(BlockContext.class).standard()
                 .runtime(new ContextRuntimeValue<>(BlockContext.class, REGISTRY)).done();
         var rebound = grammar.withRuntimeValues(List.of(RuntimeValue.of(Integer.class,
                 Pattern.literal("number"), (Integer number) -> number)));
         assertEquals(4, Compiler.of(rebound).compile("number+1", Integer.class).apply(3));
-        assertThrows(CompilationException.class, () -> Compiler.of(rebound).compile("block.x", Integer.class));
-        assertThrows(CompilationException.class, () -> Compiler.of(grammar.withoutRuntimeValues()).compile("block.x", Integer.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(rebound).compile("block.x", Integer.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(grammar.withoutRuntimeValues()).compile("block.x", Integer.class));
         assertThrows(UnsupportedOperationException.class, () -> grammar.runtimeValues().clear());
         assertEquals(1, grammar.runtimeValues().size());
     }

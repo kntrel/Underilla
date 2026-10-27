@@ -1,5 +1,7 @@
 package com.kntrel.mc.underilla.config.dsl;
 
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -21,7 +23,7 @@ class GrammarTest {
             Integer.class, Integer.class, Integer.class, Pattern.literal("+"), Integer::sum);
 
     @Test
-    void reusesLanguageDefinitionsAndReplacesRuntimeValuesAcrossContextTypes() {
+    void reusesLanguageDefinitionsAndReplacesRuntimeValuesAcrossContextTypes() throws Exception {
         RuntimeValue<String> length = RuntimeValue.of(Integer.class, Pattern.literal("x"), String::length);
         RuntimeValue<String> originalOnly = RuntimeValue.of(String.class, Pattern.literal("original"), text -> text);
         Grammar<String> original = new Grammar<>(List.of(ONE), List.of(ADD), List.of(length, originalOnly));
@@ -37,11 +39,11 @@ class GrammarTest {
         assertEquals(List.of(length, originalOnly), original.runtimeValues());
         assertEquals(4, Compiler.of(original).compile("x+1", Integer.class).apply("abc"));
         assertEquals(8, Compiler.of(copy).compile("x+1", Integer.class).apply(7));
-        assertThrows(CompilationException.class, () -> Compiler.of(copy).compile("original", String.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(copy).compile("original", String.class));
     }
 
     @Test
-    void createsContextlessGrammarWithoutCarryingOverRuntimeValues() {
+    void createsContextlessGrammarWithoutCarryingOverRuntimeValues() throws Exception {
         Grammar<String> original = new Grammar<>(List.of(ONE), List.of(ADD),
                 List.of(RuntimeValue.of(Integer.class, Pattern.literal("x"), String::length)));
 
@@ -49,12 +51,12 @@ class GrammarTest {
 
         assertTrue(contextless.runtimeValues().isEmpty());
         assertEquals(2, Compiler.of(contextless).compile("1+1", Integer.class).apply(null));
-        assertThrows(CompilationException.class, () -> Compiler.of(contextless).compile("x", Integer.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(contextless).compile("x", Integer.class));
         assertEquals(1, original.runtimeValues().size());
     }
 
     @Test
-    void snapshotsCollectionsInIterationOrderAndExposesImmutableLists() {
+    void snapshotsCollectionsInIterationOrderAndExposesImmutableLists() throws Exception {
         TypeLiteral<Integer> two = TypeLiteral.of(Integer.class, Pattern.literal("2"), Integer::valueOf);
         Set<TypeLiteral<Integer>> literals = new LinkedHashSet<>(List.of(ONE, two));
         Set<Operation<Integer, Integer, Integer>> operations = new LinkedHashSet<>(List.of(ADD));
@@ -75,7 +77,7 @@ class GrammarTest {
     }
 
     @Test
-    void rejectsNullCollectionsAndDefinitionsWhenConstructingOrRebinding() {
+    void rejectsNullCollectionsAndDefinitionsWhenConstructingOrRebinding() throws Exception {
         Grammar<Void> grammar = new Grammar<>(List.of(ONE), List.of(ADD));
         assertThrows(NullPointerException.class, () -> new Grammar<>(null, List.of(), List.of()));
         assertThrows(NullPointerException.class, () -> new Grammar<>(List.of(), null, List.of()));

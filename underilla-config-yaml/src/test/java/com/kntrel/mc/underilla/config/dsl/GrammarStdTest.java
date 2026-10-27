@@ -1,5 +1,7 @@
 package com.kntrel.mc.underilla.config.dsl;
 
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,7 +15,7 @@ class GrammarStdTest {
     private final Compiler<Void> compiler = Compiler.of(Grammar.with(Void.class).standard().done());
 
     @Test
-    void parsesNumericLiteralsAndPromotesArithmeticWithDeclaredResultTypes() {
+    void parsesNumericLiteralsAndPromotesArithmeticWithDeclaredResultTypes() throws Exception {
         assertEquals(7, compiler.compile("1+2*3", Integer.class).apply(null));
         assertEquals(5, compiler.compile("10-3-2", Integer.class).apply(null));
         assertEquals(-3, compiler.compile("-5+2", Integer.class).apply(null));
@@ -28,26 +30,26 @@ class GrammarStdTest {
         assertEquals(2L, compiler.compile("5L/2", Long.class).apply(null));
         assertEquals(2.5, compiler.compile("5/2.0", Double.class).apply(null));
         assertEquals(1, compiler.compile("5%2", Integer.class).apply(null));
-        assertThrows(CompilationException.class, () -> compiler.compile("1+2L", Integer.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("2147483648", Integer.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("1+2L", Integer.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("2147483648", Integer.class));
         assertEquals(2147483648L, compiler.compile("2147483648L", Long.class).apply(null));
         var divideByZero = compiler.compile("1/0", Integer.class);
         assertThrows(ArithmeticException.class, () -> divideByZero.apply(null));
     }
 
     @Test
-    void arithmeticOnStaticallyBroaderNumberInputsHasADoubleResult() {
+    void arithmeticOnStaticallyBroaderNumberInputsHasADoubleResult() throws Exception {
         Grammar<Number> grammar = Grammar.with(Number.class).standard()
                 .runtime(RuntimeValue.of(Number.class, Pattern.literal("x"), value -> value)).done();
         var expression = Compiler.of(grammar).compile("x+1", Double.class);
 
         assertEquals(6.0, expression.apply(5));
         assertEquals(6.5, expression.apply(5.5));
-        assertThrows(CompilationException.class, () -> Compiler.of(grammar).compile("x+1", Integer.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(grammar).compile("x+1", Integer.class));
     }
 
     @Test
-    void registersEveryConcreteArithmeticPairWithTheCorrectResultClass() {
+    void registersEveryConcreteArithmeticPairWithTheCorrectResultClass() throws Exception {
         String[] values = {"6b", "6s", "6", "6L", "6f", "6.0"};
         String[] rightValues = {"2b", "2s", "2", "2L", "2f", "2.0"};
         String[] operators = {"+", "-", "*", "/", "%"};
@@ -65,7 +67,7 @@ class GrammarStdTest {
     }
 
     @Test
-    void parsesExplicitNumericTypesAndValidatesNarrowLiteralRanges() {
+    void parsesExplicitNumericTypesAndValidatesNarrowLiteralRanges() throws Exception {
         assertEquals(Byte.valueOf((byte) 127), compiler.compile("127b", Byte.class).apply(null));
         assertEquals(Byte.valueOf((byte) -128), compiler.compile("-128B", byte.class).apply(null));
         assertEquals(Short.valueOf((short) 32767), compiler.compile("32767s", Short.class).apply(null));
@@ -76,19 +78,19 @@ class GrammarStdTest {
         assertEquals(.5f, compiler.compile(".5f", Float.class).apply(null));
         assertEquals(2.0, compiler.compile("2D", Double.class).apply(null));
         assertEquals(1.5, compiler.compile("1.5d", Double.class).apply(null));
-        assertThrows(CompilationException.class, () -> compiler.compile("128b", Byte.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("-129b", Byte.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("32768s", Short.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("-32769s", Short.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("128b", Byte.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("-129b", Byte.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("32768s", Short.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("-32769s", Short.class));
     }
 
     @Test
-    void promotesSmallIntegersAndUsesFloatPrecisionForFloatResults() {
+    void promotesSmallIntegersAndUsesFloatPrecisionForFloatResults() throws Exception {
         assertEquals(128, compiler.compile("127b+1b", Integer.class).apply(null));
         assertEquals(32768, compiler.compile("32767s+1s", Integer.class).apply(null));
         assertEquals(2, compiler.compile("5s/2b", Integer.class).apply(null));
-        assertThrows(CompilationException.class, () -> compiler.compile("1b+2b", Byte.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("1s+2s", Short.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("1b+2b", Byte.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("1s+2s", Short.class));
         assertEquals(2.5f, compiler.compile("5f/2", Float.class).apply(null));
         assertEquals(1.5f, compiler.compile("5.5f%2s", Float.class).apply(null));
         assertEquals(16777216f, compiler.compile("16777216f+1", Float.class).apply(null));
@@ -100,7 +102,7 @@ class GrammarStdTest {
     }
 
     @Test
-    void acceptsPrimitiveByteShortAndFloatRuntimeValues() {
+    void acceptsPrimitiveByteShortAndFloatRuntimeValues() throws Exception {
         Grammar<SmallNumbers> grammar = Grammar.with(SmallNumbers.class).standard()
                 .runtime(RuntimeValue.of(byte.class, Pattern.keyword("b"), SmallNumbers::b))
                 .runtime(RuntimeValue.of(short.class, Pattern.keyword("s"), SmallNumbers::s))
@@ -116,7 +118,7 @@ class GrammarStdTest {
     }
 
     @Test
-    void comparesNumbersWithoutLosingIntegralPrecisionAndSupportsEquality() {
+    void comparesNumbersWithoutLosingIntegralPrecisionAndSupportsEquality() throws Exception {
         assertTrue(compiler.compile("9007199254740993L > 9007199254740992L", Boolean.class).apply(null));
         assertFalse(compiler.compile("9007199254740993L == 9007199254740992L", Boolean.class).apply(null));
         assertTrue(compiler.compile("1 == 1.0", Boolean.class).apply(null));
@@ -128,7 +130,7 @@ class GrammarStdTest {
     }
 
     @Test
-    void numericComparisonCallbacksPreserveNaNAndInfinitySemantics() {
+    void numericComparisonCallbacksPreserveNaNAndInfinitySemantics() throws Exception {
         Grammar<Double> grammar = Grammar.with(Double.class).standard()
                 .runtime(RuntimeValue.of(Double.class, Pattern.literal("x"), value -> value)).done();
         Compiler<Double> numeric = Compiler.of(grammar);
@@ -144,7 +146,7 @@ class GrammarStdTest {
     }
 
     @Test
-    void providesBooleanNegationWithPrefixBindingAndParenthesizedSubjects() {
+    void providesBooleanNegationWithPrefixBindingAndParenthesizedSubjects() throws Exception {
         assertFalse(compiler.compile("!true", Boolean.class).apply(null));
         assertTrue(compiler.compile("not false", Boolean.class).apply(null));
         assertTrue(compiler.compile("!!true", Boolean.class).apply(null));
@@ -154,26 +156,26 @@ class GrammarStdTest {
         assertFalse(compiler.compile("not true and false", Boolean.class).apply(null));
         assertTrue(compiler.compile("not(true and false)", Boolean.class).apply(null));
         assertTrue(compiler.compile("true || false && false", Boolean.class).apply(null));
-        assertThrows(CompilationException.class, () -> compiler.compile("not 1", Boolean.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("!", Boolean.class));
-        CompilationException failure = assertThrows(CompilationException.class,
+        assertThrows(DslCompilationException.class, () -> compiler.compile("not 1", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("!", Boolean.class));
+        DslCompilationException failure = assertThrows(DslCompilationException.class,
                 () -> compiler.compile("  not(false)  ", Integer.class));
         assertEquals(2, failure.start());
         assertEquals(12, failure.end());
     }
 
     @Test
-    void decodesQuotedStringsEscapesAndConcatenation() {
+    void decodesQuotedStringsEscapesAndConcatenation() throws Exception {
         assertEquals("minecraft:caves with spaces", compiler.compile("\"minecraft:caves with spaces\"", String.class).apply(null));
         assertEquals("a\nb\t\"\\", compiler.compile("\"a\\nb\\t\\\"\\\\\"", String.class).apply(null));
         assertEquals("a", compiler.compile("\"\\u0061\"", String.class).apply(null));
         assertEquals("it's fine", compiler.compile("'it\\'s fine'", String.class).apply(null));
         assertEquals("ab", compiler.compile("'a' + \"b\"", String.class).apply(null));
-        assertThrows(CompilationException.class, () -> compiler.compile("'\\q'", String.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("'\\u12'", String.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("'\\u+061'", String.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("'unterminated", String.class));
-        assertThrows(CompilationException.class, () -> compiler.compile("trueish", Boolean.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("'\\q'", String.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("'\\u12'", String.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("'\\u+061'", String.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("'unterminated", String.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("trueish", Boolean.class));
     }
 
     private record SmallNumbers(byte b, short s, float f) {}

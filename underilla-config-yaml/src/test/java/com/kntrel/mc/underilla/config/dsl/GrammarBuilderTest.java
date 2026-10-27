@@ -1,5 +1,7 @@
 package com.kntrel.mc.underilla.config.dsl;
 
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -16,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class GrammarBuilderTest {
 
     @Test
-    void buildsAndCompilesCustomDefinitionsAlongsideStandardOnes() {
+    void buildsAndCompilesCustomDefinitionsAlongsideStandardOnes() throws Exception {
         AtomicInteger negations = new AtomicInteger();
         Grammar<Context> grammar = Grammar.with(Context.class)
                 .operation(Boolean.class, Boolean.class, Boolean.class,
@@ -43,7 +45,7 @@ class GrammarBuilderTest {
     }
 
     @Test
-    void acceptsParameterizedContextTokens() {
+    void acceptsParameterizedContextTokens() throws Exception {
         TypeToken<Integer> integer = TypeToken.of(Integer.class);
         TypeToken<Boolean> bool = TypeToken.of(Boolean.class);
         Grammar<Map<String, Integer>> grammar = Grammar.with(new TypeToken<Map<String, Integer>>() {})
@@ -63,7 +65,7 @@ class GrammarBuilderTest {
     }
 
     @Test
-    void repeatedStandardCallsAreIdempotentAndDoneCreatesIndependentSnapshots() {
+    void repeatedStandardCallsAreIdempotentAndDoneCreatesIndependentSnapshots() throws Exception {
         Grammar.Builder<Void> builder = Grammar.with(Void.class).standard();
         Grammar<Void> first = builder.done();
         TypeLiteral<Integer> extra = TypeLiteral.of(Integer.class, Pattern.keyword("one"), text -> 1);
@@ -73,14 +75,14 @@ class GrammarBuilderTest {
         assertEquals(first.transformations(), second.transformations());
         assertEquals(first.literals().size() + 1, second.literals().size());
         assertEquals(3, Compiler.of(first).compile("1+2", Integer.class).apply(null));
-        assertThrows(CompilationException.class, () -> Compiler.of(first).compile("one", Integer.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(first).compile("one", Integer.class));
         assertEquals(2, Compiler.of(second).compile("one+1", Integer.class).apply(null));
         assertThrows(UnsupportedOperationException.class, () -> second.transformations().clear());
-        assertThrows(CompilationException.class, () -> Compiler.of(Grammar.with(Void.class).done()).compile("1", Integer.class));
+        assertThrows(DslCompilationException.class, () -> Compiler.of(Grammar.with(Void.class).done()).compile("1", Integer.class));
     }
 
     @Test
-    void rebindingPreservesTransformationsAndLeavesOriginalRuntimeValuesIntact() {
+    void rebindingPreservesTransformationsAndLeavesOriginalRuntimeValuesIntact() throws Exception {
         Grammar<Context> original = Grammar.with(Context.class).standard()
                 .runtime(RuntimeValue.of(Boolean.class, Pattern.literal("active"), Context::active)).done();
         RuntimeValue<Integer> positive = RuntimeValue.of(Boolean.class, Pattern.literal("active"), value -> value > 0);
@@ -95,7 +97,7 @@ class GrammarBuilderTest {
     }
 
     @Test
-    void rejectsNullBuilderInputsAtRegistration() {
+    void rejectsNullBuilderInputsAtRegistration() throws Exception {
         assertThrows(NullPointerException.class, () -> Grammar.with((Class<Void>) null));
         assertThrows(NullPointerException.class, () -> Grammar.with((TypeToken<Void>) null));
         Grammar.Builder<Void> builder = Grammar.with(Void.class);

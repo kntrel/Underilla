@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.config.yaml;
 
 import com.kntrel.mc.underilla.config.dsl.Compiler;
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
 import com.kntrel.mc.underilla.config.model.HorizontalBound;
 import com.kntrel.mc.underilla.config.model.ReplacementRule;
 import com.kntrel.mc.underilla.config.model.Selector;
@@ -328,7 +329,7 @@ public final class YamlConfigLoader {
         if (compiler == null) throw new ConfigMappingException(path, "No DSL compiler registered for " + context.getTypeName());
         try {
             return Selector.compile(compiler, expression);
-        } catch (IllegalArgumentException exception) {
+        } catch (DslCompilationException exception) {
             throw new ConfigMappingException(path, "Invalid selector: " + exception.getMessage(), exception);
         }
     }

@@ -1,6 +1,7 @@
 package com.kntrel.mc.underilla.config.model;
 
 import com.kntrel.mc.underilla.config.dsl.Compiler;
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
@@ -21,7 +22,7 @@ public interface Selector<C> extends Predicate<C> {
     static <C> Selector<C> none() { return of(false); }
 
     /** Compiles immediately; the selector retains only the executable expression. */
-    static <C> Selector<C> compile(Compiler<C> compiler, String expression) {
+    static <C> Selector<C> compile(Compiler<C> compiler, String expression) throws DslCompilationException {
         var compiled = Objects.requireNonNull(compiler, "compiler").compile(expression, Boolean.class);
         return compiled::apply;
     }

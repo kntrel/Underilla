@@ -1,5 +1,7 @@
 package com.kntrel.mc.underilla.config.dsl;
 
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -13,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 class RuntimeValueTest {
     @Test
-    void classFactoryReadsTheContextSuppliedForEachEvaluation() {
+    void classFactoryReadsTheContextSuppliedForEachEvaluation() throws Exception {
         Pattern pattern = Pattern.literal("x");
         RuntimeValue<Context> value = RuntimeValue.of(Integer.class, pattern, Context::x);
         var bound = value.bind("x");
@@ -24,7 +26,7 @@ class RuntimeValueTest {
     }
 
     @Test
-    void typeTokenFactoryRetainsParameterizedResultMetadata() {
+    void typeTokenFactoryRetainsParameterizedResultMetadata() throws Exception {
         TypeToken<Set<String>> type = new TypeToken<>() {};
         RuntimeValue<Context> value = RuntimeValue.of(type, Pattern.literal("tags"), Context::tags);
         Set<String> tags = Set.of("minecraft:caves");
@@ -34,7 +36,7 @@ class RuntimeValueTest {
     }
 
     @Test
-    void constructionMatchingAndBindingDoNotComputeAndEvaluationDoesNotRematch() {
+    void constructionMatchingAndBindingDoNotComputeAndEvaluationDoesNotRematch() throws Exception {
         AtomicInteger matches = new AtomicInteger();
         AtomicInteger computations = new AtomicInteger();
         Pattern pattern = source -> { matches.incrementAndGet(); return 1; };
@@ -53,7 +55,7 @@ class RuntimeValueTest {
     }
 
     @Test
-    void oneDefinitionCanBindDifferentResultTypesDuringCompilation() {
+    void oneDefinitionCanBindDifferentResultTypesDuringCompilation() throws Exception {
         RuntimeValue<Context> value = new RuntimeValue<>() {
             @Override public Pattern pattern() { return Pattern.regex("number|flag"); }
             @Override public Bound<Context, ?> bind(String matched) {
@@ -69,11 +71,11 @@ class RuntimeValueTest {
         var predicate = compiler.compile("flag and number > 1", Boolean.class);
         assertTrue(predicate.apply(new Context(2, Set.of())));
         assertFalse(predicate.apply(new Context(-1, Set.of())));
-        assertThrows(CompilationException.class, () -> compiler.compile("flag+1", Integer.class));
+        assertThrows(DslCompilationException.class, () -> compiler.compile("flag+1", Integer.class));
     }
 
     @Test
-    void contextlessDefinitionsCanIgnoreNullContexts() {
+    void contextlessDefinitionsCanIgnoreNullContexts() throws Exception {
         AtomicInteger current = new AtomicInteger(1);
         RuntimeValue<Void> value = RuntimeValue.of(Integer.class, Pattern.literal("current"), _ -> current.get());
         var bound = value.bind("current");
@@ -83,7 +85,7 @@ class RuntimeValueTest {
     }
 
     @Test
-    void computationFailuresPropagateWithoutWrapping() {
+    void computationFailuresPropagateWithoutWrapping() throws Exception {
         var failure = new IllegalArgumentException("missing current block");
         RuntimeValue<Context> value = RuntimeValue.of(Integer.class, Pattern.literal("x"), _ -> { throw failure; });
         var bound = value.bind("x");
@@ -91,7 +93,7 @@ class RuntimeValueTest {
     }
 
     @Test
-    void rejectsNullDefinitionAndBindingComponents() {
+    void rejectsNullDefinitionAndBindingComponents() throws Exception {
         assertThrows(NullPointerException.class, () -> RuntimeValue.of((Class<Integer>) null, Pattern.literal("x"), x -> 1));
         assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, null, x -> 1));
         assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, Pattern.literal("x"), null));

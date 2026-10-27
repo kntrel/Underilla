@@ -1,5 +1,16 @@
 package com.kntrel.mc.underilla.config.dsl;
 
+import com.kntrel.mc.underilla.config.dsl.exception.AmbiguousOperandException;
+import com.kntrel.mc.underilla.config.dsl.exception.AmbiguousOperatorException;
+import com.kntrel.mc.underilla.config.dsl.exception.AmbiguousTransformationException;
+import com.kntrel.mc.underilla.config.dsl.exception.DslCompilationException;
+import com.kntrel.mc.underilla.config.dsl.exception.IncompatibleTypesException;
+import com.kntrel.mc.underilla.config.dsl.exception.InvalidGrammarException;
+import com.kntrel.mc.underilla.config.dsl.exception.OperandBindingException;
+import com.kntrel.mc.underilla.config.dsl.exception.PatternEvaluationException;
+import com.kntrel.mc.underilla.config.dsl.exception.UnexpectedTokenException;
+import com.kntrel.mc.underilla.config.dsl.exception.UnresolvedOperandException;
+
 import com.kntrel.mc.underilla.config.util.TypeToken;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,41 +72,46 @@ public final class Compiler<C> {
         return new Compiler<>(grammar);
     }
 
-    /** Compiles the entire source and verifies its declared result type before returning. */
-    public <T> Function<C, T> compile(String source, TypeToken<T> expectedType) {
+    /**
+     * Compiles the entire source and verifies its declared result type before returning.
+     * @throws DslCompilationException if parsing, binding, or type resolution fails
+     * @throws InvalidGrammarException if a registered definition violates its contract
+     */
+    public <T> Function<C, T> compile(String source, TypeToken<T> expectedType) throws DslCompilationException {
         Objects.requireNonNull(source, "source");
         Objects.requireNonNull(expectedType, "expectedType");
         Session session = new Session(source);
         Node<C, ?> root = session.expression(Long.MIN_VALUE);
         session.skipWhitespace();
         if (session.cursor != source.length()) {
-            throw session.error("Unexpected input; expected an operator or end of expression",
-                    session.cursor, session.cursor + 1, null);
+            throw new UnexpectedTokenException(source, session.cursor, session.cursor + 1, List.of("operator", "end of expression"), null);
         }
         Node<C, ?> resolved = specialize(root, expectedType);
         if (resolved == null) {
-            throw session.error("Expected result type " + expectedType + " but found " + root.type(),
-                    root.start(), root.end(), null);
+            throw new IncompatibleTypesException(source, root.start(), root.end(), List.of(root.type()),
+                    List.of(List.of(expectedType)), List.of());
         }
         Node<C, T> node = castNode(resolved);
         return node::evaluate;
     }
 
-    public <T> Function<C, T> compile(String source, Class<T> expectedType) {
+    public <T> Function<C, T> compile(String source, Class<T> expectedType) throws DslCompilationException {
         return compile(source, TypeToken.of(expectedType));
     }
 
     private <T> OperandDefinition<C> literalDefinition(TypeLiteral<T> literal) {
         TypeToken<T> type = Objects.requireNonNull(literal.type(), "literal.type");
+        Pattern pattern = Objects.requireNonNull(literal.pattern(), "literal.pattern");
         return new OperandDefinition<>(
-                Objects.requireNonNull(literal.pattern(), "literal.pattern"),
-                type.toString(), (source, start, end) -> new Node.Literal<>(type, start, end, literal.parse(source.substring(start, end))));
+                pattern, new DefinitionSignature(DefinitionSignature.Kind.LITERAL, pattern, List.of(), type),
+                (source, start, end) -> new Node.Literal<>(type, start, end, literal.parse(source.substring(start, end))));
     }
 
     private OperandDefinition<C> runtimeDefinition(RuntimeValue<C> value) {
+        Pattern pattern = Objects.requireNonNull(value.pattern(), "runtimeValue.pattern");
         return new OperandDefinition<>(
-                Objects.requireNonNull(value.pattern(), "runtimeValue.pattern"),
-                "runtime value", (source, start, end) -> boundRuntime(
+                pattern, new DefinitionSignature(DefinitionSignature.Kind.RUNTIME_VALUE, pattern, List.of(), null),
+                (source, start, end) -> boundRuntime(
                         Objects.requireNonNull(value.bind(source.substring(start, end)), "runtimeValue.bound"), start, end));
     }
 
@@ -158,7 +174,7 @@ public final class Compiler<C> {
         Node<C, ?> bind(String source, int start, int end);
     }
 
-    private record OperandDefinition<C>(Pattern pattern, String description, OperandBinder<C> binder) {}
+    private record OperandDefinition<C>(Pattern pattern, DefinitionSignature signature, OperandBinder<C> binder) {}
 
 
     private record OperatorDefinition<A, B, R>(
@@ -167,6 +183,23 @@ public final class Compiler<C> {
 
     private record TransformationDefinition<A, R>(
             Pattern pattern, TypeToken<A> inputType, TypeToken<R> type, Function<A, R> compute) {}
+
+    private static DefinitionSignature signature(Object definition) {
+        if (definition instanceof OperandDefinition<?> operand) return operand.signature();
+        if (definition instanceof OperatorDefinition<?, ?, ?> operator) {
+            return new DefinitionSignature(DefinitionSignature.Kind.OPERATOR, operator.pattern(),
+                    List.of(operator.aType(), operator.bType()), operator.type());
+        }
+        if (definition instanceof TransformationDefinition<?, ?> transformation) {
+            return new DefinitionSignature(DefinitionSignature.Kind.TRANSFORMATION, transformation.pattern(),
+                    List.of(transformation.inputType()), transformation.type());
+        }
+        throw new IllegalArgumentException("Unknown definition kind");
+    }
+
+    private static List<DefinitionSignature> signatures(List<?> definitions) {
+        return definitions.stream().map(Compiler::signature).toList();
+    }
 
     private record Match<D>(int length, List<D> definitions) {}
 
@@ -179,7 +212,7 @@ public final class Compiler<C> {
             this.source = source;
         }
 
-        private Node<C, ?> expression(long minPrecedence) {
+        private Node<C, ?> expression(long minPrecedence) throws DslCompilationException {
             Node<C, ?> left = operand();
             while (true) {
                 skipWhitespace();
@@ -197,7 +230,8 @@ public final class Compiler<C> {
                 int precedence = match.definitions().getFirst().precedence();
                 for (OperatorDefinition<?, ?, ?> definition : match.definitions()) {
                     if (definition.precedence() != precedence) {
-                        throw error("Operator overloads must agree on precedence", cursor, cursor + match.length(), null);
+                        throw new InvalidGrammarException("Operator overloads must agree on precedence", source,
+                                cursor, cursor + match.length(), signatures(match.definitions()));
                     }
                 }
                 if (precedence < minPrecedence) {
@@ -211,7 +245,7 @@ public final class Compiler<C> {
             }
         }
 
-        private Node<C, ?> operand() {
+        private Node<C, ?> operand() throws DslCompilationException {
             skipWhitespace();
             int start = cursor;
             if (       cursor == source.length()
@@ -219,7 +253,8 @@ public final class Compiler<C> {
                     || source.charAt(cursor) == ']'
                     || source.charAt(cursor) == ','
             ) {
-                throw error("Expected an operand", cursor, Math.min(cursor + 1, source.length()), null);
+                throw new UnexpectedTokenException(source, cursor, Math.min(cursor + 1, source.length()),
+                        List.of("operand"), null);
             }
             if (source.charAt(cursor) == '[') {
                 return vector();
@@ -229,8 +264,8 @@ public final class Compiler<C> {
                 Node<C, ?> nested = expression(Long.MIN_VALUE);
                 skipWhitespace();
                 if (cursor == source.length() || source.charAt(cursor) != ')') {
-                    throw error("Expected ')' to close '(' at " + start,
-                            cursor, Math.min(cursor + 1, source.length()), null);
+                    throw new UnexpectedTokenException(source, cursor, Math.min(cursor + 1, source.length()),
+                            List.of(")"), start);
                 }
                 cursor++;
                 return nested.withSpan(start, cursor);
@@ -239,7 +274,9 @@ public final class Compiler<C> {
             Match<TransformationDefinition<?, ?>> prefix = match(transformations, TransformationDefinition::pattern);
             if (prefix != null) {
                 if (match != null && prefix.length() == match.length()) {
-                    throw error("Ambiguous operand: a value and a transformation match", start, start + match.length(), null);
+                    List<DefinitionSignature> candidates = new ArrayList<>(signatures(match.definitions()));
+                    candidates.addAll(signatures(prefix.definitions()));
+                    throw new AmbiguousOperandException(source, start, start + match.length(), candidates);
                 }
                 if (match == null || prefix.length() > match.length()) {
                     cursor += prefix.length();
@@ -247,17 +284,16 @@ public final class Compiler<C> {
                 }
             }
             if (match == null) {
-                throw error("Unrecognized operand", start, start + 1, null);
+                throw new UnresolvedOperandException(source, start, start + 1);
             }
             if (match.definitions().size() != 1) {
-                throw error("Ambiguous operand: multiple definitions match",
-                        start, start + match.length(), null);
+                throw new AmbiguousOperandException(source, start, start + match.length(), signatures(match.definitions()));
             }
             cursor += match.length();
             return bindOperand(match.definitions().getFirst(), start, cursor);
         }
 
-        private Node<C, ?> vector() {
+        private Node<C, ?> vector() throws DslCompilationException {
             int start = cursor++;
             skipWhitespace();
             if (cursor < source.length() && source.charAt(cursor) == ']') {
@@ -278,7 +314,8 @@ public final class Compiler<C> {
                     );
                 }
                 if (cursor == source.length() || source.charAt(cursor) != ',') {
-                    throw error("Expected ',' or ']' in list opened at " + start, cursor, Math.min(cursor + 1, source.length()), null);
+                    throw new UnexpectedTokenException(source, cursor, Math.min(cursor + 1, source.length()),
+                            List.of(",", "]"), start);
                 }
                 cursor++;
             }
@@ -290,11 +327,11 @@ public final class Compiler<C> {
             return new Node.Vector<>(elementType.listType(), start, end, typed);
         }
 
-        private Node<C, ?> bindOperand(OperandDefinition<C> definition, int start, int end) {
+        private Node<C, ?> bindOperand(OperandDefinition<C> definition, int start, int end) throws DslCompilationException {
             try {
                 return definition.binder().bind(source, start, end);
             } catch (RuntimeException exception) {
-                throw error("Failed to parse operand as " + definition.description(), start, end, exception);
+                throw new OperandBindingException(source, start, end, definition.signature(), exception);
             }
         }
 
@@ -303,7 +340,7 @@ public final class Compiler<C> {
                 int start,
                 Node<C, ?> left,
                 Node<C, ?> right
-        ) {
+        ) throws DslCompilationException {
             List<OperatorDefinition<?, ?, ?>> compatible = new ArrayList<>();
             int end = start + match.length();
             for (OperatorDefinition<?, ?, ?> definition : match.definitions()) {
@@ -312,15 +349,15 @@ public final class Compiler<C> {
                 }
             }
             if (compatible.isEmpty()) {
-                throw error("No operator '" + source.substring(start, end) + "' accepts "
-                        + left.type() + " and " + right.type(), start, end, null);
+                List<DefinitionSignature> candidates = signatures(match.definitions());
+                throw new IncompatibleTypesException(source, start, end, List.of(left.type(), right.type()),
+                        candidates.stream().map(DefinitionSignature::operandTypes).toList(), candidates);
             }
             List<OperatorDefinition<?, ?, ?>> best = compatible.stream()
                     .filter(candidate -> compatible.stream().noneMatch(other -> moreSpecific(other, candidate)))
                     .toList();
             if (best.size() != 1) {
-                throw error("Ambiguous operator for operand types " + left.type() + " and " + right.type(),
-                        start, end, null);
+                throw new AmbiguousOperatorException(source, start, end, signatures(best));
             }
             return bindOperation(best.getFirst(), left, right);
         }
@@ -332,17 +369,19 @@ public final class Compiler<C> {
             return new Node.Operation<>(definition.type(), left.start(), right.end(), lhs, rhs, definition.compute());
         }
 
-        private Node<C, ?> transformation(Match<TransformationDefinition<?, ?>> match, int start, Node<C, ?> subject) {
+        private Node<C, ?> transformation(Match<TransformationDefinition<?, ?>> match, int start, Node<C, ?> subject) throws DslCompilationException {
             List<TransformationDefinition<?, ?>> compatible = match.definitions().stream()
                     .filter(definition -> specialize(subject, definition.inputType()) != null).toList();
             List<TransformationDefinition<?, ?>> best = compatible.stream().filter(candidate -> compatible.stream()
                     .noneMatch(other -> candidate.inputType().isAssignableFrom(other.inputType())
                             && !other.inputType().isAssignableFrom(candidate.inputType()))).toList();
             if (best.isEmpty()) {
-                throw error("No transformation accepts " + subject.type(), start, start + match.length(), null);
+                List<DefinitionSignature> candidates = signatures(match.definitions());
+                throw new IncompatibleTypesException(source, start, start + match.length(), List.of(subject.type()),
+                        candidates.stream().map(DefinitionSignature::operandTypes).toList(), candidates);
             }
             if (best.size() != 1) {
-                throw error("Ambiguous transformation for " + subject.type(), start, start + match.length(), null);
+                throw new AmbiguousTransformationException(source, start, start + match.length(), signatures(best));
             }
             return bindTransformation(best.getFirst(), start, subject);
         }
@@ -352,7 +391,7 @@ public final class Compiler<C> {
             return new Node.Transformation<>(definition.type(), start, subject.end(), input, definition.compute());
         }
 
-        private <D> Match<D> match(List<D> definitions, Function<D, Pattern> pattern) {
+        private <D> Match<D> match(List<D> definitions, Function<D, Pattern> pattern) throws DslCompilationException {
             Slice remaining = Slice.of(source, cursor);
             int longest = 0;
             List<D> matches = new ArrayList<>();
@@ -361,11 +400,11 @@ public final class Compiler<C> {
                 try {
                     length = pattern.apply(definition).match(remaining);
                 } catch (RuntimeException exception) {
-                    throw error("Pattern matching failed", cursor, cursor, exception);
+                    throw new PatternEvaluationException(source, cursor, cursor, signature(definition), exception);
                 }
                 if (length > remaining.length()) {
-                    throw error("Pattern returned a match longer than the remaining source",
-                            cursor, source.length(), null);
+                    throw new InvalidGrammarException("Pattern returned a match longer than the remaining source", source,
+                            cursor, source.length(), List.of(signature(definition)));
                 }
                 if (length > 0 && length >= longest) {
                     if (length > longest) {
@@ -384,8 +423,5 @@ public final class Compiler<C> {
             }
         }
 
-        private CompilationException error(String message, int start, int end, Throwable cause) {
-            return new CompilationException(message, source, start, end, cause);
-        }
     }
 }
