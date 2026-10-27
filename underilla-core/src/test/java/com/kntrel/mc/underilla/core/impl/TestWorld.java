@@ -51,6 +51,9 @@ public final class TestWorld implements WorldReader {
     public com.kntrel.mc.underilla.core.api.ID dimension() { return metadata.dimension(); }
 
     @Override
+    public long seed() { return metadata.seed(); }
+
+    @Override
     public int minHeight() { return metadata.minHeight(); }
 
     @Override

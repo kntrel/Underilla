@@ -252,7 +252,7 @@ public class InspectorCLI implements Callable<Integer> {
                         0,
                         Math.multiplyExact(chunkSize, GenerationConstants.CHUNK_SIZE),
                         GenerationConstants.CHUNK_SIZE)
-                .preservedGeneratedBiomes(ctx -> CAVE_BIOMES.contains(ctx.target().biome().id()))
+                .preservedGeneratedBiomes(snapshot -> CAVE_BIOMES.contains(snapshot.target().biome().id()))
                 .noodleCaves(cavesPolicy)
                 .build();
     }

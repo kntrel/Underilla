@@ -157,10 +157,11 @@ public final class Underilla extends JavaPlugin {
         }
 
         // Registering listeners
-        if (getUnderillaConfig().getBoolean(BooleanKeys.STRUCTURES_ENABLED)) {
-            structureEventListener = new StructureEventListener();
-            this.getServer().getPluginManager().registerEvents(structureEventListener, this);
-        }
+        structureEventListener = new StructureEventListener(worldName -> {
+            UnderillaChunkGenerator generator = worldGenerators.get(worldName);
+            return generator == null ? null : generator.generationPlan();
+        }, Underilla::isDebugEnabled);
+        this.getServer().getPluginManager().registerEvents(structureEventListener, this);
         this.getServer().getPluginManager().registerEvents(new WorldListener(), this);
 
     }

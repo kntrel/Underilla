@@ -2,7 +2,7 @@ package com.kntrel.mc.underilla.core.api;
 
 import java.util.Objects;
 
-record WorldImpl(String name, ID dimension, int minHeight, int maxHeight) implements World {
+record WorldImpl(String name, ID dimension, int minHeight, int maxHeight, long seed) implements World {
 
     WorldImpl {
         Objects.requireNonNull(name, "name");

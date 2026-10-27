@@ -1,8 +1,9 @@
 package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.*;
-import com.kntrel.mc.underilla.core.api.context.BiomeContext;
-import com.kntrel.mc.underilla.core.api.context.ChunkView;
+import com.kntrel.mc.underilla.core.api.scope.BiomeSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.DualBiomeScope;
+import com.kntrel.mc.underilla.core.api.scope.ChunkSnapshot;
 import com.kntrel.mc.underilla.core.patch.ChunkBlock;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PerBlockChunkPatcher;
@@ -34,11 +35,11 @@ class Patchers {
             int maximumY,
             boolean useTopYOnly,
             WorldMask worldMask,
-            Predicate<BiomeContext> surfaceOnlyBiome,
-            Predicate<BiomeContext> preservedGeneratedBiome,
+            Predicate<DualBiomeScope> surfaceOnlyBiome,
+            Predicate<DualBiomeScope> preservedGeneratedBiome,
             boolean preserveGeneratedBiomesOnlyUnderSurface
     ) {
-        Predicate<BiomeContext> shouldReplace = surfaceOnlyBiome.or(preservedGeneratedBiome.negate());
+        Predicate<DualBiomeScope> shouldReplace = surfaceOnlyBiome.or(preservedGeneratedBiome.negate());
         return biome -> {
             if (!generationArea.contains(biome.getX(), biome.getZ())) {
                 return;
@@ -49,10 +50,11 @@ class Patchers {
 
 
 
-            ChunkView chunk = ChunkView.of(biome.getChunkX(), biome.getChunkZ());
-            BiomeContext context = BiomeContext.of(
-                    chunk, referenceWorld, referenceBiome, biome.world(), biome.get());
-            if (shouldReplace.test(context)
+            ChunkSnapshot chunk = ChunkSnapshot.of(biome.getChunkX(), biome.getChunkZ());
+            DualBiomeScope snapshot = DualBiomeScope.of(
+                    chunk, referenceWorld, BiomeSnapshot.atBlock(referenceBiome, biome.getX(), referenceY, biome.getZ()),
+                    biome.world(), BiomeSnapshot.atBlock(biome.get(), biome.getX(), biome.getY(), biome.getZ()));
+            if (shouldReplace.test(snapshot)
                     || preserveGeneratedBiomesOnlyUnderSurface && biomeCellIntersectsMask(biome, worldMask)) {
                 biome.set(referenceBiome);
             }

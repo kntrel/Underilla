@@ -62,6 +62,8 @@ public class UnderillaChunkGenerator extends ChunkGenerator implements Listener 
     }
 
 
+    public WorldGenerationPlan generationPlan() { return generationPlan; }
+
     // IMPLEMENTATIONS
     @EventHandler(ignoreCancelled = true)
     public void onChunkLoad(ChunkLoadEvent event) {

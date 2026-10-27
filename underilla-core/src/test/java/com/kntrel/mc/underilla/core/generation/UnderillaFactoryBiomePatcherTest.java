@@ -8,6 +8,7 @@ import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.scope.WorldSnapshot;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBlockFactory;
@@ -76,7 +77,7 @@ class UnderillaFactoryBiomePatcherTest {
                 40,
                 32,
                 builder -> builder
-                        .preservedGeneratedBiomes(ctx -> DEEP_DARK.id().equals(ctx.target().biome().id()))
+                        .preservedGeneratedBiomes(snapshot -> DEEP_DARK.id().equals(snapshot.target().biome().id()))
                         .preserveGeneratedBiomesOnlyUnderSurface(true)
         );
 
@@ -96,8 +97,8 @@ class UnderillaFactoryBiomePatcherTest {
                 4,
                 4,
                 builder -> builder
-                        .surfaceOnlyBiomes(ctx -> SURFACE_ONLY.id().equals(ctx.source().biome().id()))
-                        .preservedGeneratedBiomes(ctx -> DEEP_DARK.id().equals(ctx.target().biome().id()))
+                        .surfaceOnlyBiomes(snapshot -> SURFACE_ONLY.id().equals(snapshot.source().biome().id()))
+                        .preservedGeneratedBiomes(snapshot -> DEEP_DARK.id().equals(snapshot.target().biome().id()))
         );
 
         patcher.patch(target);
@@ -106,12 +107,12 @@ class UnderillaFactoryBiomePatcherTest {
     }
 
     @Test
-    void biomePatcherComposesContextPoliciesWithSurfaceOverridesTakingPrecedence() {
+    void biomePatcherComposesSnapshotPoliciesWithSurfaceOverridesTakingPrecedence() {
         MutableBiomeData target = new MutableBiomeData(DEEP_DARK, 0, 0, 0);
         Patcher<BiomeData> patcher = Patchers.referenceWorldBiomePatcher(
                 referenceWorld(REFERENCE, 0, 4), GenerationArea.everywhere(), 4, false,
                 (_, _, _) -> { throw new AssertionError("Surface overrides must not consult the mask"); },
-                ctx -> ctx.source().biome() == REFERENCE && ctx.target().biome() == DEEP_DARK,
+                snapshot -> snapshot.source().biome().id().equals(REFERENCE.id()) && snapshot.target().biome().id().equals(DEEP_DARK.id()),
                 _ -> { throw new AssertionError("Surface overrides must take precedence over preservation"); },
                 true);
 
@@ -127,13 +128,13 @@ class UnderillaFactoryBiomePatcherTest {
         MutableBiomeData target = new MutableBiomeData(DEEP_DARK, 0, 1, 0, destination);
         Patcher<BiomeData> patcher = patcher(
                 referenceWorld(REFERENCE, 0, 4).withWorld(source), 0, 4, 4,
-                builder -> builder.preservedGeneratedBiomes(ctx -> {
-                    assertEquals(source.name(), ctx.source().world().name());
-                    assertEquals(source.dimension(), ctx.source().world().dimension());
-                    assertSame(destination, ctx.target().world());
-                    assertEquals(-64, ctx.target().world().minHeight());
-                    return ctx.source().world().dimension().equals(ID.of("minecraft:the_nether"))
-                            && ctx.target().world().name().equals("destination");
+                builder -> builder.preservedGeneratedBiomes(snapshot -> {
+                    assertEquals(source.name(), snapshot.source().world().name());
+                    assertEquals(source.dimension(), snapshot.source().world().dimension());
+                    assertEquals(WorldSnapshot.of(destination), snapshot.target().world());
+                    assertEquals(-64, snapshot.target().world().minHeight());
+                    return snapshot.source().world().dimension().equals(ID.of("minecraft:the_nether"))
+                            && snapshot.target().world().name().equals("destination");
                 }));
 
         patcher.patch(target);
@@ -142,10 +143,11 @@ class UnderillaFactoryBiomePatcherTest {
     }
 
     @Test
-    void biomePatcherSuppliesSharedChunkViewWithoutLoadingChunks() {
+    void biomePatcherSuppliesSharedChunkSnapshotWithoutLoadingChunks() {
         WorldReader referenceWorld = new WorldReader() {
             @Override public String name() { return "test-world"; }
             @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+            @Override public long seed() { return 0L; }
             @Override public int minHeight() { return -64; }
             @Override public int maxHeight() { return 320; }
 
@@ -167,10 +169,10 @@ class UnderillaFactoryBiomePatcherTest {
         MutableBiomeData target = new MutableBiomeData(DEEP_DARK, -1, 1, -17);
         Patcher<BiomeData> patcher = Patchers.referenceWorldBiomePatcher(
                 referenceWorld, GenerationArea.everywhere(), 4, false, (_, _, _) -> false,
-                ctx -> {
-                    assertEquals(-1, ctx.chunk().x());
-                    assertEquals(-2, ctx.chunk().z());
-                    return ctx.source().biome() == REFERENCE && ctx.target().biome() == DEEP_DARK;
+                snapshot -> {
+                    assertEquals(-1, snapshot.source().chunk().x());
+                    assertEquals(-2, snapshot.source().chunk().z());
+                    return snapshot.source().biome().id().equals(REFERENCE.id()) && snapshot.target().biome().id().equals(DEEP_DARK.id());
                 },
                 _ -> true, false);
 
@@ -180,7 +182,7 @@ class UnderillaFactoryBiomePatcherTest {
     }
 
     @Test
-    void biomePatcherChecksTheGenerationAreaBeforeEvaluatingContextPolicies() {
+    void biomePatcherChecksTheGenerationAreaBeforeEvaluatingSnapshotPolicies() {
         MutableBiomeData target = new MutableBiomeData(PLAINS, 8, 0, 0);
         Patcher<BiomeData> patcher = Patchers.referenceWorldBiomePatcher(
                 referenceWorld(REFERENCE, 0, 4), new GenerationArea(0, 0, 8, 8), 4, false,
@@ -200,10 +202,16 @@ class UnderillaFactoryBiomePatcherTest {
         MutableBiomeData target = new MutableBiomeData(DEEP_DARK, -1, 1, -17);
         Patcher<BiomeData> patcher = patcher(
                 new TestWorld().addChunk(reference), 0, 4, 4,
-                builder -> builder.preservedGeneratedBiomes(ctx -> {
-                    assertEquals(-1, ctx.chunk().x());
-                    assertEquals(-2, ctx.chunk().z());
-                    return ctx.source().biome() == REFERENCE && ctx.target().biome() == DEEP_DARK;
+                builder -> builder.preservedGeneratedBiomes(snapshot -> {
+                    assertEquals(-1, snapshot.source().chunk().x());
+                    assertEquals(-2, snapshot.source().chunk().z());
+                    assertEquals(-1, snapshot.source().biome().cellX());
+                    assertEquals(0, snapshot.source().biome().cellY());
+                    assertEquals(-5, snapshot.source().biome().cellZ());
+                    assertEquals(snapshot.source().biome().cellX(), snapshot.target().biome().cellX());
+                    assertEquals(snapshot.source().biome().cellY(), snapshot.target().biome().cellY());
+                    assertEquals(snapshot.source().biome().cellZ(), snapshot.target().biome().cellZ());
+                    return snapshot.source().biome().id().equals(REFERENCE.id()) && snapshot.target().biome().id().equals(DEEP_DARK.id());
                 }));
 
         patcher.patch(target);
@@ -221,9 +229,11 @@ class UnderillaFactoryBiomePatcherTest {
                 0,
                 4,
                 4,
-                builder -> builder.surfaceBiomeUseTopYOnly(true).surfaceOnlyBiomes(ctx -> {
-                    assertSame(REFERENCE, ctx.source().biome());
-                    assertSame(PLAINS, ctx.target().biome());
+                builder -> builder.surfaceBiomeUseTopYOnly(true).surfaceOnlyBiomes(snapshot -> {
+                    assertEquals(REFERENCE.id(), snapshot.source().biome().id());
+                    assertEquals(PLAINS.id(), snapshot.target().biome().id());
+                    assertEquals(1, snapshot.source().biome().cellY());
+                    assertEquals(0, snapshot.target().biome().cellY());
                     return false;
                 })
         );

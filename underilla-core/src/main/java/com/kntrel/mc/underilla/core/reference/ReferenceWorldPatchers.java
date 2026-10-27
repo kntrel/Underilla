@@ -2,9 +2,10 @@ package com.kntrel.mc.underilla.core.reference;
 
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.ChunkData;
-import com.kntrel.mc.underilla.core.api.context.ChunkView;
-import com.kntrel.mc.underilla.core.api.context.BiomeContext;
-import com.kntrel.mc.underilla.core.api.context.BlockContext;
+import com.kntrel.mc.underilla.core.api.scope.BiomeSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.ChunkSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.DualBiomeScope;
+import com.kntrel.mc.underilla.core.api.scope.DualBlockScope;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
 import com.kntrel.mc.underilla.core.generation.NoodleCavesPolicy;
@@ -50,7 +51,7 @@ public final class ReferenceWorldPatchers {
             WorldMask worldMask,
             boolean surfaceFill,
             Supplier<Block> air,
-            Predicate<BlockContext> survivingBlock,
+            Predicate<DualBlockScope> survivingBlock,
             Collection<Patcher<ChunkBlock>> transformations,
             NoodleCavesPolicy policy,
             boolean useTopYOnly,
@@ -95,7 +96,7 @@ public final class ReferenceWorldPatchers {
             WorldMask worldMask,
             boolean surfaceFill,
             Supplier<Block> air,
-            Predicate<BlockContext> survivingBlock,
+            Predicate<DualBlockScope> survivingBlock,
             List<Patcher<ChunkBlock>> transformations
     ) {
         Patcher<ChunkData> afterCarvers = withEffectiveMask(
@@ -120,7 +121,7 @@ public final class ReferenceWorldPatchers {
             WorldMask worldMask,
             boolean surfaceFill,
             Supplier<Block> air,
-            Predicate<BlockContext> survivingBlock,
+            Predicate<DualBlockScope> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             NoodleCavesPolicy.Surface policy,
             boolean useTopYOnly,
@@ -197,7 +198,7 @@ public final class ReferenceWorldPatchers {
             WorldReader negativeWorld,
             WorldMask worldMask,
             Supplier<Block> air,
-            Predicate<BlockContext> survivingBlock,
+            Predicate<DualBlockScope> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
@@ -259,7 +260,7 @@ public final class ReferenceWorldPatchers {
             PatchTimeValue<?, Optional<ChunkReader>> chunkReader,
             WorldMask worldMask,
             Supplier<Block> air,
-            Predicate<BlockContext> survivingBlock,
+            Predicate<DualBlockScope> survivingBlock,
             List<Patcher<ChunkBlock>> transformations,
             AcceptedWrite acceptedWrite
     ) {
@@ -273,8 +274,8 @@ public final class ReferenceWorldPatchers {
             boolean insideMask = worldMask.contains(original.targetChunk().world(),
                     original.globalX(), original.y(), original.globalZ());
             boolean survivesOutsideMask = survivingBlock != null
-                    && survivingBlock.test(BlockContext.of(
-                            ChunkView.of(proposed.targetChunk()),
+                    && survivingBlock.test(DualBlockScope.of(
+                            ChunkSnapshot.of(proposed.targetChunk()),
                             sourceWorld,
                             sourceWorld.biomeAt(proposed.globalX(), proposed.y(), proposed.globalZ()).orElse(null),
                             proposed.block(),
@@ -298,12 +299,14 @@ public final class ReferenceWorldPatchers {
                         block.globalX(),
                         useTopYOnly ? block.targetChunk().getMaxHeight() : block.y(),
                         block.globalZ())
-                .filter(biome -> policy.predicate().test(BiomeContext.of(
-                        ChunkView.of(block.targetChunk()),
+                .filter(biome -> policy.predicate().test(DualBiomeScope.of(
+                        ChunkSnapshot.of(block.targetChunk()),
                         referenceWorld,
-                        biome,
+                        BiomeSnapshot.atBlock(biome, block.globalX(),
+                                useTopYOnly ? block.targetChunk().getMaxHeight() : block.y(), block.globalZ()),
                         block.targetChunk().world(),
-                        block.targetChunk().getBiome(block.x(), block.y(), block.z()))))
+                        BiomeSnapshot.atBlock(block.targetChunk().getBiome(block.x(), block.y(), block.z()),
+                                block.globalX(), block.y(), block.globalZ()))))
                 .isPresent();
         if (policy.restoreLiquids()) {
             mayWriteBeforeCarvers = mayWriteBeforeCarvers.and(block -> referenceWorld

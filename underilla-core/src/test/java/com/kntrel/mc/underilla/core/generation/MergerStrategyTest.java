@@ -13,6 +13,7 @@ import com.kntrel.mc.underilla.core.api.BlockFactory;
 import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.reader.ChunkReader;
 import com.kntrel.mc.underilla.core.reader.EntityView;
@@ -245,7 +246,7 @@ class PatcherStrategyTest {
         return new ReferenceHeightWorldMask(surfaceWorld, AIR,
                 config.generationAreaMinY(), config.generationAreaMaxY(), config.maxHeightOfCaves(),
                 config.mergeDepth(), config.adaptiveMaxMergeDepth(), config.adaptiveMinHiddenBlocksMergeDepth(),
-                ctx -> config.isSurfaceWorldOnlyBiome(ctx.source().biome().id()), ctx -> config.isIgnoredForSurfaceCalculation(ctx.source().block().id()), new ChunkCache(2));
+                snapshot -> config.isSurfaceWorldOnlyBiome(snapshot.source().biome().id()), snapshot -> config.isIgnoredForSurfaceCalculation(snapshot.block().id()), new ChunkCache(2));
     }
 
     private static final class TestConfig {
@@ -410,6 +411,7 @@ class PatcherStrategyTest {
     private static final class FakeWorldReader implements WorldReader {
         @Override public String name() { return "test-world"; }
         @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+        @Override public long seed() { return 0L; }
         @Override public int minHeight() { return -64; }
         @Override public int maxHeight() { return 320; }
 
@@ -456,6 +458,12 @@ class PatcherStrategyTest {
             this.chunkX = chunkX;
             this.chunkZ = chunkZ;
             this.defaultBlock = defaultBlock;
+        }
+
+        @Override
+        public World world() {
+            return World.of("test-target", ID.of("minecraft:overworld"),
+                    minimumY, maximumY);
         }
 
         @Override

@@ -39,6 +39,7 @@ class UnderillaChunkGeneratorTest {
                 .afterNoise(chunk -> {
                     assertEquals("world", chunk.world().name());
                     assertEquals(ID.of(WORLD_INFO.getKey().toString()), chunk.world().dimension());
+                    assertEquals(WORLD_INFO.getSeed(), chunk.world().seed());
                     assertEquals(-64, chunk.world().minHeight());
                     assertEquals(320, chunk.world().maxHeight());
                     phases.add("noise");

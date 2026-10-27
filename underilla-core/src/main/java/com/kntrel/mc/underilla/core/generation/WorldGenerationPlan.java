@@ -2,9 +2,11 @@ package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.scope.StructureScope;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * Platform-neutral work and policies for one world-generation configuration.
@@ -21,7 +23,8 @@ public record WorldGenerationPlan(
         Patcher<ChunkData> afterLoad,
         Patcher<BiomeData> biomePatch,
         GenerationFlags flags,
-        Altimeter altimeter
+        Altimeter altimeter,
+        Predicate<StructureScope> structureFilter
 ) {
 
     public WorldGenerationPlan {
@@ -34,9 +37,20 @@ public record WorldGenerationPlan(
         Objects.requireNonNull(biomePatch, "biomePatch");
         Objects.requireNonNull(flags, "flags");
         Objects.requireNonNull(altimeter, "altimeter");
+        Objects.requireNonNull(structureFilter, "structureFilter");
     }
 
     public static WorldGenerationPlanBuilder build() { return new WorldGenerationPlanBuilder(); }
+
+    /**
+     * Allows fallback structures outside coverage; inside coverage, applies the structures flag and filter.
+     * The scope must supply the structure's origin chunk. Filters may be called concurrently by adapters.
+     */
+    public boolean allowsStructure(StructureScope scope) {
+        Objects.requireNonNull(scope, "scope");
+        var chunk = Objects.requireNonNull(scope.chunk(), "scope.chunk");
+        return !coverage.covers(chunk.x(), chunk.z()) || flags.structures() && structureFilter.test(scope);
+    }
 
     /**
      * Applies the after-noise patcher when this plan covers the target chunk.

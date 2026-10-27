@@ -28,12 +28,14 @@ class ReferenceWorldMetadataTest {
 
         assertEquals("Saved source", world.name());
         assertEquals(ID.of("minecraft:the_nether"), world.dimension());
+        assertEquals(1234L, world.seed());
         assertEquals(0, world.minHeight());
         assertEquals(256, world.maxHeight());
         BukkitWorldReader reader = new BukkitWorldReader(regions.toFile(), null, 1, world);
         World cached = reader.withChunkCache(new ChunkCache(1));
         assertEquals(world.name(), cached.name());
         assertEquals(world.dimension(), cached.dimension());
+        assertEquals(world.seed(), cached.seed());
         assertEquals(world.minHeight(), cached.minHeight());
         assertEquals(world.maxHeight(), cached.maxHeight());
     }
@@ -49,8 +51,24 @@ class ReferenceWorldMetadataTest {
         World world = ReferenceWorldMetadata.read(new YamlConfiguration(), "surfaceWorld", regions);
 
         assertEquals(ID.of("example:deep/moon"), world.dimension());
+        assertEquals(99L, world.seed());
         assertEquals(-128, world.minHeight());
         assertEquals(384, world.maxHeight());
+    }
+
+    @Test
+    void readsLegacySeedsFromLevelDat(@TempDir Path root) throws IOException {
+        Path regions = Files.createDirectories(root.resolve("region"));
+        CompoundTag data = new CompoundTag();
+        data.putString("LevelName", "Legacy source");
+        data.putLong("RandomSeed", -987654321L);
+        CompoundTag level = new CompoundTag();
+        level.put("Data", data);
+        NBTUtil.write(level, root.resolve("level.dat").toFile(), true);
+
+        World world = ReferenceWorldMetadata.read(new YamlConfiguration(), "surfaceWorld", regions);
+
+        assertEquals(-987654321L, world.seed());
     }
 
     @Test
@@ -65,6 +83,7 @@ class ReferenceWorldMetadataTest {
         World world = ReferenceWorldMetadata.read(config, "surfaceWorld", regions);
 
         assertEquals("Export", world.name());
+        assertEquals(0L, world.seed());
         assertEquals(ID.of("example:moon"), world.dimension());
         assertEquals(-32, world.minHeight());
         assertEquals(96, world.maxHeight());

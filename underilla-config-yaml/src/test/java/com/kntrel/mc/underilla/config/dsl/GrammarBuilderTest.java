@@ -83,7 +83,7 @@ class GrammarBuilderTest {
     void rebindingPreservesTransformationsAndLeavesOriginalRuntimeValuesIntact() {
         Grammar<Context> original = Grammar.with(Context.class).standard()
                 .runtime(RuntimeValue.of(Boolean.class, Pattern.literal("active"), Context::active)).done();
-        RuntimeValue<Integer, Boolean> positive = RuntimeValue.of(Boolean.class, Pattern.literal("active"), value -> value > 0);
+        RuntimeValue<Integer> positive = RuntimeValue.of(Boolean.class, Pattern.literal("active"), value -> value > 0);
         Grammar<Integer> rebound = original.withRuntimeValues(List.of(positive));
         Grammar<Void> contextless = original.withoutRuntimeValues();
 

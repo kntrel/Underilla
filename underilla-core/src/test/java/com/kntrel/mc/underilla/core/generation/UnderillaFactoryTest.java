@@ -10,8 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jkantrell.nbt.tag.CompoundTag;
 import com.kntrel.mc.underilla.core.api.*;
-import com.kntrel.mc.underilla.core.api.context.BiomeContext;
-import com.kntrel.mc.underilla.core.api.context.ChunkView;
+import com.kntrel.mc.underilla.core.api.scope.DualBiomeScope;
+import com.kntrel.mc.underilla.core.api.scope.BlockSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.ChunkSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.WorldSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.StructureScope;
+import com.kntrel.mc.underilla.core.api.scope.StructureSnapshot;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
@@ -41,6 +45,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class UnderillaFactoryTest {
+
+    @Test
+    void structureFilterSurvivesVerticalBoundsAndInspection(@TempDir Path output) {
+        Predicate<StructureScope> filter = _ -> false;
+        TestWorld reference = new TestWorld(0, 4, AIR, PLAINS);
+        reference.setBlock(0, 0, 0, REFERENCE);
+        WorldGenerationPlan plan = UnderillaFactory.none(reference)
+                .blocks(BLOCKS).verticalRange(0, 4).generationArea(0, 0, 16, 16)
+                .structureFilter(filter)
+                .inspect(InspectionRegion.zSlice(0, 0, 1, 0, 4), output)
+                .build();
+        assertSame(filter, plan.structureFilter());
+        assertFalse(plan.allowsStructure(StructureScope.of(
+                null, new ChunkSnapshot(0, 0), null,
+                StructureSnapshot.of(ID.of("minecraft:fortress")))));
+    }
 
     private static final TestBlock AIR = TestBlock.air("minecraft:air");
     private static final TestBlock GENERATED = TestBlock.solid("minecraft:generated");
@@ -206,6 +226,7 @@ class UnderillaFactoryTest {
     private static final WorldReader EMPTY_WORLD = new WorldReader() {
         @Override public String name() { return "test-world"; }
         @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+        @Override public long seed() { return 0L; }
         @Override public int minHeight() { return -64; }
         @Override public int maxHeight() { return 320; }
 
@@ -409,8 +430,8 @@ class UnderillaFactoryTest {
         assertSame(NoodleCavesPolicy.underground(), NoodleCavesPolicy.underground());
 
         NoodleCavesPolicy.Surface policy = NoodleCavesPolicy.surface(biome -> true, true);
-        assertTrue(policy.predicate().test(BiomeContext.of(
-                ChunkView.of(0, 0), PLAINS, null)));
+        assertTrue(policy.predicate().test(DualBiomeScope.of(
+                ChunkSnapshot.of(0, 0), PLAINS, null)));
         assertTrue(policy.restoreLiquids());
     }
 
@@ -463,10 +484,10 @@ class UnderillaFactoryTest {
         target.setBiome(0, 1, 0, cave);
         WorldGenerationPlan plan = configured(UnderillaFactory.absolute(new TestWorld().addChunk(reference)))
                 .surfaceFill(false)
-                .noodleCaves(NoodleCavesPolicy.surface(ctx -> {
-                    assertEquals(target.getChunkX(), ctx.chunk().x());
-                    assertEquals(target.getChunkZ(), ctx.chunk().z());
-                    return ctx.source().biome() == PLAINS && ctx.target().biome() == cave;
+                .noodleCaves(NoodleCavesPolicy.surface(snapshot -> {
+                    assertEquals(target.getChunkX(), snapshot.source().chunk().x());
+                    assertEquals(target.getChunkZ(), snapshot.source().chunk().z());
+                    return snapshot.source().biome().id().equals(PLAINS.id()) && snapshot.target().biome().id().equals(cave.id());
                 }, false))
                 .build();
 
@@ -563,7 +584,7 @@ class UnderillaFactoryTest {
         WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
                 .surfaceFill(false)
                 .chunkCacheSize(cacheSize)
-                .keptSurfaceBlocks(ctx -> ctx.source().block().id().equals(ore.id()))
+                .keptSurfaceBlocks(snapshot -> snapshot.source().block().id().equals(ore.id()))
                 .noodleCaves(NoodleCavesPolicy.surface(_ -> false, false))
                 .build();
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
@@ -584,7 +605,7 @@ class UnderillaFactoryTest {
         WorldGenerationPlan plan = configured(UnderillaFactory.absolute(referenceWorld))
                 .maximumCaveY(2)
                 .surfaceBlockTransformer(block -> block.id().equals(REFERENCE.id()) ? WATER : block)
-                .keptSurfaceBlocks(ctx -> ctx.source().block().id().equals(WATER.id()))
+                .keptSurfaceBlocks(snapshot -> snapshot.source().block().id().equals(WATER.id()))
                 .build();
         TestChunkGrid target = new TestChunkGrid(0, 0, 0, 4, GENERATED, PLAINS);
 
@@ -604,16 +625,16 @@ class UnderillaFactoryTest {
                 .maximumCaveY(4)
                 .surfaceFill(false)
                 .surfaceBlockTransformer(_ -> WATER)
-                .keptSurfaceBlocks(ctx -> {
-                    assertEquals(target.getChunkX(), ctx.chunk().x());
-                    assertEquals(target.getChunkZ(), ctx.chunk().z());
-                    assertEquals(ctx.target().block().x(), ctx.source().block().x());
-                    assertEquals(ctx.target().block().y(), ctx.source().block().y());
-                    assertEquals(ctx.target().block().z(), ctx.source().block().z());
-                    assertEquals(-16 + Math.floorMod(ctx.target().block().x(), 16), ctx.source().block().x());
-                    assertEquals(-32 + Math.floorMod(ctx.target().block().z(), 16), ctx.source().block().z());
-                    return ctx.source().block().id().equals(WATER.id()) && ctx.target().block().id().equals(GENERATED.id())
-                            && ctx.source().biome() == PLAINS && ctx.target().biome() == cave;
+                .keptSurfaceBlocks(snapshot -> {
+                    assertEquals(target.getChunkX(), snapshot.source().chunk().x());
+                    assertEquals(target.getChunkZ(), snapshot.source().chunk().z());
+                    assertEquals(snapshot.target().block().x(), snapshot.source().block().x());
+                    assertEquals(snapshot.target().block().y(), snapshot.source().block().y());
+                    assertEquals(snapshot.target().block().z(), snapshot.source().block().z());
+                    assertEquals(-16 + Math.floorMod(snapshot.target().block().x(), 16), snapshot.source().block().x());
+                    assertEquals(-32 + Math.floorMod(snapshot.target().block().z(), 16), snapshot.source().block().z());
+                    return snapshot.source().block().id().equals(WATER.id()) && snapshot.target().block().id().equals(GENERATED.id())
+                            && snapshot.source().biome().id().equals(PLAINS.id()) && snapshot.target().biome().id().equals(cave.id());
                 })
                 .build();
 
@@ -634,11 +655,11 @@ class UnderillaFactoryTest {
                         new TestWorld().addChunk(reference).withWorld(source)))
                 .maximumCaveY(4)
                 .surfaceFill(false)
-                .keptSurfaceBlocks(ctx -> {
-                    assertEquals(source.name(), ctx.source().world().name());
-                    assertEquals(source.dimension(), ctx.source().world().dimension());
-                    assertSame(destination, ctx.target().world());
-                    return ctx.target().world().minHeight() == -4 && ctx.target().world().maxHeight() == 8;
+                .keptSurfaceBlocks(snapshot -> {
+                    assertEquals(source.name(), snapshot.source().world().name());
+                    assertEquals(source.dimension(), snapshot.source().world().dimension());
+                    assertEquals(WorldSnapshot.of(destination), snapshot.target().world());
+                    return snapshot.target().world().minHeight() == -4 && snapshot.target().world().maxHeight() == 8;
                 })
                 .build();
 
@@ -758,7 +779,7 @@ class UnderillaFactoryTest {
             WorldReader referenceWorld,
             WorldMask worldMask,
             Supplier<Block> air,
-            Predicate<Block> survivingBlock,
+            Predicate<BlockSnapshot> survivingBlock,
             Collection<Patcher<ChunkBlock>> transformations
     ) {
         return ReferenceWorldPatchers.from(
@@ -767,7 +788,7 @@ class UnderillaFactoryTest {
                 worldMask,
                 false,
                 air,
-                survivingBlock == null ? null : ctx -> survivingBlock.test(ctx.source().block()),
+                survivingBlock == null ? null : snapshot -> survivingBlock.test(snapshot.source().block()),
                 transformations,
                 NoodleCavesPolicy.underground(),
                 false,

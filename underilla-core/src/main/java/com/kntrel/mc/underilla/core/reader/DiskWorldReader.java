@@ -92,6 +92,9 @@ public abstract class DiskWorldReader implements WorldReader {
     public ID dimension() { return world.dimension(); }
 
     @Override
+    public long seed() { return world.seed(); }
+
+    @Override
     public int minHeight() { return world.minHeight(); }
 
     @Override

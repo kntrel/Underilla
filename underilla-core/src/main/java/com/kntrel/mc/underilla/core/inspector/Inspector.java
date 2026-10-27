@@ -89,7 +89,8 @@ public final class Inspector {
                 decorate(plan.afterLoad(), Phase.LOAD),
                 plan.biomePatch(),
                 plan.flags(),
-                plan.altimeter());
+                plan.altimeter(),
+                plan.structureFilter());
     }
 
     /** Completes after every selected frame has been rendered and delivered to the sink. */

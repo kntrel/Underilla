@@ -29,6 +29,9 @@ public class BukkitWorldInfo implements WorldInfo, World {
     public int maxHeight() { return worldInfo_.getMaxHeight(); }
 
     @Override
+    public long seed() { return worldInfo_.getSeed(); }
+
+    @Override
     public long getSeed() { return this.worldInfo_.getSeed(); }
 
     @Override

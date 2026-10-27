@@ -2,6 +2,7 @@ package com.kntrel.mc.underilla.core.generation;
 
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.scope.StructureScope;
 import com.kntrel.mc.underilla.core.patch.ChunkProfiledPatcher;
 import com.kntrel.mc.underilla.core.patch.Patcher;
 import com.kntrel.mc.underilla.core.patch.PatcherPipeline;
@@ -11,6 +12,7 @@ import com.kntrel.mc.underilla.core.profiling.Tracker;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * Builder for a complete generation plan, with safe no-op patch defaults.
@@ -38,6 +40,13 @@ public final class WorldGenerationPlanBuilder {
     private boolean mobs = true;
     private boolean structures = true;
     private Altimeter altimeter = NO_OP_ALTIMETER;
+    private Predicate<StructureScope> structureFilter = _ -> true;
+
+    /** Sets the structure selection policy, which may run concurrently on generation threads. */
+    public WorldGenerationPlanBuilder structureFilter(Predicate<StructureScope> structureFilter) {
+        this.structureFilter = Objects.requireNonNull(structureFilter, "structureFilter");
+        return this;
+    }
 
     /** Sets the chunks for which this plan should replace the platform fallback. */
     public WorldGenerationPlanBuilder coverage(ChunkCoverage coverage) {
@@ -185,7 +194,8 @@ public final class WorldGenerationPlanBuilder {
                 profiledPipeline(afterLoad),
                 profiledBiomePatcher(),
                 flags,
-                profiledAltimeter()
+                profiledAltimeter(),
+                structureFilter
         );
     }
 

@@ -22,11 +22,11 @@ class GrammarTest {
 
     @Test
     void reusesLanguageDefinitionsAndReplacesRuntimeValuesAcrossContextTypes() {
-        RuntimeValue<String, Integer> length = RuntimeValue.of(Integer.class, Pattern.literal("x"), String::length);
-        RuntimeValue<String, String> originalOnly = RuntimeValue.of(String.class, Pattern.literal("original"), text -> text);
+        RuntimeValue<String> length = RuntimeValue.of(Integer.class, Pattern.literal("x"), String::length);
+        RuntimeValue<String> originalOnly = RuntimeValue.of(String.class, Pattern.literal("original"), text -> text);
         Grammar<String> original = new Grammar<>(List.of(ONE), List.of(ADD), List.of(length, originalOnly));
-        RuntimeValue<Integer, Integer> integer = RuntimeValue.of(Integer.class, Pattern.literal("x"), value -> value);
-        List<RuntimeValue<Integer, ?>> replacements = new ArrayList<>(List.of(integer));
+        RuntimeValue<Integer> integer = RuntimeValue.of(Integer.class, Pattern.literal("x"), value -> value);
+        List<RuntimeValue<Integer>> replacements = new ArrayList<>(List.of(integer));
 
         Grammar<Integer> copy = original.withRuntimeValues(replacements);
         replacements.clear();
@@ -58,8 +58,8 @@ class GrammarTest {
         TypeLiteral<Integer> two = TypeLiteral.of(Integer.class, Pattern.literal("2"), Integer::valueOf);
         Set<TypeLiteral<Integer>> literals = new LinkedHashSet<>(List.of(ONE, two));
         Set<Operation<Integer, Integer, Integer>> operations = new LinkedHashSet<>(List.of(ADD));
-        RuntimeValue<String, Integer> length = RuntimeValue.of(Integer.class, Pattern.literal("x"), String::length);
-        Set<RuntimeValue<String, Integer>> runtimeValues = new LinkedHashSet<>(List.of(length));
+        RuntimeValue<String> length = RuntimeValue.of(Integer.class, Pattern.literal("x"), String::length);
+        Set<RuntimeValue<String>> runtimeValues = new LinkedHashSet<>(List.of(length));
 
         Grammar<String> grammar = new Grammar<>(literals, operations, runtimeValues);
         literals.clear();
@@ -81,6 +81,6 @@ class GrammarTest {
         assertThrows(NullPointerException.class, () -> new Grammar<>(List.of(), null, List.of()));
         assertThrows(NullPointerException.class, () -> new Grammar<>(List.of(), List.of(), null));
         assertThrows(NullPointerException.class, () -> grammar.withRuntimeValues(null));
-        assertThrows(NullPointerException.class, () -> grammar.withRuntimeValues(Arrays.asList((RuntimeValue<Void, ?>) null)));
+        assertThrows(NullPointerException.class, () -> grammar.withRuntimeValues(Arrays.asList((RuntimeValue<Void>) null)));
     }
 }

@@ -9,103 +9,95 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.kntrel.mc.underilla.config.util.TypeToken;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 class RuntimeValueTest {
-
     @Test
     void classFactoryReadsTheContextSuppliedForEachEvaluation() {
-        Pattern pattern = Pattern.literal("ref.block.x");
-        RuntimeValue<Context, Integer> value = RuntimeValue.of(Integer.class, pattern, Context::x);
-
-        assertEquals(TypeToken.of(Integer.class), value.type());
+        Pattern pattern = Pattern.literal("x");
+        RuntimeValue<Context> value = RuntimeValue.of(Integer.class, pattern, Context::x);
+        var bound = value.bind("x");
+        assertEquals(TypeToken.of(Integer.class), bound.type());
         assertSame(pattern, value.pattern());
-        assertEquals(12, value.compute(new Context(12, Set.of())));
-        assertEquals(24, value.compute(new Context(24, Set.of())));
+        assertEquals(12, bound.compute(new Context(12, Set.of())));
+        assertEquals(24, bound.compute(new Context(24, Set.of())));
     }
 
     @Test
     void typeTokenFactoryRetainsParameterizedResultMetadata() {
-        TypeToken<Set<String>> type = new TypeToken<Set<String>>() {};
-        RuntimeValue<Context, Set<String>> value = RuntimeValue.of(
-                type, Pattern.literal("ref.biomes.tags"), Context::tags);
+        TypeToken<Set<String>> type = new TypeToken<>() {};
+        RuntimeValue<Context> value = RuntimeValue.of(type, Pattern.literal("tags"), Context::tags);
         Set<String> tags = Set.of("minecraft:caves");
-
-        assertSame(type, value.type());
-        assertSame(tags, value.compute(new Context(0, tags)));
+        var bound = value.bind("tags");
+        assertSame(type, bound.type());
+        assertSame(tags, bound.compute(new Context(0, tags)));
     }
 
     @Test
-    void constructionAndMatchingDoNotComputeAndComputingDoesNotRematchOrCache() {
+    void constructionMatchingAndBindingDoNotComputeAndEvaluationDoesNotRematch() {
         AtomicInteger matches = new AtomicInteger();
         AtomicInteger computations = new AtomicInteger();
-        Pattern pattern = src -> {
-            matches.incrementAndGet();
-            return 1;
-        };
-        RuntimeValue<Context, Integer> value = RuntimeValue.of(Integer.class, pattern, context -> {
+        Pattern pattern = source -> { matches.incrementAndGet(); return 1; };
+        RuntimeValue<Context> value = RuntimeValue.of(Integer.class, pattern, context -> {
             computations.incrementAndGet();
             return context.x();
         });
-
         assertEquals(0, matches.get());
-        assertEquals(0, computations.get());
         assertEquals(1, value.pattern().match(Slice.of("x")));
+        var bound = value.bind("x");
         assertEquals(0, computations.get());
-        assertEquals(12, value.compute(new Context(12, Set.of())));
-        assertEquals(24, value.compute(new Context(24, Set.of())));
+        assertEquals(12, bound.compute(new Context(12, Set.of())));
+        assertEquals(24, bound.compute(new Context(24, Set.of())));
         assertEquals(1, matches.get());
         assertEquals(2, computations.get());
     }
 
     @Test
-    void canBeAttachedToARuntimeNodeAndCombinedWithAnOperation() {
-        RuntimeValue<Context, Integer> value = RuntimeValue.of(
-                Integer.class, Pattern.literal("ref.block.x"), Context::x);
-        Operation<Integer, Integer, Boolean> lessEqual = Operation.of(
-                Integer.class, Integer.class, Boolean.class, Pattern.literal("<="), (a, b) -> a <= b);
-        Node<Context, Boolean> root = new Node.Operation<>(lessEqual.type(), 0, 0,
-                new Node.Runtime<>(value.type(), 0, 0, value::compute),
-                new Node.Literal<>(TypeToken.of(Integer.class), 0, 0, 64), lessEqual);
-        Function<Context, Boolean> expression = root::evaluate;
-
-        assertTrue(expression.apply(new Context(64, Set.of())));
-        assertFalse(expression.apply(new Context(65, Set.of())));
+    void oneDefinitionCanBindDifferentResultTypesDuringCompilation() {
+        RuntimeValue<Context> value = new RuntimeValue<>() {
+            @Override public Pattern pattern() { return Pattern.regex("number|flag"); }
+            @Override public Bound<Context, ?> bind(String matched) {
+                return switch (matched) {
+                    case "number" -> Bound.of(TypeToken.of(Integer.class), Context::x);
+                    case "flag" -> Bound.of(TypeToken.of(Boolean.class), context -> context.x() > 0);
+                    default -> throw new IllegalArgumentException(matched);
+                };
+            }
+        };
+        var compiler = Compiler.of(Grammar.with(Context.class).standard().runtime(value).done());
+        assertEquals(4, compiler.compile("number+1", Integer.class).apply(new Context(3, Set.of())));
+        var predicate = compiler.compile("flag and number > 1", Boolean.class);
+        assertTrue(predicate.apply(new Context(2, Set.of())));
+        assertFalse(predicate.apply(new Context(-1, Set.of())));
+        assertThrows(CompilationException.class, () -> compiler.compile("flag+1", Integer.class));
     }
 
     @Test
     void contextlessDefinitionsCanIgnoreNullContexts() {
         AtomicInteger current = new AtomicInteger(1);
-        RuntimeValue<Void, Integer> value = RuntimeValue.of(
-                Integer.class, Pattern.literal("current"), ignored -> current.get());
-
-        assertEquals(1, value.compute(null));
+        RuntimeValue<Void> value = RuntimeValue.of(Integer.class, Pattern.literal("current"), _ -> current.get());
+        var bound = value.bind("current");
+        assertEquals(1, bound.compute(null));
         current.set(2);
-        assertEquals(2, value.compute(null));
+        assertEquals(2, bound.compute(null));
     }
 
     @Test
     void computationFailuresPropagateWithoutWrapping() {
-        IllegalArgumentException failure = new IllegalArgumentException("missing current block");
-        RuntimeValue<Context, Integer> value = RuntimeValue.of(
-                Integer.class, Pattern.literal("ref.block.x"), context -> {
-                    throw failure;
-                });
-
-        assertSame(failure, assertThrows(IllegalArgumentException.class,
-                () -> value.compute(new Context(0, Set.of()))));
+        var failure = new IllegalArgumentException("missing current block");
+        RuntimeValue<Context> value = RuntimeValue.of(Integer.class, Pattern.literal("x"), _ -> { throw failure; });
+        var bound = value.bind("x");
+        assertSame(failure, assertThrows(IllegalArgumentException.class, () -> bound.compute(new Context(0, Set.of()))));
     }
 
     @Test
-    void rejectsNullDefinitions() {
-        Pattern pattern = Pattern.literal("ref.block.x");
-        Function<Context, Integer> compute = Context::x;
-
-        assertThrows(NullPointerException.class, () -> RuntimeValue.of((Class<Integer>) null, pattern, compute));
-        assertThrows(NullPointerException.class, () -> RuntimeValue.of((TypeToken<Integer>) null, pattern, compute));
-        assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, null, compute));
-        assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, pattern, null));
+    void rejectsNullDefinitionAndBindingComponents() {
+        assertThrows(NullPointerException.class, () -> RuntimeValue.of((Class<Integer>) null, Pattern.literal("x"), x -> 1));
+        assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, null, x -> 1));
+        assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, Pattern.literal("x"), null));
+        assertThrows(NullPointerException.class, () -> RuntimeValue.Bound.of(null, x -> 1));
+        assertThrows(NullPointerException.class, () -> RuntimeValue.Bound.of(TypeToken.of(Integer.class), null));
+        assertThrows(NullPointerException.class, () -> RuntimeValue.of(Integer.class, Pattern.literal("x"), x -> 1).bind(null));
     }
 
     private record Context(int x, Set<String> tags) {}

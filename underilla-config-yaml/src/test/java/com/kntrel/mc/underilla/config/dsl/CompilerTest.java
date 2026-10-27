@@ -84,7 +84,7 @@ class CompilerTest {
         }, text -> { parsed.incrementAndGet(); return Integer.valueOf(text); });
         Operation<Integer, Integer, Integer> add = Operation.of(Integer.class, Integer.class,
                 Integer.class, Pattern.literal("+"), (a, b) -> { operated.incrementAndGet(); return a + b; });
-        RuntimeValue<Context, Integer> runtime = RuntimeValue.of(Integer.class, Pattern.literal("x"), ctx -> {
+        RuntimeValue<Context> runtime = RuntimeValue.of(Integer.class, Pattern.literal("x"), ctx -> {
             evaluated.incrementAndGet(); return ctx.x();
         });
         Compiler<Context> compiler = Compiler.of(new Grammar<>(List.of(literal), List.of(add), List.of(runtime)));
@@ -202,7 +202,7 @@ class CompilerTest {
         TypeLiteral<Integer> literal = TypeLiteral.of(Integer.class, Pattern.literal("x"), text -> {
             invocations.incrementAndGet(); return 1;
         });
-        RuntimeValue<Void, Integer> value = RuntimeValue.of(Integer.class, Pattern.literal("x"), ignored -> {
+        RuntimeValue<Void> value = RuntimeValue.of(Integer.class, Pattern.literal("x"), ignored -> {
             invocations.incrementAndGet(); return 2;
         });
         Compiler<Void> compiler = new Compiler<>(new Grammar<>(List.of(literal), List.of(), List.of(value)));
@@ -232,7 +232,7 @@ class CompilerTest {
     @Test
     void groupedNodesRetainFullSourceSpansWithoutEvaluatingRuntimeValues() {
         AtomicInteger evaluations = new AtomicInteger();
-        RuntimeValue<Context, Integer> runtime = RuntimeValue.of(Integer.class, Pattern.literal("x"), context -> {
+        RuntimeValue<Context> runtime = RuntimeValue.of(Integer.class, Pattern.literal("x"), context -> {
             evaluations.incrementAndGet();
             return context.x();
         });
@@ -294,7 +294,7 @@ class CompilerTest {
 
     @Test
     void snapshotsRuntimeCollectionsAndSharesGrammarAcrossContextTypes() {
-        List<RuntimeValue<Context, ?>> values = new ArrayList<>();
+        List<RuntimeValue<Context>> values = new ArrayList<>();
         values.add(RuntimeValue.of(Integer.class, Pattern.literal("x"), Context::x));
         Compiler<Context> contextCompiler = new Compiler<>(ARITHMETIC.withRuntimeValues(values));
         values.clear();

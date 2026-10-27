@@ -27,17 +27,17 @@ import java.util.function.Function;
  */
 public final class Compiler<C> {
 
-    private final List<OperandDefinition<C, ?>> operands;
+    private final List<OperandDefinition<C>> operands;
     private final List<OperatorDefinition<?, ?, ?>> operators;
     private final List<TransformationDefinition<?, ?>> transformations;
 
     public Compiler(Grammar<C> grammar) {
         Objects.requireNonNull(grammar, "grammar");
-        List<OperandDefinition<C, ?>> operands = new ArrayList<>();
+        List<OperandDefinition<C>> operands = new ArrayList<>();
         for (TypeLiteral<?> literal : grammar.literals()) {
             operands.add(literalDefinition(literal));
         }
-        for (RuntimeValue<C, ?> runtimeValue : grammar.runtimeValues()) {
+        for (RuntimeValue<C> runtimeValue : grammar.runtimeValues()) {
             operands.add(runtimeDefinition(runtimeValue));
         }
         this.operands = List.copyOf(operands);
@@ -80,18 +80,22 @@ public final class Compiler<C> {
         return compile(source, TypeToken.of(expectedType));
     }
 
-    private <T> OperandDefinition<C, T> literalDefinition(TypeLiteral<T> literal) {
+    private <T> OperandDefinition<C> literalDefinition(TypeLiteral<T> literal) {
         TypeToken<T> type = Objects.requireNonNull(literal.type(), "literal.type");
         return new OperandDefinition<>(
                 Objects.requireNonNull(literal.pattern(), "literal.pattern"),
-                type, (source, start, end) -> new Node.Literal<>(type, start, end, literal.parse(source.substring(start, end))));
+                type.toString(), (source, start, end) -> new Node.Literal<>(type, start, end, literal.parse(source.substring(start, end))));
     }
 
-    private <T> OperandDefinition<C, T> runtimeDefinition(RuntimeValue<C, T> value) {
-        TypeToken<T> type = Objects.requireNonNull(value.type(), "runtimeValue.type");
+    private OperandDefinition<C> runtimeDefinition(RuntimeValue<C> value) {
         return new OperandDefinition<>(
                 Objects.requireNonNull(value.pattern(), "runtimeValue.pattern"),
-                type, (source, start, end) -> new Node.Runtime<>(type, start, end, value::compute));
+                "runtime value", (source, start, end) -> boundRuntime(
+                        Objects.requireNonNull(value.bind(source.substring(start, end)), "runtimeValue.bound"), start, end));
+    }
+
+    private <T> Node<C, T> boundRuntime(RuntimeValue.Bound<C, T> value, int start, int end) {
+        return new Node.Runtime<>(value.type(), start, end, value::compute);
     }
 
     private static <A, B, R> OperatorDefinition<A, B, R> operatorDefinition(Operation<A, B, R> operation) {
@@ -122,11 +126,12 @@ public final class Compiler<C> {
     }
 
     @FunctionalInterface
-    private interface OperandBinder<C, T> {
-        Node<C, T> bind(String source, int start, int end);
+    private interface OperandBinder<C> {
+        Node<C, ?> bind(String source, int start, int end);
     }
 
-    private record OperandDefinition<C, T>(Pattern pattern, TypeToken<T> type, OperandBinder<C, T> binder) {}
+    private record OperandDefinition<C>(Pattern pattern, String description, OperandBinder<C> binder) {}
+
 
     private record OperatorDefinition<A, B, R>(
             Pattern pattern, TypeToken<A> aType, TypeToken<B> bType, TypeToken<R> type,
@@ -192,7 +197,7 @@ public final class Compiler<C> {
                 cursor++;
                 return nested.withSpan(start, cursor);
             }
-            Match<OperandDefinition<C, ?>> match = match(operands, OperandDefinition::pattern);
+            Match<OperandDefinition<C>> match = match(operands, OperandDefinition::pattern);
             Match<TransformationDefinition<?, ?>> prefix = match(transformations, TransformationDefinition::pattern);
             if (prefix != null) {
                 if (match != null && prefix.length() == match.length()) {
@@ -214,11 +219,11 @@ public final class Compiler<C> {
             return bindOperand(match.definitions().getFirst(), start, cursor);
         }
 
-        private <T> Node<C, T> bindOperand(OperandDefinition<C, T> definition, int start, int end) {
+        private Node<C, ?> bindOperand(OperandDefinition<C> definition, int start, int end) {
             try {
                 return definition.binder().bind(source, start, end);
             } catch (RuntimeException exception) {
-                throw error("Failed to parse operand as " + definition.type(), start, end, exception);
+                throw error("Failed to parse operand as " + definition.description(), start, end, exception);
             }
         }
 

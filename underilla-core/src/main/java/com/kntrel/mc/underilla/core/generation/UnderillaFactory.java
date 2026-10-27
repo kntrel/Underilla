@@ -7,8 +7,10 @@ import com.kntrel.mc.underilla.core.api.ChunkData;
 import com.kntrel.mc.underilla.core.api.Entity;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.api.ID;
-import com.kntrel.mc.underilla.core.api.context.BiomeContext;
-import com.kntrel.mc.underilla.core.api.context.BlockContext;
+import com.kntrel.mc.underilla.core.api.scope.BlockScope;
+import com.kntrel.mc.underilla.core.api.scope.StructureScope;
+import com.kntrel.mc.underilla.core.api.scope.DualBiomeScope;
+import com.kntrel.mc.underilla.core.api.scope.DualBlockScope;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cleanup.EntityCleanupPatcher;
 import com.kntrel.mc.underilla.core.inspector.InspectionRegion;
@@ -107,10 +109,11 @@ public final class UnderillaFactory {
         private int chunkCacheSize = 64;
         private BlockFactory blocks;
         private GenerationArea generationArea = GenerationArea.everywhere();
-        private Predicate<BiomeContext> surfaceOnlyBiome = _ -> false;
-        private Predicate<BiomeContext> preservedGeneratedBiome = _ -> false;
-        private Predicate<BlockContext> ignoredSurfaceBlock = _ -> false;
-        private Predicate<BlockContext> keptSurfaceBlock;
+        private Predicate<DualBiomeScope> surfaceOnlyBiome = _ -> false;
+        private Predicate<DualBiomeScope> preservedGeneratedBiome = _ -> false;
+        private Predicate<BlockScope> passthroughSurfaceBlock = _ -> false;
+        private Predicate<DualBlockScope> keptTargetBlock;
+        private Predicate<StructureScope> structureFilter = _ -> true;
         private UnaryOperator<Block> surfaceBlockTransformer;
         private Function<ID, Optional<ID>> cleanupSupportReplacement;
         private Function<ID, Optional<ID>> cleanupBlockReplacement;
@@ -204,13 +207,13 @@ public final class UnderillaFactory {
         }
 
         /** The target biome is available during biome replacement, but not reference-boundary scans. */
-        public Builder surfaceOnlyBiomes(Predicate<BiomeContext> surfaceOnlyBiome) {
+        public Builder surfaceOnlyBiomes(Predicate<DualBiomeScope> surfaceOnlyBiome) {
             this.surfaceOnlyBiome = Objects.requireNonNull(surfaceOnlyBiome, "surfaceOnlyBiome");
             return this;
         }
 
         /** Both sampled biomes and source/target chunk coordinates are available. */
-        public Builder preservedGeneratedBiomes(Predicate<BiomeContext> preservedGeneratedBiome) {
+        public Builder preservedGeneratedBiomes(Predicate<DualBiomeScope> preservedGeneratedBiome) {
             this.preservedGeneratedBiome = Objects.requireNonNull(
                     preservedGeneratedBiome, "preservedGeneratedBiome");
             return this;
@@ -222,14 +225,14 @@ public final class UnderillaFactory {
         }
 
         /** Evaluated against source data only while calculating cached reference boundaries. */
-        public Builder ignoredSurfaceBlocks(Predicate<BlockContext> ignoredSurfaceBlock) {
-            this.ignoredSurfaceBlock = Objects.requireNonNull(ignoredSurfaceBlock, "ignoredSurfaceBlock");
+        public Builder passthroughSourceBlocks(Predicate<BlockScope> passthroughSurfaceBlock) {
+            this.passthroughSurfaceBlock = Objects.requireNonNull(passthroughSurfaceBlock, "passthroughSurfaceBlock");
             return this;
         }
 
         /** The source block is the transformed proposal, and the target block is its destination. */
-        public Builder keptSurfaceBlocks(Predicate<BlockContext> keptSurfaceBlock) {
-            this.keptSurfaceBlock = Objects.requireNonNull(keptSurfaceBlock, "keptSurfaceBlock");
+        public Builder keptSurfaceBlocks(Predicate<DualBlockScope> keptSurfaceBlock) {
+            this.keptTargetBlock = Objects.requireNonNull(keptSurfaceBlock, "keptSurfaceBlock");
             return this;
         }
 
@@ -286,6 +289,12 @@ public final class UnderillaFactory {
             return this;
         }
 
+        /** Sets the structure selection policy, which may run concurrently on generation threads. */
+        public Builder structureFilter(Predicate<StructureScope> structureFilter) {
+            this.structureFilter = Objects.requireNonNull(structureFilter, "structureFilter");
+            return this;
+        }
+
         public Builder structures(boolean enabled) {
             structuresEnabled = enabled;
             return this;
@@ -330,7 +339,7 @@ public final class UnderillaFactory {
                     worldMask,
                     configuredSurfaceFill,
                     configuredAir,
-                    keptSurfaceBlock,
+                    keptTargetBlock,
                     surfaceBlockTransformer,
                     surfaceBiomeUseTopYOnly,
                     chunkCache
@@ -390,6 +399,7 @@ public final class UnderillaFactory {
                     .afterFeatures(featurePatchers)
                     .afterLoad(loadPatchers)
                     .flags(flags)
+                    .structureFilter(structureFilter)
                     .altimeter(altimeter)
                     .done();
             generationPlan = configuredMinimumY > DEFAULT_MINIMUM_Y || configuredMaximumY < DEFAULT_MAXIMUM_Y
@@ -500,7 +510,8 @@ public final class UnderillaFactory {
                     verticallyBound(plan.afterLoad(), minimumY, maximumY),
                     plan.biomePatch(),
                     plan.flags(),
-                    plan.altimeter()
+                    plan.altimeter(),
+                    plan.structureFilter()
             );
         }
 
@@ -519,7 +530,7 @@ public final class UnderillaFactory {
                 WorldMask worldMask,
                 boolean surfaceFill,
                 Supplier<Block> air,
-                Predicate<BlockContext> survivingBlock,
+                Predicate<DualBlockScope> survivingBlock,
                 UnaryOperator<Block> blockTransformer,
                 boolean useTopYOnly,
                 ChunkCache chunkCache
@@ -565,7 +576,7 @@ public final class UnderillaFactory {
                         adaptiveMaximumDepth,
                         adaptiveMinimumHiddenDepth,
                         surfaceOnlyBiome,
-                        ignoredSurfaceBlock,
+                        passthroughSurfaceBlock,
                         cache
                 );
                 case NONE -> new AbsoluteWorldMask(minimumY);

@@ -1,0 +1,277 @@
+# UCEL selections --------------------------------------------------------------
+# UCEL means Underilla Configuration Expression Language.
+# Selectors accept one boolean expression or a list of expressions joined by OR.
+# An empty list matches nothing; true matches everything; false matches nothing.
+# Single-world contexts expose local roots: block, biome, world, chunk, structure,
+# or entity, according to the context. The setting determines which world's data is supplied.
+# Dual-world contexts expose source and target. Bare block, biome, and world alias
+# source.block, source.biome, and source.world in those contexts.
+# structure and entity refer to the candidate being evaluated.
+# chunk refers to the evaluated chunk. Each selector lists its available roots.
+# @namespace:name is a resource ID; tagged checks a tag; matches checks a full-ID
+# regular expression. Tags must be supplied by Minecraft or an installed data pack.
+# Replacement rules run in order; the first matching if selects the literal ID in with.
+
+# Worlds -----------------------------------------------------------------------
+worlds:
+  target:
+    # Name of the destination world receiving the merged terrain.
+    name: world
+    # Generator for chunks outside the surface source.
+    # VoidWorldGenerator creates empty chunks; VANILLA uses vanilla generation.
+    # An installed generator plugin's name is also accepted.
+    outside-generator: VANILLA
+
+  source:
+    source:
+      # Select a saved world and dimension. Relative paths start at the server root.
+      # Dimension IDs without a namespace default to minecraft.
+      # For this layout, terrain is read from:
+      # world_surface/dimensions/minecraft/overworld/region
+      world-path: world_surface
+      dimension: minecraft:overworld
+
+      # Alternative: replace world-path and dimension with a direct region path.
+      # Use this for older world layouts or separately stored region files.
+      # Do not combine both source forms.
+      # region-path: world_surface/region
+
+      # Entity data is resolved from the selected world and dimension.
+      # For a direct region source, provide its entity directory explicitly.
+      # entities-path: world_surface/entities
+
+      # Metadata is read from level.dat where available and inferred from the
+      # source layout and dimension type. Override only missing or incorrect values.
+      # Custom dimension types with unknown bounds require min-height/max-height.
+      # max-height is exclusive. These describe the source, not the output area.
+      # name: "Surface reference"
+      # min-height: -64
+      # max-height: 320
+
+    # Replace source blocks while copying, before final cleanup.
+    # Scope for each if: block, biome, world, and chunk, supplied from the source.
+    # Example:
+    #   - if: block.id == @minecraft:sand
+    #     with: minecraft:sandstone
+    replace-blocks: []
+
+  underground:
+    # vanilla: generate new underground; world: copy it from the source below.
+    type: vanilla
+    # Used only when type is world. Supports the same source forms and metadata
+    # overrides as worlds.source.source. Source-world biome transfer remains
+    # unsupported; this selects the underground block source only.
+    source:
+      world-path: world_caves
+      dimension: minecraft:overworld
+      # Alternative to world-path and dimension:
+      # region-path: world_caves/region
+      # name: "Underground reference"
+      # min-height: -64
+      # max-height: 320
+
+# Area -------------------------------------------------------------------------
+area:
+  # Horizontal block coordinates: minimum inclusive, maximum exclusive.
+  # X/Z bounds must be multiples of 16. Keep a small area for initial test runs.
+  # Each X/Z bound also accepts auto, inferred from the source region-file bounds;
+  # those bounds can include missing chunks within a partially filled region.
+  min-x: 0
+  min-z: 0
+  max-x: 512
+  max-z: 512
+
+  # Output vertical limits in blocks: minimum inclusive, maximum exclusive.
+  min-y: -64
+  max-y: 320
+
+# Merge ------------------------------------------------------------------------
+merge:
+  # surface: follow the source terrain, retaining a surface layer; recommended.
+  # absolute: copy surface terrain above a fixed Y boundary.
+  # none: copy source terrain without merging in replacement underground.
+  strategy: surface
+
+  # Used only by the absolute strategy.
+  absolute:
+    boundary: 64
+    depth: 8
+
+  # Used only by the surface strategy.
+  surface:
+    # Thickness of source terrain retained below its surface, in blocks.
+    depth: 8
+    adaptive-depth:
+      # Extend the retained layer beside exposed terrain to cover cliffs.
+      # Disable if this protection is unnecessary to reduce generation work.
+      enabled: true
+      # Maximum adaptive depth in blocks.
+      max-depth: 50
+      # Minimum hidden thickness in blocks; must not exceed depth or max-depth.
+      min-hidden-depth: 2
+
+    # Scan down each column until a solid block that does not match is found.
+    # Matching blocks are passed through, so trees and ice need not count as terrain.
+    # Scope: block, biome, world, and chunk, supplied from the source during this scan.
+    passthrough-block-if:
+      - block tagged @minecraft:logs
+      - block tagged @minecraft:leaves
+      - block tagged @minecraft:planks
+      - block tagged @minecraft:fences
+      - block tagged @minecraft:fence_gates
+      - block tagged @minecraft:walls
+      - block tagged @minecraft:doors
+      - block tagged @minecraft:trapdoors
+      - block tagged @minecraft:ice
+      - block.id matches 'minecraft:(.*)_wood'
+      - block.id matches 'minecraft:(.*)_stem'
+      - block.id matches 'minecraft:(.*)_hyphae'
+
+  # Keep matching source blocks outside the normal merge selection.
+  # Scope: source/target.block, source/target.biome, source/target.world, and chunk.
+  # block/biome/world alias the source values; target.block is the destination value.
+  # Example: block.id == @minecraft:diamond_ore and biome.id != @minecraft:desert
+  keep-source-if: >-
+    false
+
+
+# Biomes -----------------------------------------------------------------------
+# Copy source biomes into the target, with rules for preserving selected target biomes.
+biomes:
+  source:
+    # Take the source's biome from the top-most y coordinate. This saves CPU time.
+    # Practical if the source world has a 2D biome map.
+    # Set to false if your source world has 3D biomes.
+    top-only: true
+
+  target:
+    # Preserve matching target biomes instead of overwriting them with source biomes.
+    # Scope: source/target.biome, source/target.world, and chunk. No block data.
+    # biome/world alias the source values, including inside this target section.
+    # Example: target.biome tagged @minecraft:caves and biome.id != @minecraft:desert
+    preserve-if: target.biome tagged @minecraft:caves
+    # Restrict preservation to outside terrain merged from the source.
+    # When true, source biomes take precedence inside that terrain even if preserve-if matches.
+    # When false, preserve-if may also retain target biomes inside source terrain.
+    outside-source-terrain: true
+
+# Generation -------------------------------------------------------------------
+# This section customizes Minecraft's world generation stages
+generation:
+  population:
+    # Allow vanilla features/decorations and generation-time mob spawning.
+    # Features include trees, flowers, and ores; customize them with datapacks.
+    enabled: true
+
+  structures:
+    # Allow vanilla and data pack structures to be generated.
+    enabled: true
+    # Allow matching structures. Scope: structure, biome, world, and chunk, from the target.
+    # The biome is sampled at the structure evaluation position when available.
+    # structure.id identifies its type; structure.origin exposes global x/y/z.
+    # structure.bounds exposes minX/minY/minZ, maxX/maxY/maxZ, width/height/depth.
+    # Source values and block data are unavailable.
+    # Example: structure.id != @minecraft:monument
+    allow-if: >-
+      true
+
+  carvers:
+    # Use vanilla carvers, including custom carvers configured by biome datapacks.
+    enabled: true
+
+    # Preserve liquids when carving the surface, preventing holes in bodies of water and lava.
+    preserve-liquids: true
+
+    # Allow carving where this biome-scoped expression matches.
+    # Scope: biome, world, and chunk, supplied from the source.
+    # Target values and block data are unavailable at this evaluation stage.
+    # Example: biome.id != @minecraft:desert
+    allow-if: >-
+      true
+
+
+
+# Cleanup ----------------------------------------------------------------------
+# Cleanup runs after merging and generation. Block cleanup adds per-block work;
+# disable unneeded passes if their corrections are unnecessary for your source.
+cleanup:
+  blocks:
+    # Controls both support-block corrections and general replacements below.
+    enabled: true
+    # Replace the bottom block of unsupported columns to support sand/gravel.
+    # Scope for each if: block, biome, world, and chunk, supplied from the target.
+    support-blocks:
+      - if: block.id == @minecraft:sand
+        with: minecraft:sandstone
+      - if: block.id == @minecraft:red_sand
+        with: minecraft:red_sandstone
+      - if: block.id == @minecraft:gravel
+        with: minecraft:andesite
+
+    # Applied after support-block corrections. Use minecraft:air to remove blocks.
+    # Scope for each if: block, biome, world, and chunk, supplied from the target.
+    # Example:
+    #   - if: block.id matches 'minecraft:.*_leaves'
+    #     with: minecraft:air
+    replace-blocks: []
+
+  illegal-blocks:
+    # Remove invalid leftovers such as half beds/doors, unsupported plants,
+    # and underground grass. This pass is independent of cleanup.blocks.enabled.
+    enabled: true
+    # These rules select replacements only for blocks already found to be invalid.
+    # Unmatched invalid blocks become air.
+    # Scope for each if: block, biome, world, and chunk, supplied from the target.
+    replace-blocks:
+      - if: block.id == @minecraft:grass_block
+        with: minecraft:dirt
+      - if: block.id == @minecraft:podzol
+        with: minecraft:dirt
+      - if: block.id == @minecraft:dirt_path
+        with: minecraft:dirt
+
+  entities:
+    enabled: true
+    # Remove matching entities currently in the target chunk.
+    # Scope: entity, world, and chunk, supplied from the target.
+    # Source values, biomes, and block data are unavailable.
+    # Example: entity.id matches 'minecraft:.*_minecart'
+    remove-if: entity.id == @minecraft:item # Dropped items.
+
+# Performance ------------------------------------------------------------------
+performance:
+  cache:
+    # Number of source regions held in memory, including terrain/entity data.
+    # Each region covers 32 x 32 chunks. Higher values cost more memory and can
+    # help scattered access; above 16 rarely helps region-by-region generation.
+    # Minimum: 1.
+    region-files: 16
+
+    # Number of recently used source chunks held ready for concurrent generation
+    # and neighboring-terrain inspection. Too small causes repeated reads and
+    # calculations; larger values trade memory for speed.
+    # Minimum: 1; recommended minimum: 32.
+    chunks: 64
+
+# Diagnostics ------------------------------------------------------------------
+diagnostics:
+  debug: false
+  # Seconds between progress messages. Values below 1 disable them.
+  progress-interval-seconds: 10
+
+  inspection:
+    # Capture generation stages as PNGs for one vertical slice.
+    # Adds rendering work; enable only while diagnosing generation.
+    enabled: false
+    # Fixed horizontal axis: z produces an X-by-Y image; x produces Z-by-Y.
+    axis: z
+    # Fixed world block coordinate on the selected axis.
+    slice-coordinate: 0
+    # First chunk coordinate on the traversed axis: X for axis z, Z for axis x.
+    start-chunk: 0
+    # Consecutive chunks along the traversed axis. Minimum: 1.
+    length-chunks: 32
+    # Overlay translucent biome colors on the images.
+    biome-overlay: false
+    # Directory receiving stage PNGs and the combined sequence.png.
+    output: ./underilla-inspect

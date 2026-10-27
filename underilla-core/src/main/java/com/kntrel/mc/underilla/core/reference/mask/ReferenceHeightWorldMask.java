@@ -4,9 +4,12 @@ import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.api.ID;
-import com.kntrel.mc.underilla.core.api.context.ChunkView;
-import com.kntrel.mc.underilla.core.api.context.BiomeContext;
-import com.kntrel.mc.underilla.core.api.context.BlockContext;
+import com.kntrel.mc.underilla.core.api.scope.BiomeSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.BlockScope;
+import com.kntrel.mc.underilla.core.api.scope.BlockSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.ChunkSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.DualBiomeScope;
+import com.kntrel.mc.underilla.core.api.scope.WorldSnapshot;
 import com.kntrel.mc.underilla.core.api.GenerationConstants;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.cache.TopicChunkCache;
@@ -34,8 +37,8 @@ public final class ReferenceHeightWorldMask implements WorldMask {
     private final int mergeDepth;
     private final int adaptiveMaximumDepth;
     private final int adaptiveMinimumHiddenDepth;
-    private final Predicate<BiomeContext> surfaceWorldOnlyBiome;
-    private final Predicate<BlockContext> ignoredSurfaceBlock;
+    private final Predicate<DualBiomeScope> surfaceWorldOnlyBiome;
+    private final Predicate<BlockScope> passthroughSurfaceBlock;
 
     public ReferenceHeightWorldMask(
             WorldReader surfaceWorld,
@@ -46,8 +49,8 @@ public final class ReferenceHeightWorldMask implements WorldMask {
             int mergeDepth,
             int adaptiveMaximumDepth,
             int adaptiveMinimumHiddenDepth,
-            Predicate<BiomeContext> surfaceWorldOnlyBiome,
-            Predicate<BlockContext> ignoredSurfaceBlock,
+            Predicate<DualBiomeScope> surfaceWorldOnlyBiome,
+            Predicate<BlockScope> passthroughSurfaceBlock,
             ChunkCache cache
     ) {
         this.surfaceWorld = Objects.requireNonNull(surfaceWorld, "surfaceWorld");
@@ -60,7 +63,7 @@ public final class ReferenceHeightWorldMask implements WorldMask {
         this.adaptiveMaximumDepth = adaptiveMaximumDepth;
         this.adaptiveMinimumHiddenDepth = adaptiveMinimumHiddenDepth;
         this.surfaceWorldOnlyBiome = Objects.requireNonNull(surfaceWorldOnlyBiome, "surfaceWorldOnlyBiome");
-        this.ignoredSurfaceBlock = Objects.requireNonNull(ignoredSurfaceBlock, "ignoredSurfaceBlock");
+        this.passthroughSurfaceBlock = Objects.requireNonNull(passthroughSurfaceBlock, "passthroughSurfaceBlock");
     }
 
     @Override
@@ -78,7 +81,7 @@ public final class ReferenceHeightWorldMask implements WorldMask {
         );
         int column = Math.floorMod(globalZ, size) * size + Math.floorMod(globalX, size);
         WorldKey target = targetWorld == null ? null : new WorldKey(targetWorld.name(), targetWorld.dimension(),
-                targetWorld.minHeight(), targetWorld.maxHeight());
+                targetWorld.minHeight(), targetWorld.maxHeight(), targetWorld.seed());
         synchronized (chunk) {
             if (!Objects.equals(chunk.target, target)) {
                 Arrays.fill(chunk.known, false);
@@ -98,7 +101,7 @@ public final class ReferenceHeightWorldMask implements WorldMask {
         private final boolean[] known = new boolean[heights.length];
     }
 
-    private record WorldKey(String name, ID dimension, int minimumY, int maximumY) {}
+    private record WorldKey(String name, ID dimension, int minimumY, int maximumY, long seed) {}
 
     private int boundaryAt(World targetWorld, int globalX, int globalZ) {
         int clampedHardSurfaceBoundary = Math.max(minimumY, Math.min(hardSurfaceBoundary, maximumY));
@@ -107,15 +110,15 @@ public final class ReferenceHeightWorldMask implements WorldMask {
         }
 
         Optional<Biome> biome = surfaceWorld.biomeAt(globalX, maximumY, globalZ);
-        ChunkView chunk = ChunkView.of(Math.floorDiv(globalX, GenerationConstants.CHUNK_SIZE),
+        ChunkSnapshot chunk = ChunkSnapshot.of(Math.floorDiv(globalX, GenerationConstants.CHUNK_SIZE),
                 Math.floorDiv(globalZ, GenerationConstants.CHUNK_SIZE));
-        if (biome.isPresent() && surfaceWorldOnlyBiome.test(BiomeContext.of(
-                chunk, surfaceWorld, biome.get(), targetWorld, null))) {
+        if (biome.isPresent() && surfaceWorldOnlyBiome.test(DualBiomeScope.of(
+                chunk, surfaceWorld, BiomeSnapshot.atBlock(biome.get(), globalX, maximumY, globalZ), targetWorld, null))) {
             return minimumY;
         }
 
         int lowerBlock = clampedHardSurfaceBoundary + mergeDepth;
-        while (!isSurfaceBlock(targetWorld, globalX, lowerBlock, globalZ)
+        while (!isSurfaceBlock(globalX, lowerBlock, globalZ)
                 && lowerBlock > minimumY) {
             lowerBlock--;
         }
@@ -136,16 +139,13 @@ public final class ReferenceHeightWorldMask implements WorldMask {
         return lowerBlock - finalDepth;
     }
 
-    private boolean isSurfaceBlock(World targetWorld, int x, int y, int z) {
+    private boolean isSurfaceBlock(int x, int y, int z) {
         Block block = surfaceWorld.blockAt(x, y, z).orElse(air);
-        ChunkView chunk = ChunkView.of(Math.floorDiv(x, GenerationConstants.CHUNK_SIZE),
+        ChunkSnapshot chunk = ChunkSnapshot.of(Math.floorDiv(x, GenerationConstants.CHUNK_SIZE),
                 Math.floorDiv(z, GenerationConstants.CHUNK_SIZE));
-        return block.isSolid() && !ignoredSurfaceBlock.test(
-                BlockContext.of(
-                        chunk,
-                        surfaceWorld,
-                        surfaceWorld.biomeAt(x, y, z).orElse(null), block,
-                        targetWorld, null, null));
+        return block.isSolid() && !passthroughSurfaceBlock.test(
+                BlockScope.of(WorldSnapshot.of(surfaceWorld), chunk,
+                        BiomeSnapshot.atBlock(surfaceWorld.biomeAt(x, y, z).orElse(null), x, y, z), BlockSnapshot.of(block)));
     }
 
     private static boolean haveNonSolidNeighbour(WorldReader world, int x, int y, int z) {

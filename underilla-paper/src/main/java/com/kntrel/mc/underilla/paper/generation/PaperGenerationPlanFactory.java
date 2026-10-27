@@ -11,6 +11,9 @@ import com.kntrel.mc.underilla.core.profiling.Instrumenter;
 import com.kntrel.mc.underilla.core.reader.WorldReader;
 import com.kntrel.mc.underilla.paper.Underilla;
 import com.kntrel.mc.underilla.paper.impl.BukkitEntity;
+import com.kntrel.mc.underilla.paper.impl.BukkitIDs;
+import io.papermc.paper.registry.RegistryAccess;
+import io.papermc.paper.registry.RegistryKey;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.BooleanKeys;
 import com.kntrel.mc.underilla.paper.io.UnderillaConfig.SetBiomeStringKeys;
@@ -22,6 +25,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /** Maps Underilla's Paper configuration to the platform-neutral generation-plan API. */
 public final class PaperGenerationPlanFactory {
@@ -62,6 +66,10 @@ public final class PaperGenerationPlanFactory {
                 config.getSetBiomeString(SetBiomeStringKeys.SURFACE_WORLD_ONLY_ON_THIS_BIOMES),
                 config.getBoolean(BooleanKeys.PRESERVE_LIQUID_FROM_CAVERS));
 
+        var structures = RegistryAccess.registryAccess().getRegistry(RegistryKey.STRUCTURE);
+        Set<ID> allowedStructures = config.getSetStructure(UnderillaConfig.SetStructureKeys.SURUCTURE_ONLY)
+                .stream().map(structures::getKeyOrThrow).map(BukkitIDs::from).collect(Collectors.toUnmodifiableSet());
+
         builder
                 .instrumenter(instrumenter)
                 .verticalRange(config.generationAreaMinY(), config.generationAreaMaxY())
@@ -77,17 +85,18 @@ public final class PaperGenerationPlanFactory {
                         config.generationAreaMinZ(),
                         config.generationAreaMaxX(),
                         config.generationAreaMaxZ())
-                .surfaceOnlyBiomes(ctx -> config.isSurfaceWorldOnlyBiome(ctx.source().biome().id()))
-                .preservedGeneratedBiomes(ctx -> config.shouldPreserveBiome(ctx.target().biome().id()))
+                .surfaceOnlyBiomes(snapshot -> config.isSurfaceWorldOnlyBiome(snapshot.source().biome().id()))
+                .preservedGeneratedBiomes(snapshot -> config.shouldPreserveBiome(snapshot.target().biome().id()))
                 .preserveGeneratedBiomesOnlyUnderSurface(config.preserveBiomesOnlyUnderSurface())
-                .ignoredSurfaceBlocks(ctx -> config.isIgnoredForSurfaceCalculation(ctx.source().block().id()))
-                .keptSurfaceBlocks(ctx -> config.shouldKeepSurfaceBlockInCaves(ctx.source().block().id()))
+                .passthroughSourceBlocks(snapshot -> config.isIgnoredForSurfaceCalculation(snapshot.block().id()))
+                .keptSurfaceBlocks(snapshot -> config.shouldKeepSurfaceBlockInCaves(snapshot.source().block().id()))
                 .surfaceBlockTransformer(block -> transformSurfaceBlock(block, config, blocks))
                 .surfaceBiomeUseTopYOnly(config.surfaceBiomeUseTopYOnly())
                 .carvers(config.carversEnabled())
                 .features(config.vanillaPopulationEnabled())
                 .mobs(config.vanillaPopulationEnabled())
                 .structures(config.structuresEnabled())
+                .structureFilter(scope -> allowedStructures.contains(scope.structure().id()))
                 .noodleCaves(noodleCavesPolicy);
 
         Function<ID, Optional<ID>> cleanUpSupport = config.getBoolean(BooleanKeys.CLEAN_BLOCKS_ENABLED)
@@ -163,7 +172,7 @@ public final class PaperGenerationPlanFactory {
             return NoodleCavesPolicy.underground();
         }
         return NoodleCavesPolicy.surface(
-                ctx -> carved.contains(ctx.source().biome().id()) && !protectedSurface.contains(ctx.source().biome().id()),
+                snapshot -> carved.contains(snapshot.source().biome().id()) && !protectedSurface.contains(snapshot.source().biome().id()),
                 restoreLiquids);
     }
 

@@ -3,9 +3,14 @@ package com.kntrel.mc.underilla.core.generation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.kntrel.mc.underilla.core.api.BiomeData;
 import com.kntrel.mc.underilla.core.api.ChunkData;
+import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.scope.ChunkSnapshot;
+import com.kntrel.mc.underilla.core.api.scope.StructureScope;
+import com.kntrel.mc.underilla.core.api.scope.StructureSnapshot;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestChunkGrid;
@@ -17,6 +22,47 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class WorldGenerationPlanTest {
+
+    @Test
+    void structureSelectionUsesScopeAndDefaultsToAllow() {
+        StructureScope village = structure("minecraft:village_plains", 2, -3);
+        StructureScope fortress = structure("minecraft:fortress", 2, -3);
+        assertTrue(WorldGenerationPlan.build().done().allowsStructure(village));
+        WorldGenerationPlan plan = WorldGenerationPlan.build()
+                .structureFilter(scope -> scope.structure().id().equals(village.structure().id()))
+                .done();
+        assertTrue(plan.allowsStructure(village));
+        assertFalse(plan.allowsStructure(fortress));
+    }
+
+    @Test
+    void disabledStructuresRejectWithoutEvaluatingFilter() {
+        WorldGenerationPlan plan = WorldGenerationPlan.build().structures(false)
+                .structureFilter(_ -> { throw new AssertionError("Disabled structure filter ran"); }).done();
+        assertFalse(plan.allowsStructure(structure("minecraft:fortress", 2, -3)));
+    }
+
+    @Test
+    void structuresOutsideCoverageRemainUnrestricted() {
+        WorldGenerationPlan plan = WorldGenerationPlan.build()
+                .coverage((x, z) -> x == 2 && z == -3).structures(false)
+                .structureFilter(_ -> { throw new AssertionError("Fallback structure filter ran"); }).done();
+        assertTrue(plan.allowsStructure(structure("minecraft:fortress", 3, -3)));
+        assertFalse(plan.allowsStructure(structure("minecraft:fortress", 2, -3)));
+    }
+
+    @Test
+    void structureFilterAndOriginChunkAreRequired() {
+        assertThrows(NullPointerException.class,
+                () -> WorldGenerationPlan.build().structureFilter(null));
+        assertThrows(NullPointerException.class,
+                () -> WorldGenerationPlan.build().done().allowsStructure(
+                        StructureScope.of(null, null, StructureSnapshot.of(ID.of("minecraft:fortress")))));
+    }
+
+    private static StructureScope structure(String id, int chunkX, int chunkZ) {
+        return StructureScope.of(null, new ChunkSnapshot(chunkX, chunkZ), null, StructureSnapshot.of(ID.of(id)));
+    }
 
     @Test
     void builderComposesPatchersAtEachPhaseInDeclaredOrder() {

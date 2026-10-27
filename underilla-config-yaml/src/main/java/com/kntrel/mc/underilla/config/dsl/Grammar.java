@@ -17,13 +17,13 @@ public final class Grammar<C> {
     private final List<TypeLiteral<?>> literals;
     private final List<Operation<?, ?, ?>> operations;
     private final List<Transformation<?, ?>> transformations;
-    private final List<RuntimeValue<C, ?>> runtimeValues;
+    private final List<RuntimeValue<C>> runtimeValues;
 
     /** Copies the collections in iteration order and rejects null collections or definitions. */
     public Grammar(
             Collection<? extends TypeLiteral<?>> literals,
             Collection<? extends Operation<?, ?, ?>> operations,
-            Collection<? extends RuntimeValue<C, ?>> runtimeValues
+            Collection<? extends RuntimeValue<C>> runtimeValues
     ) {
         this(literals, operations, List.of(), runtimeValues);
     }
@@ -33,8 +33,9 @@ public final class Grammar<C> {
             Collection<? extends TypeLiteral<?>> literals,
             Collection<? extends Operation<?, ?, ?>> operations,
             Collection<? extends Transformation<?, ?>> transformations,
-            Collection<? extends RuntimeValue<C, ?>> runtimeValues
+            Collection<? extends RuntimeValue<C>> runtimeValues
     ) {
+
         this.literals = List.copyOf(literals);
         this.operations = List.copyOf(operations);
         this.transformations = List.copyOf(transformations);
@@ -57,7 +58,7 @@ public final class Grammar<C> {
         return operations;
     }
 
-    public List<RuntimeValue<C, ?>> runtimeValues() {
+    public List<RuntimeValue<C>> runtimeValues() {
         return runtimeValues;
     }
 
@@ -80,7 +81,7 @@ public final class Grammar<C> {
      * The supplied runtime values replace this grammar's runtime values and are copied in
      * iteration order. This grammar is unchanged.
      */
-    public <D> Grammar<D> withRuntimeValues(Collection<? extends RuntimeValue<D, ?>> runtimeValues) {
+    public <D> Grammar<D> withRuntimeValues(Collection<? extends RuntimeValue<D>> runtimeValues) {
         return new Grammar<>(literals, operations, transformations, runtimeValues);
     }
 
@@ -95,7 +96,7 @@ public final class Grammar<C> {
         private final List<TypeLiteral<?>> literals = new ArrayList<>();
         private final List<Operation<?, ?, ?>> operations = new ArrayList<>();
         private final List<Transformation<?, ?>> transformations = new ArrayList<>();
-        private final List<RuntimeValue<C, ?>> runtimeValues = new ArrayList<>();
+        private final List<RuntimeValue<C>> runtimeValues = new ArrayList<>();
         private boolean standardAdded;
 
         private Builder() {}
@@ -150,7 +151,7 @@ public final class Grammar<C> {
             return transformation(Transformation.of(inputType, type, pattern, compute));
         }
 
-        public Builder<C> runtime(RuntimeValue<C, ?> runtimeValue) {
+        public Builder<C> runtime(RuntimeValue<C> runtimeValue) {
             runtimeValues.add(Objects.requireNonNull(runtimeValue, "runtimeValue"));
             return this;
         }

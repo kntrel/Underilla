@@ -46,6 +46,8 @@ public final class ReferenceWorldMetadata {
         ID dimension = ID.of(dimensionName);
 
         CompoundTag generation = data.getCompoundTag("WorldGenSettings");
+        long seed = generation != null && generation.get("seed") != null
+                ? generation.getLong("seed") : data.get("RandomSeed") == null ? 0L : data.getLong("RandomSeed");
         CompoundTag inlineType = null;
         ID dimensionType = dimension;
         if (generation != null) {
@@ -73,7 +75,7 @@ public final class ReferenceWorldMetadata {
         if (config.isSet(section + ".maxHeight")) { maximumY = config.getInt(section + ".maxHeight"); }
         if (minimumY == null) { throw missing(section, "minHeight"); }
         if (maximumY == null) { throw missing(section, "maxHeight"); }
-        return World.of(name, dimension, minimumY, maximumY);
+        return World.of(name, dimension, minimumY, maximumY, seed);
     }
 
     private static IllegalArgumentException missing(String section, String field) {

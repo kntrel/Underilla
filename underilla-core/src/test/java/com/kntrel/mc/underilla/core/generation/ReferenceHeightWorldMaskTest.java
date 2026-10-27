@@ -3,13 +3,13 @@ package com.kntrel.mc.underilla.core.generation;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.Block;
 import com.kntrel.mc.underilla.core.api.World;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.scope.WorldSnapshot;
 import com.kntrel.mc.underilla.core.cache.ChunkCache;
 import com.kntrel.mc.underilla.core.impl.TestBlock;
 import com.kntrel.mc.underilla.core.impl.TestBiome;
@@ -25,6 +25,27 @@ import com.kntrel.mc.underilla.core.reference.mask.WorldMask;
 import org.junit.jupiter.api.Test;
 
 class ReferenceHeightWorldMaskTest {
+
+    @Test
+    void worldsWithDifferentSeedsInvalidateCachedBoundaryDecisions() {
+        Block air = TestBlock.air("minecraft:air");
+        Biome biome = new TestBiome("minecraft:plains");
+        TestWorld source = new TestWorld().addChunk(new TestChunkGrid(0, 0, 0, 9, air, biome)
+                .fillLayer(5, TestBlock.solid("minecraft:stone")));
+        AtomicInteger evaluations = new AtomicInteger();
+        WorldMask mask = new ReferenceHeightWorldMask(source, air, 0, 8, 8, 0, 0, 0,
+                scope -> {
+                    evaluations.incrementAndGet();
+                    return scope.target().world().seed() == 2L;
+                }, _ -> false, new ChunkCache(1));
+        World first = World.of("generated", ID.of("minecraft:overworld"), 0, 16, 1L);
+        World second = World.of("generated", ID.of("minecraft:overworld"), 0, 16, 2L);
+
+        assertFalse(mask.contains(first, 0, 1, 0));
+        assertTrue(mask.contains(second, 0, 1, 0));
+        assertFalse(mask.contains(first, 0, 1, 0));
+        assertEquals(3, evaluations.get());
+    }
 
     @Test
     void scansEachNegativeColumnOnlyOnceAcrossAllYValues() {
@@ -57,9 +78,9 @@ class ReferenceHeightWorldMaskTest {
         TestChunkGrid source = new TestChunkGrid(0, 0, 0, 9, air, biome).fillLayer(5, stone);
         TestWorld reader = new TestWorld().addChunk(source).withWorld(sourceWorld);
         WorldMask mask = new ReferenceHeightWorldMask(reader, air, 0, 8, 8, 0, 0, 0,
-                ctx -> {
-                    assertSame(reader, ctx.source().world());
-                    return ctx.target().world().dimension().equals(ID.of("minecraft:the_nether"));
+                snapshot -> {
+                    assertEquals(WorldSnapshot.of(reader), snapshot.source().world());
+                    return snapshot.target().world().dimension().equals(ID.of("minecraft:the_nether"));
                 }, _ -> false, new ChunkCache(1));
         WorldMask composed = new com.kntrel.mc.underilla.core.reference.mask.UnionWorldMask(
                 mask.inverted(), (_, _, _) -> false);
@@ -80,17 +101,22 @@ class ReferenceHeightWorldMaskTest {
         source.fillLayer(5, ignored);
         TestWorld world = new TestWorld().addChunk(source);
         WorldMask mask = new ReferenceHeightWorldMask(world, air, 0, 8, 8, 0, 0, 0,
-                ctx -> {
-                    assertSame(biome, ctx.source().biome());
-                    assertNull(ctx.target().biome());
+                snapshot -> {
+                    assertEquals(biome.id(), snapshot.source().biome().id());
+                    assertNull(snapshot.target().biome());
                     return false;
                 },
-                ctx -> {
-                    assertSame(biome, ctx.source().biome());
-                    assertEquals(-1, ctx.chunk().x());
-                    assertEquals(-2, ctx.chunk().z());
-                    assertNull(ctx.target().block());
-                    return ctx.source().block().id().equals(ignored.id());
+                snapshot -> {
+                    assertEquals(WorldSnapshot.of(world), snapshot.world());
+                    assertEquals(biome.id(), snapshot.biome().id());
+                    assertEquals(-1, snapshot.chunk().x());
+                    assertEquals(-2, snapshot.chunk().z());
+                    assertEquals(-1, snapshot.block().x());
+                    assertEquals(-17, snapshot.block().z());
+                    assertEquals(-1, snapshot.biome().cellX());
+                    assertEquals(Math.floorDiv(snapshot.block().y(), 4), snapshot.biome().cellY());
+                    assertEquals(-5, snapshot.biome().cellZ());
+                    return snapshot.block().id().equals(ignored.id());
                 }, new ChunkCache(1));
 
         assertFalse(mask.contains(-1, 3, -17));
@@ -122,6 +148,7 @@ class ReferenceHeightWorldMaskTest {
     private static final class CountingWorld implements WorldReader {
         @Override public String name() { return "test-world"; }
         @Override public com.kntrel.mc.underilla.core.api.ID dimension() { return com.kntrel.mc.underilla.core.api.ID.of("minecraft:overworld"); }
+        @Override public long seed() { return 0L; }
         @Override public int minHeight() { return -64; }
         @Override public int maxHeight() { return 320; }
 

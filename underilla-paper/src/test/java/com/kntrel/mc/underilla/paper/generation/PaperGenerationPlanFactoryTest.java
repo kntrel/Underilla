@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.kntrel.mc.underilla.core.api.Biome;
 import com.kntrel.mc.underilla.core.api.ID;
-import com.kntrel.mc.underilla.core.api.context.BiomeContext;
-import com.kntrel.mc.underilla.core.api.context.ChunkView;
+import com.kntrel.mc.underilla.core.api.scope.DualBiomeScope;
+import com.kntrel.mc.underilla.core.api.scope.ChunkSnapshot;
 import com.kntrel.mc.underilla.core.generation.NoodleCavesPolicy;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -49,8 +49,8 @@ class PaperGenerationPlanFactoryTest {
                         Set.of(),
                         true));
 
-        assertTrue(policy.predicate().test(context(PLAINS_BIOME)));
-        assertFalse(policy.predicate().test(context(DESERT_BIOME)));
+        assertTrue(policy.predicate().test(snapshot(PLAINS_BIOME)));
+        assertFalse(policy.predicate().test(snapshot(DESERT_BIOME)));
         assertTrue(policy.restoreLiquids());
     }
 
@@ -83,8 +83,8 @@ class PaperGenerationPlanFactoryTest {
                         Set.of(),
                         false));
 
-        assertTrue(policy.predicate().test(context(PLAINS_BIOME)));
-        assertTrue(policy.predicate().test(context(DESERT_BIOME)));
+        assertTrue(policy.predicate().test(snapshot(PLAINS_BIOME)));
+        assertTrue(policy.predicate().test(snapshot(DESERT_BIOME)));
     }
 
     @Test
@@ -101,12 +101,12 @@ class PaperGenerationPlanFactoryTest {
                         Set.of(),
                         false));
 
-        assertTrue(policy.predicate().test(context(PLAINS_BIOME)));
-        assertFalse(policy.predicate().test(context(DESERT_BIOME)));
+        assertTrue(policy.predicate().test(snapshot(PLAINS_BIOME)));
+        assertFalse(policy.predicate().test(snapshot(DESERT_BIOME)));
     }
 
-    private static BiomeContext context(Biome biome) {
-        return BiomeContext.of(ChunkView.of(0, 0), biome, null);
+    private static DualBiomeScope snapshot(Biome biome) {
+        return DualBiomeScope.of(ChunkSnapshot.of(0, 0), biome, null);
     }
 
 }
