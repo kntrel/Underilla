@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.config.provided;
+package com.kntrel.mc.underilla.config.ucel;
 
 import com.kntrel.mc.underilla.config.dsl.Operation;
 import com.kntrel.mc.underilla.config.dsl.Pattern;
@@ -7,20 +7,23 @@ import com.kntrel.mc.underilla.config.util.TypeToken;
 import com.kntrel.mc.underilla.core.api.ID;
 import java.util.Collection;
 
-/** Tests whether every requested tag belongs to the taggable value. */
-public final class TaggedAllOperation implements Operation<Taggable, Collection<ID>, Boolean> {
+/** Tests whether at least one requested tag belongs to the taggable value. */
+public final class TaggedAnyOperation implements Operation<Taggable, Collection<ID>, Boolean> {
     private static final TypeToken<Collection<ID>> TAGS = new TypeToken<>() {};
-    private static final Pattern ALL = TaggedOperation.qualifiedPattern("all");
-    private static final Pattern TAGGED = Pattern.keyword("tagged");
-    private static final Pattern PATTERN = source -> {
-        int qualified = ALL.match(source);
-        return qualified > 0 ? qualified : TAGGED.match(source);
-    };
+    private static final Pattern PATTERN = TaggedOperation.qualifiedPattern("any");
 
     @Override public TypeToken<Taggable> aType() { return TypeToken.of(Taggable.class); }
     @Override public TypeToken<Collection<ID>> bType() { return TAGS; }
     @Override public TypeToken<Boolean> type() { return TypeToken.of(Boolean.class); }
     @Override public Pattern pattern() { return PATTERN; }
     @Override public int precedence() { return 40; }
-    @Override public Boolean apply(Taggable lhs, Collection<ID> rhs) { return lhs.tags().containsAll(rhs); }
+
+    @Override
+    public Boolean apply(Taggable lhs, Collection<ID> rhs) {
+        var tags = lhs.tags();
+        for (ID requested : rhs) {
+            if (tags.contains(requested)) return true;
+        }
+        return false;
+    }
 }

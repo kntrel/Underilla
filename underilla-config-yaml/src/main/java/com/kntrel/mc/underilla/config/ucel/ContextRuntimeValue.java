@@ -1,4 +1,4 @@
-package com.kntrel.mc.underilla.config.provided;
+package com.kntrel.mc.underilla.config.ucel;
 
 import com.kntrel.mc.underilla.config.dsl.Pattern;
 import com.kntrel.mc.underilla.config.dsl.RuntimeValue;
