@@ -7,7 +7,7 @@ import com.kntrel.mc.underilla.config.util.TypeToken;
 import com.kntrel.mc.underilla.core.api.ID;
 
 /** Tests whether a taggable value contains one tag ID. */
-public final class TaggedOperation implements Operation<Taggable, ID, Boolean> {
+final class TaggedOperation implements Operation<Taggable, ID, Boolean> {
     private static final Pattern PATTERN = Pattern.keyword("tagged");
 
     @Override public TypeToken<Taggable> aType() { return TypeToken.of(Taggable.class); }

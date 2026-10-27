@@ -8,7 +8,7 @@ import com.kntrel.mc.underilla.core.api.ID;
 import java.util.Collection;
 
 /** Tests whether every requested tag belongs to the taggable value. */
-public final class TaggedAllOperation implements Operation<Taggable, Collection<ID>, Boolean> {
+final class TaggedAllOperation implements Operation<Taggable, Collection<ID>, Boolean> {
     private static final TypeToken<Collection<ID>> TAGS = new TypeToken<>() {};
     private static final Pattern ALL = TaggedOperation.qualifiedPattern("all");
     private static final Pattern TAGGED = Pattern.keyword("tagged");

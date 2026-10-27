@@ -8,8 +8,9 @@
 # source.block, source.biome, and source.world in those contexts.
 # structure and entity refer to the candidate being evaluated.
 # chunk refers to the evaluated chunk. Each selector lists its available roots.
-# @namespace:name is a resource ID; tagged checks a tag; matches checks a full-ID
+# @namespace:name is a resource ID; tagged checks a tag; match checks a full-ID
 # regular expression. Tags must be supplied by Minecraft or an installed data pack.
+# Resource IDs may omit the namespace: @doors means @minecraft:doors.
 # Replacement rules run in order; the first matching if selects the literal ID in with.
 
 # Worlds -----------------------------------------------------------------------
@@ -114,15 +115,18 @@ merge:
     # Matching blocks are passed through, so trees and ice need not count as terrain.
     # Scope: block, biome, world, and chunk, supplied from the source during this scan.
     passthrough-block-if:
-      - block tagged @minecraft:logs
-      - block tagged @minecraft:leaves
-      - block tagged @minecraft:planks
-      - block tagged @minecraft:fences
-      - block tagged @minecraft:fence_gates
-      - block tagged @minecraft:walls
-      - block tagged @minecraft:doors
-      - block tagged @minecraft:trapdoors
-      - block tagged @minecraft:ice
+      - >-
+        block tagged any [
+          @minecraft:logs,
+          @minecraft:leaves,
+          @minecraft:planks,
+          @minecraft:fences,
+          @minecraft:fence_gates,
+          @minecraft:walls,
+          @minecraft:doors,
+          @minecraft:trapdoors,
+          @minecraft:ice
+        ]
       - block match 'minecraft:(.*)_wood'
       - block match 'minecraft:(.*)_stem'
       - block match 'minecraft:(.*)_hyphae'
@@ -211,7 +215,7 @@ cleanup:
     # Applied after support-block corrections. Use minecraft:air to remove blocks.
     # Scope for each if: block, biome, world, and chunk, supplied from the target.
     # Example:
-    #   - if: block.id matches 'minecraft:.*_leaves'
+    #   - if: block.id match 'minecraft:.*_leaves'
     #     with: minecraft:air
     replace-blocks: []
 
@@ -235,7 +239,7 @@ cleanup:
     # Remove matching entities currently in the target chunk.
     # Scope: entity, world, and chunk, supplied from the target.
     # Source values, biomes, and block data are unavailable.
-    # Example: entity.id matches 'minecraft:.*_minecart'
+    # Example: entity.id match 'minecraft:.*_minecart'
     remove-if: entity.id = @minecraft:item # Dropped items.
 
 # Performance ------------------------------------------------------------------

@@ -7,17 +7,17 @@ import com.kntrel.mc.underilla.config.util.TypeToken;
 import com.kntrel.mc.underilla.core.api.ID;
 
 /** Compares an identifiable value's ID with another ID. */
-public final class IdentityEqualityOperation implements Operation<Identifiable, ID, Boolean> {
+final class IdentityEqualityOperation implements Operation<Identifiable, ID, Boolean> {
     private final boolean negated;
     private final Pattern pattern;
 
     /** Creates the {@code =} operation. */
-    public IdentityEqualityOperation() {
+    IdentityEqualityOperation() {
         this(false);
     }
 
     /** Creates {@code !=} when negated, or {@code =} otherwise. */
-    public IdentityEqualityOperation(boolean negated) {
+    IdentityEqualityOperation(boolean negated) {
         this.negated = negated;
         this.pattern = Pattern.literal(negated ? "!=" : "=");
     }

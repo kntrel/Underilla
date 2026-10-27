@@ -6,7 +6,7 @@ import com.kntrel.mc.underilla.config.entity.Identifiable;
 import com.kntrel.mc.underilla.config.util.TypeToken;
 
 /** Matches an identifiable value's entire ID string against the regular expression on the right. */
-public final class IdentifiableMatchOperation implements Operation<Identifiable, String, Boolean> {
+final class IdentifiableMatchOperation implements Operation<Identifiable, String, Boolean> {
     private static final Pattern PATTERN = Pattern.keyword("match");
 
     @Override public TypeToken<Identifiable> aType() { return TypeToken.of(Identifiable.class); }

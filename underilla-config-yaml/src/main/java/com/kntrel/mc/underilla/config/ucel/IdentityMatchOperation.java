@@ -6,7 +6,7 @@ import com.kntrel.mc.underilla.config.util.TypeToken;
 import com.kntrel.mc.underilla.core.api.ID;
 
 /** Matches an entire ID string against the regular expression on the right. */
-public final class IdentityMatchOperation implements Operation<ID, String, Boolean> {
+final class IdentityMatchOperation implements Operation<ID, String, Boolean> {
     private static final Pattern PATTERN = Pattern.keyword("match");
 
     @Override public TypeToken<ID> aType() { return TypeToken.of(ID.class); }

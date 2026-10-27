@@ -23,6 +23,15 @@ class IdLiteralTest {
     }
 
     @Test
+    void defaultsUnqualifiedIdsToMinecraft() throws Exception {
+        for (String value : new String[] {"doors", "fences", "stone", "path/to.some_value-3"}) {
+            assertEquals(ID.of("minecraft", value), compiler.compile("@" + value, ID.class).apply(null));
+        }
+        assertTrue(compiler.compile("@doors = @minecraft:doors", Boolean.class).apply(null));
+        assertTrue(compiler.compile("@fences in [@doors, @minecraft:fences]", Boolean.class).apply(null));
+    }
+
+    @Test
     void cooperatesWithOperatorsAndCollections() throws Exception {
         assertTrue(compiler.compile("@minecraft:stone=@minecraft:stone", Boolean.class).apply(null));
         assertTrue(compiler.compile("@minecraft:stone in [@minecraft:dirt, @minecraft:stone]", Boolean.class).apply(null));
@@ -31,7 +40,7 @@ class IdLiteralTest {
 
     @Test
     void rejectsMalformedIds() {
-        for (String source : new String[] {"minecraft:stone", "@stone", "@:stone", "@minecraft:",
+        for (String source : new String[] {"minecraft:stone", "@", "@:stone", "@minecraft:",
                 "@Minecraft:stone", "@minecraft:Stone", "@minecraft:stone!", "@minecraft:stone:extra"}) {
             assertThrows(DslCompilationException.class, () -> compiler.compile(source, ID.class), source);
         }

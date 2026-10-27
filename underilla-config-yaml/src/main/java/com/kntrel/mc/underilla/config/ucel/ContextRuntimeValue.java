@@ -17,11 +17,11 @@ import java.util.Objects;
  * Binding resolves declared property types and composes getters; evaluation alone reads the context.
  * The DSL treats the matched chain as a single runtime value and has no knowledge of its syntax.
  */
-public final class ContextRuntimeValue<C> implements RuntimeValue<C> {
+final class ContextRuntimeValue<C> implements RuntimeValue<C> {
     private final PropertyRepository registry;
     private final Map<String, Property<C, ?>> roots;
 
-    public ContextRuntimeValue(Class<C> contextType, PropertyRepository registry) {
+    ContextRuntimeValue(Class<C> contextType, PropertyRepository registry) {
         Objects.requireNonNull(contextType, "contextType");
         this.registry = Objects.requireNonNull(registry, "registry");
         var roots = new LinkedHashMap<String, Property<C, ?>>();

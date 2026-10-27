@@ -5,7 +5,7 @@ import com.kntrel.mc.underilla.config.dsl.Pattern;
 import com.kntrel.mc.underilla.config.util.TypeToken;
 
 /** Matches an entire string against the regular expression on the right. */
-public final class MatchOperation implements Operation<String, String, Boolean> {
+final class MatchOperation implements Operation<String, String, Boolean> {
     private static final Pattern PATTERN = Pattern.keyword("match");
 
     @Override public TypeToken<String> aType() { return TypeToken.of(String.class); }
