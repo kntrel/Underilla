@@ -30,6 +30,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
@@ -38,7 +40,8 @@ import org.yaml.snakeyaml.reader.UnicodeReader;
 
 /**
  * Loads one YAML document into the immutable model. Missing settings inherit bundled YAML defaults;
- * explicit nulls, unknown keys, duplicate keys, and invalid values are rejected.
+ * explicit nulls, unknown keys, duplicate keys, and invalid values are rejected. User selector
+ * compilation failures are logged and the affected setting uses its bundled default.
  * Nullable source paths/metadata may explicitly be null. Every selector is compiled before returning.
  * Instances and compiler registrations are immutable; each load creates its own parser.
  * Attached compilers own grammar/root availability and their evaluation thread safety.
@@ -48,10 +51,16 @@ public final class YamlConfigLoader {
             "entities-path", "name", "min-height", "max-height");
 
     private final Map<Type, Compiler<?>> compilers;
+    private final Logger logger;
 
-    public YamlConfigLoader() { this(Map.of()); }
+    public YamlConfigLoader() { this(LoggerFactory.getLogger(YamlConfigLoader.class)); }
 
-    private YamlConfigLoader(Map<Type, Compiler<?>> compilers) { this.compilers = Map.copyOf(compilers); }
+    public YamlConfigLoader(Logger logger) { this(Map.of(), logger); }
+
+    private YamlConfigLoader(Map<Type, Compiler<?>> compilers, Logger logger) {
+        this.compilers = Map.copyOf(compilers);
+        this.logger = Objects.requireNonNull(logger, "logger");
+    }
 
     /** Returns a new loader using this compiler for selectors with the given context type. */
     public <C> YamlConfigLoader withCompiler(Class<C> context, Compiler<C> compiler) {
@@ -61,7 +70,7 @@ public final class YamlConfigLoader {
     public <C> YamlConfigLoader withCompiler(TypeToken<C> context, Compiler<C> compiler) {
         var copy = new HashMap<>(compilers);
         copy.put(Objects.requireNonNull(context, "context").type(), Objects.requireNonNull(compiler, "compiler"));
-        return new YamlConfigLoader(copy);
+        return new YamlConfigLoader(copy, logger);
     }
 
     /** Compiles the complete bundled config.yml with this loader's registered compilers. */
@@ -179,7 +188,20 @@ public final class YamlConfigLoader {
             String key = keys.get(i);
             Object defaultValue = defaults.get(key);
             if (values.containsKey(key)) {
-                arguments[i] = convert(values.get(key), component.getGenericType(), defaultValue, child(path, key), variables);
+                String settingPath = child(path, key);
+                try {
+                    arguments[i] = convert(values.get(key), component.getGenericType(), defaultValue, settingPath, variables);
+                } catch (ConfigMappingException exception) {
+                    if (!(exception.getCause() instanceof DslCompilationException compilation)
+                            || !defaults.containsKey(key)) throw exception;
+                    logger.error("Invalid selector at {}:\n{}", exception.path(), compilation.getMessage());
+                    logger.warn("Falling back to the bundled default for '{}'.", settingPath);
+                    try {
+                        arguments[i] = convert(defaultValue, component.getGenericType(), null, settingPath, variables);
+                    } catch (ConfigMappingException defaultFailure) {
+                        throw new IllegalStateException("Cannot load bundled default for '" + settingPath + "'.", defaultFailure);
+                    }
+                }
             } else if (defaults.containsKey(key)) {
                 arguments[i] = convert(defaultValue, component.getGenericType(), null, child(path, key), variables);
             } else {

@@ -30,6 +30,9 @@ import com.kntrel.mc.underilla.core.api.ID;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringReader;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,6 +44,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.Logger;
+import org.slf4j.helpers.MessageFormatter;
 
 class YamlConfigLoaderTest {
     private final YamlConfigLoader loader = configuredLoader();
@@ -52,7 +57,11 @@ class YamlConfigLoaderTest {
     }
 
     private static YamlConfigLoader configuredLoader() {
-        return new YamlConfigLoader()
+        return configuredLoader(new YamlConfigLoader());
+    }
+
+    private static YamlConfigLoader configuredLoader(YamlConfigLoader loader) {
+        return loader
                 .withCompiler(BlockContext.class, stubCompiler(expression -> !expression.equals("false")))
                 .withCompiler(DualBlockContext.class, stubCompiler(expression -> !expression.equals("false")))
                 .withCompiler(DualBiomeContext.class, stubCompiler(expression -> !expression.equals("false")))
@@ -136,16 +145,70 @@ class YamlConfigLoaderTest {
     }
 
     @Test
-    void compilerFailuresKeepTheSelectorPathAndCauseEvenAfterAnAlwaysTrueEntry() {
+    void compilerFailuresLogTheDetailedErrorAndUseDefaultsEvenAfterAnAlwaysTrueEntry() {
+        var messages = new ArrayList<String>();
         var failure = new IllegalArgumentException("Unsupported test expression");
-        var configured = loader.withCompiler(StructureContext.class, stubCompiler(expression -> {
+        var configured = configuredLoader(new YamlConfigLoader(recordingLogger(messages)))
+                .withCompiler(StructureContext.class, stubCompiler(expression -> {
             if (expression.equals("invalid")) throw failure;
             return true;
         }));
-        var exception = assertThrows(ConfigMappingException.class,
-                () -> configured.load("generation: {structures: {allow-if: [true, invalid]}}"));
-        assertEquals("generation.structures.allow-if[1]", exception.path());
-        assertEquals(failure, exception.getCause().getCause());
+        var config = configured.load("generation: {structures: {enabled: false, allow-if: [true, invalid]}}");
+        assertTrue(config.generation().structures().allowIf().test(null));
+        assertFalse(config.generation().structures().enabled());
+        assertEquals(2, messages.size());
+        assertTrue(messages.get(0).startsWith("error: Invalid selector at generation.structures.allow-if[1]:"));
+        assertTrue(messages.get(0).contains("Unsupported test expression"));
+        assertTrue(messages.get(0).contains("\ninvalid\n^~~~~~~"));
+        assertEquals("warn: Falling back to the bundled default for 'generation.structures.allow-if'.", messages.get(1));
+    }
+
+    @Test
+    void independentInvalidSelectorsEachFallBackWithoutLosingOtherSettings() {
+        var messages = new ArrayList<String>();
+        var configured = configuredLoader(new YamlConfigLoader(recordingLogger(messages)))
+                .withCompiler(StructureContext.class, Compiler.of(Grammar.with(StructureContext.class).standard().done()))
+                .withCompiler(BiomeContext.class, Compiler.of(Grammar.with(BiomeContext.class).standard().done()));
+        var config = configured.load("""
+                generation:
+                  population: {enabled: false}
+                  structures: {allow-if: unknown}
+                  carvers: {preserve-liquids: false, allow-if: '1 + true'}
+                """);
+        assertFalse(config.generation().population().enabled());
+        assertFalse(config.generation().carvers().preserveLiquids());
+        assertTrue(config.generation().structures().allowIf().test(null));
+        assertTrue(config.generation().carvers().allowIf().test(null));
+        assertEquals(4, messages.size());
+        assertTrue(messages.get(0).contains("Unrecognized operand at 0: unknown"));
+        assertTrue(messages.get(2).contains("Incompatible types"));
+    }
+
+    @Test
+    void failureToCompileTheBundledDefaultIsNotRetriedAsAnotherFallback() {
+        var messages = new ArrayList<String>();
+        var configured = configuredLoader(new YamlConfigLoader(recordingLogger(messages)))
+                .withCompiler(StructureContext.class, stubCompiler(expression -> {
+                    throw new IllegalArgumentException("broken compiler");
+                }));
+        var failure = assertThrows(IllegalStateException.class,
+                () -> configured.load("generation: {structures: {allow-if: invalid}}"));
+        assertEquals("Cannot load bundled default for 'generation.structures.allow-if'.", failure.getMessage());
+        assertTrue(failure.getCause() instanceof ConfigMappingException);
+        assertEquals(2, messages.size());
+    }
+
+    private static Logger recordingLogger(List<String> messages) {
+        return (Logger) Proxy.newProxyInstance(Logger.class.getClassLoader(), new Class<?>[] {Logger.class},
+                (proxy, method, arguments) -> {
+                    if (method.getName().equals("error") || method.getName().equals("warn")) {
+                        Object[] values = Arrays.copyOfRange(arguments, 1, arguments.length);
+                        messages.add(method.getName() + ": " + MessageFormatter.arrayFormat((String) arguments[0], values).getMessage());
+                    }
+                    if (method.getReturnType() == boolean.class) return true;
+                    if (method.getName().equals("getName")) return "test";
+                    return null;
+                });
     }
     @Test
     void bundledYamlMapsToAnExecutableModel() throws IOException {
