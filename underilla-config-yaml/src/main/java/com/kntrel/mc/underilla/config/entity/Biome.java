@@ -2,40 +2,18 @@ package com.kntrel.mc.underilla.config.entity;
 
 import com.kntrel.mc.underilla.config.property.Prop;
 import com.kntrel.mc.underilla.core.api.ID;
+import com.kntrel.mc.underilla.core.api.scope.BiomeSnapshot;
 import java.util.Set;
 
-/**
- * Read-only biome sample selected by the operation's evaluation contract.
- * Cell coordinates identify the sampled biome cell, rather than global block coordinates.
- */
-public non-sealed interface Biome extends Entity {
+/** Read-only biome sample, with biome-cell coordinates and externally supplied registry tags. */
+public non-sealed interface Biome extends ConfigEntity, Identifiable, Taggable {
+    static Biome of(BiomeSnapshot snapshot, Set<ID> tags) { return new Impl.BiomeValue(snapshot, tags); }
 
-    @Prop
-    Chunk chunk();
-
-    @Prop
-    default World world() { return chunk().world(); }
-
-    @Prop
-    ID identifier();
-
-    @Prop
-    default String namespace() { return identifier().namespace(); }
-
-    @Prop
-    default String name() { return identifier().value(); }
-
-
-    /** Unmodifiable set of registry tag identifiers, without a leading {@code #}. */
-    @Prop
-    Set<ID> tags();
-
-    @Prop
-    int cellX();
-
-    @Prop
-    int cellY();
-
-    @Prop
-    int cellZ();
+    @Prop ID id();
+    @Prop default String namespace() { return id().namespace(); }
+    @Prop default String name() { return id().value(); }
+    @Prop Set<ID> tags();
+    @Prop int cellX();
+    @Prop int cellY();
+    @Prop int cellZ();
 }
